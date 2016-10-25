@@ -15,6 +15,7 @@ import java.util.List;
  * @author kate
  */
 public class Number extends AbstractFunction {
+
 	public static class Instance extends GenericObject {
 		public final double number;
 		private final Number Number;
@@ -64,44 +65,19 @@ public class Number extends AbstractFunction {
 		public Instance clone() {
 			return new Instance(Number, number);
 		}
-		@Override
-		public java.lang.String toString() {
-			java.lang.String dlbString = Double.toString(number);
-			int ePos = dlbString.indexOf('E');
-			if(ePos > -1) {
-				java.lang.String second = dlbString.substring(ePos+1);
-				java.lang.String first = dlbString.substring(0, ePos);
-				if(first.endsWith(".0"))
-					first = first.substring(0, first.length()-2);
-				
-				int period = first.indexOf('.');
-				if(period > -1) {
-					int exp = Integer.valueOf(second);
-					if(exp < first.length() - period) {
-						int expperiod = exp+period+1;
-						
-						if(expperiod >= first.length())
-							return first.substring(0, period) + first.substring(period + 1, expperiod);
-						return first.substring(0, period) + first.substring(period + 1, expperiod) + '.' + first.substring(expperiod);
-					}
-				}
-				
-				StringBuilder builder = new StringBuilder(first);
-				if(second.startsWith("-"))
-					builder.append('e');
-				else
-					builder.append("e+");
-				builder.append(second);
-				return builder.toString();
-			} else if(dlbString.endsWith(".0"))
-				return dlbString.substring(0, dlbString.length()-2);
-			return dlbString;
-		}
 	}
 	
 	private final List<WeakReference<Instance>> INSTANCES = new ArrayList();
-	public Number(Global global) {
-		super(global);
+	public Number() {}
+	
+	protected void initPrototypeFunctions(final Global global) {
+		GenericObject prototype = prototype();
+		prototype.setHidden("toString", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return global.wrap(Number.toString(((Instance)_this).number));
+			}
+		});
 	}
 
 	@Override
@@ -149,4 +125,36 @@ public class Number extends AbstractFunction {
 		}
 	}
 	
+	public static java.lang.String toString(double number) {
+		java.lang.String dlbString = Double.toString(number);
+		int ePos = dlbString.indexOf('E');
+		if(ePos > -1) {
+			java.lang.String second = dlbString.substring(ePos+1);
+			java.lang.String first = dlbString.substring(0, ePos);
+			if(first.endsWith(".0"))
+				first = first.substring(0, first.length()-2);
+
+			int period = first.indexOf('.');
+			if(period > -1) {
+				int exp = Integer.valueOf(second);
+				if(exp < first.length() - period) {
+					int expperiod = exp+period+1;
+
+					if(expperiod >= first.length())
+						return first.substring(0, period) + first.substring(period + 1, expperiod);
+					return first.substring(0, period) + first.substring(period + 1, expperiod) + '.' + first.substring(expperiod);
+				}
+			}
+
+			StringBuilder builder = new StringBuilder(first);
+			if(second.startsWith("-"))
+				builder.append('e');
+			else
+				builder.append("e+");
+			builder.append(second);
+			return builder.toString();
+		} else if(dlbString.endsWith(".0"))
+			return dlbString.substring(0, dlbString.length()-2);
+		return dlbString;
+	}
 }

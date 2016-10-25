@@ -7,12 +7,16 @@ package net.nexustools.njs;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  *
  * @author kate
  */
 public class Object extends AbstractFunction {
+	public static final Pattern BUILT_IN = Pattern.compile("^net\\.nexustools\\.njs\\.([a-zA-Z])$");
+	
 	public Object() {}
 
 	public void initPrototypeFunctions(final Global global) {
@@ -22,7 +26,7 @@ public class Object extends AbstractFunction {
 				return new GenericArray(global, params[0].keys().toArray());
 			}
 			@Override
-			protected java.lang.String toStringName() {
+			public java.lang.String name() {
 				return "Object_getOwnPropertyNames";
 			}
 		});
@@ -32,7 +36,7 @@ public class Object extends AbstractFunction {
 				return new GenericArray(global, params[0].ownPropertyNames().toArray());
 			}
 			@Override
-			protected java.lang.String toStringName() {
+			public java.lang.String name() {
 				return "Object_getOwnPropertyNames";
 			}
 		});
@@ -48,17 +52,18 @@ public class Object extends AbstractFunction {
 				
 				try {
 					BaseFunction constructor = _this.constructor();
-					if(constructor instanceof AbstractFunction) {
+					if(constructor instanceof BaseFunction) {
 						Class<?> clazz = constructor.getClass();
-						if(clazz.getName().startsWith("net.nexustools.njs"))
-							return global.wrap("[object " + ((AbstractFunction)constructor).toStringName() + "]");
+						Matcher matcher = BUILT_IN.matcher(clazz.getName());
+						if(matcher.matches())
+							return global.wrap("[object " + matcher.group(1) + "]");
 					}
 				} catch(Error.JavaException ex) {}
 				
-				return global.wrap(_this.toString());
+				return global.wrap("[object Object]");
 			}
 			@Override
-			protected java.lang.String toStringName() {
+			public java.lang.String name() {
 				return "Object_prototype_toString";
 			}
 		});
@@ -68,7 +73,7 @@ public class Object extends AbstractFunction {
 				return _this;
 			}
 			@Override
-			protected java.lang.String toStringName() {
+			public java.lang.String name() {
 				return "Object_prototype_valueOf";
 			}
 		});

@@ -18,14 +18,46 @@ public class String extends AbstractFunction {
 	public static class Instance extends GenericObject {
 		public final java.lang.String string;
 		public final String String;
-		public Instance(String String, java.lang.String string) {
+		Instance(Number Number, final String String, final java.lang.String string) {
+			this(Number.wrap(string.length()), String, string);
+		}
+		Instance(BaseObject length, final String String, final java.lang.String string) {
 			super(String.prototype(), String);
 			this.String = String;
 			this.string = string;
+			
+			setReadOnly("length", length);
+			setArrayOverride(new ArrayOverride() {
+				@Override
+				public BaseObject get(int i, Or<BaseObject> or) {
+					if(i < 0 || i >= string.length())
+						return Undefined.INSTANCE;
+					
+					return String.wrap(string.substring(i, i));
+				}
+
+				@Override
+				public boolean delete(int i, Or<java.lang.Boolean> or) {
+					return false;
+				}
+
+				@Override
+				public void set(int i, BaseObject val) {}
+
+				@Override
+				public boolean has(int i) {
+					return i >= 0 && i < string.length();
+				}
+
+				@Override
+				public int length() {
+					return string.length();
+				}
+			});
 		}
 		@Override
 		public Instance clone() {
-			return new Instance(String, string);
+			return new Instance(getDirectly("length"), String, string);
 		}
 		@Override
 		public java.lang.String toString() {
@@ -33,10 +65,12 @@ public class String extends AbstractFunction {
 		}
 	}
 	
+	private Number Number;
 	private final List<WeakReference<Instance>> WRAPS = new ArrayList();
 	public String() {}
 	
 	protected void initPrototypeFunctions(Global global) {
+		Number = global.Number;
 		GenericObject prototype = prototype();
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
@@ -52,7 +86,7 @@ public class String extends AbstractFunction {
 		if(val instanceof Instance)
 			return ((Instance)val).clone();
 		
-		return new Instance(this, val.toString());
+		return new Instance(Number, this, val.toString());
 	}
 	
 	@Override
@@ -61,6 +95,7 @@ public class String extends AbstractFunction {
 	}
 
 	public Instance wrap(java.lang.String string) {
+		assert(string != null);
 		synchronized(WRAPS) {
 			Iterator<WeakReference<Instance>> it = WRAPS.iterator();
 			while(it.hasNext()) {
@@ -72,9 +107,10 @@ public class String extends AbstractFunction {
 					return um;
 			}
 			
-			Instance um = new Instance(this, string);
-			um.seal();
+			assert(Number != null);
+			Instance um = new Instance(Number, this, string);
 			WRAPS.add(new WeakReference(um));
+			um.seal();
 			return um;
 		}
 	}

@@ -11,7 +11,7 @@ import java.util.Arrays;
  *
  * @author kate
  */
-public class Date extends AbstractFunction implements BaseFunction {
+public class Date extends AbstractFunction {
 	public static class Instance extends GenericObject {
 		public final java.util.Date date;
 		public Instance(Date Date, java.util.Date date) {
@@ -31,7 +31,7 @@ public class Date extends AbstractFunction implements BaseFunction {
 				throw new Error.JavaException("TypeError", "this is not a Date object.");
 			}
 			@Override
-			protected java.lang.String toStringName() {
+			public java.lang.String name() {
 				return "Date_prototype_valueOf";
 			}
 		});
@@ -43,7 +43,7 @@ public class Date extends AbstractFunction implements BaseFunction {
 				throw new Error.JavaException("TypeError", "this is not a Date object.");
 			}
 			@Override
-			protected java.lang.String toStringName() {
+			public java.lang.String name() {
 				return "Date_prototype_toString";
 			}
 		});

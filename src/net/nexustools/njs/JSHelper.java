@@ -17,12 +17,20 @@ import java.util.logging.Logger;
  * @author kate
  */
 public class JSHelper {
-	public static <O> O jsToJava(BaseObject jsObject, Class<O> desiredClass) {
+	public static <O> O jsToJava(final BaseObject jsObject, Class<O> desiredClass) {
 		if(jsObject instanceof Undefined || jsObject instanceof Null)
 			return null;
 		
 		if(desiredClass == String.class)
 			return (O)jsObject.toString();
+		
+		if(desiredClass == Runnable.class && jsObject instanceof BaseFunction)
+			return (O)new Runnable() {
+				@Override
+				public void run() {
+					((BaseFunction)jsObject).call(Undefined.INSTANCE);
+				}
+			};
 		
 		if(jsObject instanceof Number.Instance) {
 			if(jsObject instanceof Number.Instance)
@@ -116,7 +124,7 @@ public class JSHelper {
 						}
 					}
 					@Override
-					protected java.lang.String toStringName() {
+					public java.lang.String name() {
 						return "importClass";
 					}
 				});

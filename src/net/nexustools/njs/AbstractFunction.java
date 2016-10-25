@@ -26,7 +26,8 @@ public abstract class AbstractFunction extends GenericObject implements BaseFunc
 		GenericObject prototype = new GenericObject(Object);
 		prototype.setStorage("constructor", this, false);
 		setStorage("prototype", prototype, false);
-		setStorage("name", String.wrap(toStringName()), false);
+		if(name() != null)
+			setStorage("name", String.wrap(name()), false);
 	}
 	public AbstractFunction(String String, Object Object, Function Function, java.lang.String name) {
 		this(String, Object, Function, String.wrap(name));
@@ -52,7 +53,7 @@ public abstract class AbstractFunction extends GenericObject implements BaseFunc
 		try {
 			return initPrototype(Object);
 		} finally {
-			setStorage("name", String.wrap(toStringName()), false);
+			setStorage("name", String.wrap(name()), false);
 		}
 	}
 	
@@ -80,24 +81,22 @@ public abstract class AbstractFunction extends GenericObject implements BaseFunc
 		return (GenericObject)get("prototype", OR_REFERENCE_ERROR_BO);
 	}
 	
-	protected java.lang.String toStringArguments() {
+	@Override
+	public java.lang.String arguments() {
 		return "";
 	}
 	
-	protected java.lang.String toStringName() {
+	@Override
+	public java.lang.String name() {
 		java.lang.String className = getClass().getName().replaceAll("[^a-zA-Z0-9]", "_");
 		if(className.startsWith("net_nexustools_njs_"))
 			className = className.substring(19);
 		return className;
 	}
 	
-	public java.lang.String toStringSource() {
-		return "[java_code]";
-	}
-
 	@Override
-	public java.lang.String toString() {
-		return "function " + toStringName() + "(" + toStringArguments() + ") { " + toStringSource() + " }";
+	public java.lang.String source() {
+		return "[java_code]";
 	}
 	
 }

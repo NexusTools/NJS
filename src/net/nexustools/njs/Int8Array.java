@@ -35,8 +35,23 @@ public class Int8Array extends Uint8Array {
 		}
 	}
 
-	public Int8Array(Global global) {
+	public Int8Array(final Global global) {
 		super(global);
+		GenericObject prototype = prototype();
+		prototype.setHidden("toString", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				StringBuilder builder = new StringBuilder();
+				for(int i=0; i<global.toNumber(_this.get("length")).toInt(); i++) {
+					if(i > 0)
+						builder.append(',');
+					BaseObject value = _this.get(i, OR_NULL);
+					if(value != null)
+						builder.append(value);
+				}
+				return global.wrap(builder.toString());
+			}
+		});
 	}
 
 	@Override

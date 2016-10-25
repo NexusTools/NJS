@@ -19,13 +19,25 @@ public class Function extends AbstractFunction {
 
 	public void initPrototypeFunctions(final Global global) {
 		GenericObject prototype = prototype();
+		prototype.setHidden("toString", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				if(_this instanceof BaseFunction)
+					return global.wrap("function " + ((BaseFunction)_this).name() + "(" + ((BaseFunction)_this).arguments() + ") { " + ((BaseFunction)_this).source() + " }");
+				throw new Error.JavaException("TypeError", "this is not instance of Function");
+			}
+			@Override
+			public java.lang.String toString() {
+				return "Function_prototype_toString";
+			}
+		});
 		prototype.setStorage("apply", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				throw new RuntimeException();
 			}
 			@Override
-			protected java.lang.String toStringName() {
+			public java.lang.String name() {
 				return "Function_prototype_apply";
 			}
 		}, false);
@@ -56,7 +68,7 @@ public class Function extends AbstractFunction {
 				}
 			}
 			@Override
-			protected java.lang.String toStringName() {
+			public java.lang.String name() {
 				return "Function_prototype_call";
 			}
 		}, false);
@@ -83,15 +95,15 @@ public class Function extends AbstractFunction {
 				});
 			}
 			@Override
-			public java.lang.String toStringSource() {
+			public java.lang.String source() {
 				return source;
 			}
 			@Override
-			protected java.lang.String toStringArguments() {
+			public java.lang.String arguments() {
 				return arguments;
 			}
 			@Override
-			protected java.lang.String toStringName() {
+			public java.lang.String name() {
 				return get("name").toString();
 			}
 		};

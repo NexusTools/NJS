@@ -25,13 +25,27 @@ public class JavaConstructor extends AbstractFunction {
 	public final Class<?> javaClass;
 	public final java.lang.String javaClassString;
 	private final Map<Integer, List<Constructor>> constructors = new HashMap();
-	JavaConstructor(final Global global, Class<?> javaClass) {
+	JavaConstructor(final Global global, final Class<?> javaClass) {
 		super(global);
 		assert(javaClass != null);
 		this.javaClass = javaClass;
 		javaClassString = javaClass.getName().replace(".", "_");
+		assert(javaClassString != null);
 		Class<?> superClass = javaClass.getSuperclass();
 		this.global = global;
+		
+		setStorage("name", global.wrap(javaClassString), false);
+		
+		setHidden("toString", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return global.wrap(javaClass.toString());
+			}
+			@Override
+			public java.lang.String name() {
+				return javaClassString + "_toString";
+			}
+		});
 		
 		GenericObject prototype = prototype();
 		if(superClass != null) {
@@ -100,7 +114,72 @@ public class JavaConstructor extends AbstractFunction {
 					throw new UnsupportedOperationException();
 				}
 				@Override
-				protected java.lang.String toStringName() {
+				public java.lang.String name() {
+					return toStringName;
+				}
+			});
+		}
+		
+		methods.clear();
+		for(final Method method : javaClass.getDeclaredMethods()) {
+			if((method.getModifiers() & Modifier.STATIC) == 0)
+				continue;
+			
+			List<Method> meths = methods.get(method.getName());
+			if(meths == null)
+				methods.put(method.getName(), meths = new ArrayList());
+			meths.add(method);
+		}
+		
+		for(Map.Entry<java.lang.String, List<Method>> entry : methods.entrySet()) {
+			final Map<Integer, List<Method>> byLength = new HashMap();
+			for(Method method : entry.getValue()) {
+				List<Method> meths = byLength.get(method.getParameterCount());
+				if(meths == null)
+					byLength.put(method.getParameterCount(), meths = new ArrayList());
+				meths.add(method);
+			}
+			
+			final java.lang.String toStringName = javaClassString + "_" + entry.getKey();
+			setHidden(entry.getKey(), new AbstractFunction(global) {
+				@Override
+				public BaseObject call(BaseObject _this, BaseObject... params) {
+					if(params.length == 0)
+						try {
+							return global.javaToJS(byLength.get(0).get(0).invoke(null));
+						} catch (IllegalAccessException ex) {
+							throw new Error.JavaException("JavaError", ex.toString(), ex);
+						} catch (IllegalArgumentException ex) {
+							throw new Error.JavaException("JavaError", ex.toString(), ex);
+						} catch (InvocationTargetException ex) {
+							throw new Error.JavaException("JavaError", ex.toString(), ex);
+						}
+					java.lang.Object[] converted = new java.lang.Object[params.length];
+					for(Method method : byLength.get(params.length)) {
+						again:
+						while(true) {
+							Class[] types = method.getParameterTypes();
+							for(int i=0; i<params.length; i++)
+								try {
+									converted[i] = JSHelper.jsToJava(params[i], types[i]);
+								} catch(ClassCastException ex) {
+									break again;
+								}
+							try {
+								return global.wrap(method.invoke(null, converted));
+							} catch (IllegalAccessException ex) {
+								throw new Error.JavaException("JavaError", ex.toString(), ex);
+							} catch (IllegalArgumentException ex) {
+								throw new Error.JavaException("JavaError", ex.toString(), ex);
+							} catch (InvocationTargetException ex) {
+								throw new Error.JavaException("JavaError", ex.toString(), ex);
+							}
+						}
+					}
+					throw new UnsupportedOperationException();
+				}
+				@Override
+				public java.lang.String name() {
 					return toStringName;
 				}
 			});
@@ -146,43 +225,31 @@ public class JavaConstructor extends AbstractFunction {
 
 	@Override
 	public BaseObject construct(BaseObject... params) {
-		switch(params.length) {
-			case 0:
+		java.lang.Object[] converted = new java.lang.Object[params.length];
+		for(Constructor constructor : constructors.get(params.length)) {
+			next:
+			while(true) {
+				Class[] types = constructor.getParameterTypes();
+				for(int i=0; i<params.length; i++)
+					try {
+						converted[i] = JSHelper.jsToJava(params[i], types[i]);
+					} catch(ClassCastException ex) {
+						break next;
+					}
 				try {
-					return global.wrap(javaClass.newInstance());
+					return global.wrap(constructor.newInstance(converted));
 				} catch (InstantiationException ex) {
 					throw new Error.JavaException("JavaError", ex.toString(), ex);
 				} catch (IllegalAccessException ex) {
 					throw new Error.JavaException("JavaError", ex.toString(), ex);
+				} catch (IllegalArgumentException ex) {
+					throw new Error.JavaException("JavaError", ex.toString(), ex);
+				} catch (InvocationTargetException ex) {
+					throw new Error.JavaException("JavaError", ex.toString(), ex);
 				}
-				
-			default:
-				java.lang.Object[] converted = new java.lang.Object[params.length];
-				for(Constructor constructor : constructors.get(params.length)) {
-					next:
-					while(true) {
-						Class[] types = constructor.getParameterTypes();
-						for(int i=0; i<params.length; i++)
-							try {
-								converted[i] = JSHelper.jsToJava(params[i], types[i]);
-							} catch(ClassCastException ex) {
-								break next;
-							}
-						try {
-							return global.wrap(constructor.newInstance(converted));
-						} catch (InstantiationException ex) {
-							throw new Error.JavaException("JavaError", ex.toString(), ex);
-						} catch (IllegalAccessException ex) {
-							throw new Error.JavaException("JavaError", ex.toString(), ex);
-						} catch (IllegalArgumentException ex) {
-							throw new Error.JavaException("JavaError", ex.toString(), ex);
-						} catch (InvocationTargetException ex) {
-							throw new Error.JavaException("JavaError", ex.toString(), ex);
-						}
-					}
-				}
-				throw new UnsupportedOperationException();
+			}
 		}
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
@@ -191,7 +258,7 @@ public class JavaConstructor extends AbstractFunction {
 	}
 
 	@Override
-	protected java.lang.String toStringName() {
+	public java.lang.String name() {
 		return javaClassString;
 	}
 	

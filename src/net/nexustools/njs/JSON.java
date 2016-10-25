@@ -97,7 +97,7 @@ public class JSON extends GenericObject {
 				}
 			}
 			@Override
-			protected java.lang.String toStringName() {
+			public java.lang.String name() {
 				return "JSON_stringify";
 			}
 		});
@@ -107,7 +107,7 @@ public class JSON extends GenericObject {
 				throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
 			}
 			@Override
-			protected java.lang.String toStringName() {
+			public java.lang.String name() {
 				return "JSON_parse";
 			}
 		});

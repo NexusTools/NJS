@@ -78,6 +78,45 @@ public class GenericObject implements BaseObject {
 			return false;
 		}
 	}
+	public static final class ReadOnlyProperty implements Property {
+		final BaseObject value;
+		public ReadOnlyProperty(BaseObject val) {
+			value = val;
+		}
+		@Override
+		public final boolean enumerable() {
+			return false;
+		}
+
+		@Override
+		public BaseObject get() {
+			return value;
+		}
+
+		@Override
+		public BaseObject getValue() {
+			return value;
+		}
+
+		@Override
+		public BaseFunction getSetter() {
+			return null;
+		}
+
+		@Override
+		public BaseFunction getGetter() {
+			return null;
+		}
+
+		@Override
+		public void set(BaseObject val) {
+		}
+
+		@Override
+		public boolean configurable() {
+			return false;
+		}
+	}
 	public class ExtendedProperty implements Property {
 		public BaseObject value;
 		public BaseFunction getter;
@@ -242,6 +281,10 @@ public class GenericObject implements BaseObject {
 	public final void setHidden(java.lang.String key, BaseObject value) {
 		assert(key != null);
 		setProperty(key, new HiddenProperty(value));
+	}
+	public final void setReadOnly(java.lang.String key, BaseObject value) {
+		assert(key != null);
+		setProperty(key, new ReadOnlyProperty(value));
 	}
 	
 	public final void setProperty(java.lang.String key, Property property) {

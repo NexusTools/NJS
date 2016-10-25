@@ -21,7 +21,7 @@ public class Global extends GenericObject {
 	public final Function Function = new Function(this);
 	public final Object Object = new Object();
 	public final String String = new String();
-	public final Number Number;
+	public final Number Number = new Number();
 	public final Boolean Boolean;
 	public final Symbol Symbol;
 	public final Array Array;
@@ -40,16 +40,18 @@ public class Global extends GenericObject {
 		Object.initPrototype(Object);
 		Function.initPrototype(Object);
 		String.initPrototype(Object);
+		Number.initPrototype(Object);
 		
 		Object.setHidden("__proto__", Function.prototype());
 		Function.setHidden("__proto__", Function.prototype());
 		String.setHidden("__proto__", Function.prototype());
+		Number.setHidden("__proto__", Function.prototype());
 		
+		String.initPrototypeFunctions(this);
 		Object.initPrototypeFunctions(this);
 		Function.initPrototypeFunctions(this);
-		String.initPrototypeFunctions(this);
+		Number.initPrototypeFunctions(this);
 		
-		Number = new Number(this);
 		Boolean = new Boolean(this);
 		Symbol = new Symbol(this);
 		Array = new Array(this);
@@ -85,12 +87,17 @@ public class Global extends GenericObject {
 		return Number.wrap(number);
 	}
 	
+	public Boolean.Instance wrap(boolean bool) {
+		return bool ? Boolean.TRUE : Boolean.FALSE;
+	}
+	
 	public String.Instance wrap(java.lang.String string) {
 		return String.wrap(string);
 	}
 
 	private static final List<WeakReference<JavaConstructor>> CONSTRUCTORS = new ArrayList();
 	public JavaConstructor wrap(Class<?> javaClass) {
+		assert(javaClass != null);
 		synchronized(CONSTRUCTORS) {
 			Iterator<WeakReference<JavaConstructor>> it = CONSTRUCTORS.iterator();
 			while(it.hasNext()) {

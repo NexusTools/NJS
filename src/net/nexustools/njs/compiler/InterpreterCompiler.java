@@ -15,8 +15,13 @@ import net.nexustools.njs.Scopeable;
 
 import java.util.Iterator;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+import net.nexustools.njs.ConstructableFunction;
 import net.nexustools.njs.GenericArray;
+import net.nexustools.njs.GenericObject;
 
 /**
  *
@@ -66,11 +71,11 @@ public class InterpreterCompiler extends AbstractCompiler {
 	public static interface Runnable {
 		public Referenceable run(Global global, Scope scope);
 	}
+	public static final Referenceable UNDEFINED_REFERENCE = new Referenceable(net.nexustools.njs.Undefined.INSTANCE);
 	public static final Runnable UNDEFINED = new Runnable() {
-		public final Referenceable REFERENCE = new Referenceable(net.nexustools.njs.Undefined.INSTANCE);
 		@Override
 		public Referenceable run(Global global, Scope scope) {
-			return REFERENCE;
+			return UNDEFINED_REFERENCE;
 		}
 	};
 	public static final Runnable NULL = new Runnable() {
@@ -323,6 +328,24 @@ public class InterpreterCompiler extends AbstractCompiler {
 					return new Referenceable(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).resolve())).multiply(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).resolve()))));
 				}
 			};
+		} else if(object instanceof LessThan) {
+			final Runnable lhs = compile(((LessThan)object).lhs);
+			final Runnable rhs = compile(((LessThan)object).rhs);
+			return new Runnable() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					return new Referenceable(global.wrap(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).resolve())).number < global.Number.from(JSHelper.valueOf(rhs.run(global, scope).resolve())).number));
+				}
+			};
+		} else if(object instanceof MoreThan) {
+			final Runnable lhs = compile(((MoreThan)object).lhs);
+			final Runnable rhs = compile(((MoreThan)object).rhs);
+			return new Runnable() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					return new Referenceable(global.wrap(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).resolve())).number > global.Number.from(JSHelper.valueOf(rhs.run(global, scope).resolve())).number));
+				}
+			};
 		} else if(object instanceof MultiplyEq) {
 			final Runnable lhs = compile(((MultiplyEq)object).lhs);
 			final Runnable rhs = compile(((MultiplyEq)object).rhs);
@@ -339,8 +362,6 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 			};
 		} else if(object instanceof Plus) {
-			if(((Plus)object).lhs == null)
-				((Plus)object).lhs = new Number(0);
 			final Runnable lhs = compile(((Plus)object).lhs);
 			final Runnable rhs = compile(((Plus)object).rhs);
 			return new Runnable() {
@@ -406,7 +427,8 @@ public class InterpreterCompiler extends AbstractCompiler {
 			for(int i=0; i<len; i++) {
 				Var.Set set = ret.get(i);
 				keys[i] = set.lhs;
-				values[i] = compile(set.rhs);
+				if(set.rhs != null)
+					values[i] = compile(set.rhs);
 			}
 			
 			return new Runnable() {
@@ -425,7 +447,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 						else
 							scope.var(keys[i]);
 					}
-					return UNDEFINED.run(global, scope);
+					return UNDEFINED_REFERENCE;
 				}
 			};
 		} else if(object instanceof Function) {
@@ -443,11 +465,11 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 			}
 			final java.lang.String arguments = argBuilder.toString();
-			final Script impl = createScript(((Function)object).impl, true);
+			final Script impl = compileScript(((Function)object).impl, true);
 			return new Runnable() {
 				@Override
 				public Referenceable run(final Global global, final Scope scope) {
-					AbstractFunction func = new AbstractFunction(global) {
+					AbstractFunction func = new ConstructableFunction(global) {
 						@Override
 						public BaseObject call(BaseObject _this, BaseObject... params) {
 							Scope s = scope.extend(_this);
@@ -462,15 +484,15 @@ public class InterpreterCompiler extends AbstractCompiler {
 							return impl.exec(global, s);
 						}
 						@Override
-						public java.lang.String toStringSource() {
+						public java.lang.String source() {
 							return source;
 						}
 						@Override
-						protected java.lang.String toStringArguments() {
+						public java.lang.String arguments() {
 							return arguments;
 						}
 						@Override
-						protected java.lang.String toStringName() {
+						public java.lang.String name() {
 							return name == null ? "anonymous" : name;
 						}
 					};
@@ -518,6 +540,176 @@ public class InterpreterCompiler extends AbstractCompiler {
 					return rhs.run(global, scope);
 				}
 			};
+		} else if(object instanceof PlusPlus) {
+			if(((PlusPlus)object).lhs != null) {
+				final Runnable lhs = compile(((PlusPlus)object).lhs);
+				return new Runnable() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						Referenceable ref = lhs.run(global, scope);
+						if(ref.key == null)
+							throw new net.nexustools.njs.Error.JavaException("ReferenceError", "Cannot set value without knowing its parent and key");
+						
+						net.nexustools.njs.Number.Instance val = global.toNumber(ref.resolve());
+						ref.object.set(ref.key, global.wrap(val.number + 1));
+						return new Referenceable(val);
+					}
+				};
+			} else {
+				final Runnable rhs = compile(((PlusPlus)object).rhs);
+				return new Runnable() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						Referenceable ref = rhs.run(global, scope);
+						if(ref.key == null)
+							throw new net.nexustools.njs.Error.JavaException("ReferenceError", "Cannot set value without knowing its parent and key");
+						
+						net.nexustools.njs.Number.Instance val = global.toNumber(ref.resolve());
+						ref.object.set(ref.key, val = global.wrap(val.number+1));
+						return new Referenceable(val);
+					}
+				};
+			}
+		} else if(object instanceof While) {
+			final Runnable condition = compile(((While)object).condition);
+			if(((While)object).simpleimpl != null) {
+				final Runnable impl = compile(((While)object).simpleimpl);
+				return new Runnable() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						while(JSHelper.isTrue(condition.run(global, scope).resolve())) {
+							Referenceable ref = impl.run(global, scope);
+							if(ref instanceof Return)
+								return ref;
+							ref.resolve();
+						}
+
+						return UNDEFINED_REFERENCE;
+					}
+				};
+			}
+			final Script impl = compileScript(((While)object).impl, ScriptType.Block);
+			return new Runnable() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					while(JSHelper.isTrue(condition.run(global, scope).resolve())) {
+						BaseObject ret = impl.exec(global, scope.extend());
+						if(ret != null)
+							return new Return(ret);
+					}
+					
+					return UNDEFINED_REFERENCE;
+				}
+			};
+		} else if(object instanceof OpenGroup) {
+			final Map<java.lang.String, Runnable> compiled = new HashMap();
+			for(Map.Entry<java.lang.String, Part> entry : ((OpenGroup)object).entries.entrySet()) {
+				compiled.put(entry.getKey(), compile(entry.getValue()));
+			}
+			return new Runnable() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					GenericObject object = new GenericObject(global);
+					for(Map.Entry<java.lang.String, Runnable> entry : compiled.entrySet()) {
+						object.setStorage(entry.getKey(), entry.getValue().run(global, scope).resolve(), true);
+					}
+					return new Referenceable(object);
+				}
+			};
+		} else if(object instanceof Try) {
+			final Script impl = compileScript(((Try)object).impl, ScriptType.Block);
+			if(((Try)object).c != null && ((Try)object).f != null) {
+				final java.lang.String name = ((Reference)((Try)object).c.condition).ref;
+				final Script c = compileScript(((Try)object).c.impl, ScriptType.Block);
+				final Script f = compileScript(((Try)object).f.impl, ScriptType.Block);
+				return new Runnable() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						try {
+							BaseObject ret = impl.exec(global, scope.extend());
+							if(ret != null)
+								return new Return(ret);
+						} catch(Throwable t) {
+							Scope extended = scope.extend();
+							extended.var(name, JSHelper.javaToJS(global, t));
+							BaseObject ret = c.exec(global, extended);
+							if(ret != null)
+								return new Return(ret);
+						} finally {
+							BaseObject ret = f.exec(global, scope.extend());
+							if(ret != null)
+								return new Return(ret);
+						}
+						
+						return UNDEFINED_REFERENCE;
+					}
+				};
+			} else if(((Try)object).c != null) {
+				final java.lang.String name = ((Reference)((Try)object).c.condition).ref;
+				final Script c = compileScript(((Try)object).c.impl, ScriptType.Block);
+				return new Runnable() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						try {
+							BaseObject ret = impl.exec(global, scope.extend());
+							if(ret != null)
+								return new Return(ret);
+						} catch(Throwable t) {
+							Scope extended = scope.extend();
+							extended.var(name, JSHelper.javaToJS(global, t));
+							BaseObject ret = c.exec(global, extended);
+							if(ret != null)
+								return new Return(ret);
+						}
+						
+						return UNDEFINED_REFERENCE;
+					}
+				};
+			} else if(((Try)object).f != null) {
+				final Script f = compileScript(((Try)object).f.impl, ScriptType.Block);
+				return new Runnable() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						try {
+							BaseObject ret = impl.exec(global, scope.extend());
+							if(ret != null)
+								return new Return(ret);
+						} finally {
+							BaseObject ret = f.exec(global, scope.extend());
+							if(ret != null)
+								return new Return(ret);
+						}
+						
+						return UNDEFINED_REFERENCE;
+					}
+				};
+			}
+		} else if(object instanceof If) {
+			final Runnable condition = compile(((If)object).condition);
+			if(((If)object).simpleimpl != null) {
+				final Runnable impl = compile(((If)object).simpleimpl);
+				return new Runnable() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						if(JSHelper.isTrue(condition.run(global, scope).resolve())) {
+							Referenceable ref = impl.run(global, scope);
+							if(ref instanceof Return)
+								return ref;
+							ref.resolve();
+						}
+						
+						return UNDEFINED_REFERENCE;
+					}
+				};
+			}
+		} else if(object instanceof Boolean) {
+			final boolean value = ((Boolean)object).value;
+			return new Runnable() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					return new Referenceable(global.wrap(value));
+				}
+			};
 		} else if(object instanceof Undefined)
 			return UNDEFINED;
 		else if(object instanceof Null)
@@ -526,10 +718,18 @@ public class InterpreterCompiler extends AbstractCompiler {
 		throw new UnsupportedOperationException("Cannot compile: " + object + " (" + object.getClass().getSimpleName() + ')');
 	}
 	
+	
 	@Override
-	protected Script createScript(final Object[] script, boolean inFunction) {
-		System.out.println(join(Arrays.asList(script), ';'));
-		
+	protected Script compileScript(final Object[] script, boolean inFunction) {
+		return compileScript(script, inFunction ? ScriptType.Function : ScriptType.Global);
+	}
+	
+	public static enum ScriptType {
+		Global,
+		Function,
+		Block
+	}
+	protected Script compileScript(final Object[] script, ScriptType type) {
 		if(script.length == 0)
 			return new Script() {
 				@Override
@@ -542,30 +742,56 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 			};
 		
-		if(inFunction) {
-			final Runnable[] parts = new Runnable[script.length];
-			for(int i=0; i<parts.length; i++)
-				parts[i] = compile(script[i]);
-			final int max = parts.length;
-			return new Script() {
-				@Override
-				public BaseObject exec(Global global, Scope scope) {
-					if(scope == null)
-						scope = new Scope.Extended(global);
+		switch(type) {
+			case Function:
+			{
+				final Runnable[] parts = new Runnable[script.length];
+				for(int i=0; i<parts.length; i++)
+					parts[i] = compile(script[i]);
+				final int max = parts.length;
+				return new Script() {
+					@Override
+					public BaseObject exec(Global global, Scope scope) {
+						if(scope == null)
+							scope = new Scope.Extended(global);
 
-					for(int i=0; i<max; i++) {
-						Referenceable ref = parts[i].run(global, scope);
-						if(ref instanceof Return)
-							return ref.resolve();
-						ref.resolve();
+						for(int i=0; i<max; i++) {
+							Referenceable ref = parts[i].run(global, scope);
+							if(ref instanceof Return)
+								return ref.resolve();
+							ref.resolve();
+						}
+						return net.nexustools.njs.Undefined.INSTANCE;
 					}
-					return net.nexustools.njs.Undefined.INSTANCE;
-				}
-				@Override
-				public java.lang.String toString() {
-					return Arrays.toString(script);
-				}
-			};
+					@Override
+					public java.lang.String toString() {
+						return Arrays.toString(script);
+					}
+				};
+			}
+			case Block:
+			{
+				final Runnable[] parts = new Runnable[script.length];
+				for(int i=0; i<parts.length; i++)
+					parts[i] = compile(script[i]);
+				final int max = parts.length;
+				return new Script() {
+					@Override
+					public BaseObject exec(Global global, Scope scope) {
+						for(int i=0; i<max; i++) {
+							Referenceable ref = parts[i].run(global, scope);
+							if(ref instanceof Return)
+								return ref.resolve();
+							ref.resolve();
+						}
+						return null;
+					}
+					@Override
+					public java.lang.String toString() {
+						return Arrays.toString(script);
+					}
+				};
+			}
 		}
 		
 		if(script.length == 1) {
