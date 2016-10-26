@@ -5,12 +5,16 @@
  */
 package net.nexustools.njs.compiler;
 
+import java.lang.ref.WeakReference;
 import net.nexustools.njs.AbstractFunction;
 import net.nexustools.njs.BaseFunction;
 import net.nexustools.njs.BaseObject;
 import net.nexustools.njs.Global;
 import net.nexustools.njs.JSHelper;
 import net.nexustools.njs.Scope;
+import net.nexustools.njs.ConstructableFunction;
+import net.nexustools.njs.GenericArray;
+import net.nexustools.njs.GenericObject;
 import net.nexustools.njs.Scopeable;
 
 import java.util.Iterator;
@@ -18,60 +22,188 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
-import net.nexustools.njs.ConstructableFunction;
-import net.nexustools.njs.GenericArray;
-import net.nexustools.njs.GenericObject;
+import static net.nexustools.njs.compiler.AbstractCompiler.join;
 
 /**
  *
  * @author kate
  */
 public class InterpreterCompiler extends AbstractCompiler {
-	public static class Referenceable {
-
-		final java.lang.String key;
-		final java.lang.String full;
-		final Scopeable object;
-		public Referenceable(BaseObject object) {
-			this(null, null, object);
+	private static class PrecompiledData {
+		final Runnable[] functionImpls;
+		private PrecompiledData(Runnable[] functionImpls) {
+			this.functionImpls = functionImpls;
 		}
-		public Referenceable(java.lang.String key, Scopeable object) {
-			this(key, key, object);
-		}
-		public Referenceable(java.lang.String key, java.lang.String full, Scopeable object) {
-			this.key = key;
-			this.full = full;
-			this.object = object;
-		}
-
-		private BaseObject resolve() {
-			if(key != null)
-				return object.get(key);
-			return (BaseObject)object;
-		}
-		
-		private static java.lang.String join(Iterator<java.lang.String> chain) {
-			StringBuilder builder = new StringBuilder();
-			if(chain.hasNext()) {
-				builder.append(chain.next());
-				while(chain.hasNext()) {
-					builder.append('.');
-					builder.append(chain.next());
-				}
+		private void exec(Global global, Scope scope) {
+			for(Runnable impl : functionImpls) {
+				BaseFunction func = (BaseFunction)impl.run(global, scope).get();
+				scope.var(func.name(), func);
 			}
-			return builder.toString();
 		}
 	}
-	public static class Return extends Referenceable {
+	private PrecompiledData precompile(ScriptData script) {
+		Runnable[] functionImpls = new Runnable[script.functions.length];
+		for(int i=0; i<functionImpls.length; i++)
+			functionImpls[i] = compile(script.functions[i]);
+		return new PrecompiledData(functionImpls);
+	}
+	public static interface Referenceable {
+		public BaseObject get();
+		public void set(BaseObject value);
+		public boolean delete();
+	}
+	public static interface KnownReferenceable extends Referenceable {
+		public java.lang.String source();
+	}
+	public static class ValueReferenceable implements Referenceable {
+		public final BaseObject value;
+		public ValueReferenceable(BaseObject value) {
+			this.value = value;
+		}
+		@Override
+		public BaseObject get() {
+			return value;
+		}
+		@Override
+		public void set(BaseObject value) {
+			throw new net.nexustools.njs.Error.JavaException("ReferenceError", "Cannot set a value without knowing its parent and index");
+		}
+		@Override
+		public boolean delete() {
+			throw new net.nexustools.njs.Error.JavaException("ReferenceError", "Cannot delete a value without knowing its parent and index");
+		}
+	}
+	public static class Return extends ValueReferenceable {
 		public Return(BaseObject object) {
 			super(object);
+		}
+	}
+	public static interface ParentedReferenceable extends Referenceable {
+		public Scopeable parent();
+	}
+	public static class StringKeyReferenceable implements KnownReferenceable, ParentedReferenceable {
+		public final Scopeable parent;
+		public final java.lang.String key;
+		public final java.lang.String source;
+		public StringKeyReferenceable(java.lang.String source, java.lang.String key, Scopeable parent) {
+			this.parent = parent;
+			this.source = source;
+			this.key = key;
+		}
+		@Override
+		public Scopeable parent() {
+			return parent;
+		}
+		@Override
+		public java.lang.String source() {
+			return source;
+		}
+		@Override
+		public BaseObject get() {
+			return parent.get(key);
+		}
+		@Override
+		public void set(BaseObject value) {
+			parent.set(key, value);
+		}
+		@Override
+		public boolean delete() {
+			return parent.delete(key);
+		}
+	}
+	public static class IntegerKeyReferenceable implements KnownReferenceable, ParentedReferenceable {
+		public final int key;
+		public final BaseObject parent;
+		public final java.lang.String source;
+		public IntegerKeyReferenceable(java.lang.String source, int key, BaseObject parent) {
+			this.parent = parent;
+			this.source = source;
+			this.key = key;
+		}
+		@Override
+		public Scopeable parent() {
+			return parent;
+		}
+		@Override
+		public java.lang.String source() {
+			return source;
+		}
+		@Override
+		public BaseObject get() {
+			return parent.get(key);
+		}
+		@Override
+		public void set(BaseObject value) {
+			parent.set(key, value);
+		}
+		@Override
+		public boolean delete() {
+			return parent.delete(key);
+		}
+	}
+	public static class ObjectKeyReferenceable implements KnownReferenceable, ParentedReferenceable {
+		public final BaseObject key;
+		public final BaseObject parent;
+		public final java.lang.String source;
+		public ObjectKeyReferenceable(java.lang.String source, BaseObject key, BaseObject parent) {
+			this.parent = parent;
+			this.source = source;
+			this.key = key;
+		}
+		@Override
+		public Scopeable parent() {
+			return parent;
+		}
+		@Override
+		public java.lang.String source() {
+			return source;
+		}
+		@Override
+		public BaseObject get() {
+			if(key instanceof net.nexustools.njs.String.Instance)
+				return parent.get(((net.nexustools.njs.String.Instance) key).string);
+			else if(key instanceof net.nexustools.njs.Number.Instance && ((net.nexustools.njs.Number.Instance)key).number >= 0
+					 && ((net.nexustools.njs.Number.Instance)key).number <= java.lang.Integer.MAX_VALUE && ((net.nexustools.njs.Number.Instance)key).number == (int)((net.nexustools.njs.Number.Instance)key).number)
+				return parent.get((int)((net.nexustools.njs.Number.Instance)key).number);
+			else
+				return parent.get(key.toString());
+		}
+		@Override
+		public void set(BaseObject val) {
+			if(key instanceof net.nexustools.njs.String.Instance)
+				parent.set(((net.nexustools.njs.String.Instance) key).string, val);
+			else if(key instanceof net.nexustools.njs.Number.Instance && ((net.nexustools.njs.Number.Instance)key).number >= 0
+					 && ((net.nexustools.njs.Number.Instance)key).number <= java.lang.Integer.MAX_VALUE && ((net.nexustools.njs.Number.Instance)key).number == (int)((net.nexustools.njs.Number.Instance)key).number)
+				parent.set((int)((net.nexustools.njs.Number.Instance)key).number, val);
+			else
+				parent.set(key.toString(), val);
+		}
+		@Override
+		public boolean delete() {
+			if(key instanceof net.nexustools.njs.String.Instance)
+				return parent.delete(((net.nexustools.njs.String.Instance) key).string);
+			else if(key instanceof net.nexustools.njs.Number.Instance && ((net.nexustools.njs.Number.Instance)key).number >= 0
+					 && ((net.nexustools.njs.Number.Instance)key).number <= java.lang.Integer.MAX_VALUE && ((net.nexustools.njs.Number.Instance)key).number == (int)((net.nexustools.njs.Number.Instance)key).number)
+				return parent.delete((int)((net.nexustools.njs.Number.Instance)key).number);
+			else
+				return parent.delete(key.toString());
 		}
 	}
 	public static interface Runnable {
 		public Referenceable run(Global global, Scope scope);
 	}
-	public static final Referenceable UNDEFINED_REFERENCE = new Referenceable(net.nexustools.njs.Undefined.INSTANCE);
+	public static final Referenceable UNDEFINED_REFERENCE = new Referenceable() {
+		@Override
+		public BaseObject get() {
+			return net.nexustools.njs.Undefined.INSTANCE;
+		}
+		@Override
+		public void set(BaseObject value) {}
+		@Override
+		public boolean delete() {
+			return false;
+		}
+	};
 	public static final Runnable UNDEFINED = new Runnable() {
 		@Override
 		public Referenceable run(Global global, Scope scope) {
@@ -79,7 +211,20 @@ public class InterpreterCompiler extends AbstractCompiler {
 		}
 	};
 	public static final Runnable NULL = new Runnable() {
-		public final Referenceable REFERENCE = new Referenceable(net.nexustools.njs.Null.INSTANCE);
+		public final Referenceable REFERENCE = new Referenceable() {
+			@Override
+			public BaseObject get() {
+				return net.nexustools.njs.Null.INSTANCE;
+			}
+
+			@Override
+			public void set(BaseObject value) {}
+
+			@Override
+			public boolean delete() {
+				return false;
+			}
+		};
 		@Override
 		public Referenceable run(Global global, Scope scope) {
 			return REFERENCE;
@@ -87,12 +232,18 @@ public class InterpreterCompiler extends AbstractCompiler {
 	};
 	
 	private Runnable compile(Object object) {
+		return compile(null, object);
+	}
+	private Runnable compile(PrecompiledData data, Object object) {
+		if(DEBUG)
+			System.out.println("Compiling " + describe(object));
+		
 		if(object instanceof Integer) {
 			final double number = ((Integer)object).value;
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new Referenceable(global.wrap(number));
+					return new ValueReferenceable(global.wrap(number));
 				}
 			};
 		} else if(object instanceof Number) {
@@ -100,7 +251,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new Referenceable(global.wrap(number));
+					return new ValueReferenceable(global.wrap(number));
 				}
 			};
 		} else if(object instanceof String) {
@@ -108,7 +259,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new Referenceable(global.wrap(string));
+					return new ValueReferenceable(global.wrap(string));
 				}
 			};
 		} else if(object instanceof Reference) {
@@ -116,19 +267,19 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new Referenceable(ref, ref, scope);
+					return new StringKeyReferenceable(ref, ref, scope);
 				}
 			};
 		} else if(object instanceof ReferenceChain) {
 			final Iterable<java.lang.String> chain = ((ReferenceChain)object).chain;
-			final java.lang.String full = Referenceable.join(chain.iterator());
+			final java.lang.String full = join(chain, '.');
 			final java.lang.String key = ((ReferenceChain)object).chain.remove(((ReferenceChain)object).chain.size()-1);
-			final java.lang.String base = Referenceable.join(chain.iterator());
+			final java.lang.String base = join(chain, '.');
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
 					try {
-						return new Referenceable(key, full, scope.resolve(chain));
+						return new StringKeyReferenceable(full, key, scope.resolve(chain));
 					} catch(net.nexustools.njs.Error.JavaException err) {
 						if(err.type.equals("TypeError")) {
 							if(err.getUnderlyingMessage().endsWith("from null"))
@@ -147,7 +298,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						return new Referenceable(((BaseFunction)reference.run(global, scope).resolve()).construct());
+						return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct());
 					}
 				};
 			
@@ -161,7 +312,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							return new Referenceable(((BaseFunction)reference.run(global, scope).resolve()).construct(argr[0].run(global, scope).resolve()));
+							return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct(argr[0].run(global, scope).get()));
 						}
 					};
 					
@@ -169,7 +320,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							return new Referenceable(((BaseFunction)reference.run(global, scope).resolve()).construct(argr[0].run(global, scope).resolve(), argr[1].run(global, scope).resolve()));
+							return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct(argr[0].run(global, scope).get(), argr[1].run(global, scope).get()));
 						}
 					};
 					
@@ -177,7 +328,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							return new Referenceable(((BaseFunction)reference.run(global, scope).resolve()).construct(argr[0].run(global, scope).resolve(), argr[1].run(global, scope).resolve(), argr[2].run(global, scope).resolve()));
+							return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct(argr[0].run(global, scope).get(), argr[1].run(global, scope).get(), argr[2].run(global, scope).get()));
 						}
 					};
 					
@@ -187,8 +338,8 @@ public class InterpreterCompiler extends AbstractCompiler {
 						public Referenceable run(Global global, Scope scope) {
 							BaseObject[] args = new BaseObject[argr.length];
 							for(int i=0; i<args.length; i++)
-								args[i] = argr[i].run(global, scope).resolve();
-							return new Referenceable(((BaseFunction)reference.run(global, scope).resolve()).construct(args));
+								args[i] = argr[i].run(global, scope).get();
+							return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct(args));
 						}
 					};
 			}
@@ -202,19 +353,16 @@ public class InterpreterCompiler extends AbstractCompiler {
 						Referenceable ref = reference.run(global, scope);
 						BaseFunction func;
 						try {
-							if(ref.key != null)
-								func = ((BaseFunction)ref.resolve());
-							else
-								func = ((BaseFunction)ref.object);
+							func = ((BaseFunction)ref.get());
 						} catch(Exception ex) {
-							if(ref.full != null)
-								throw new net.nexustools.njs.Error.JavaException("TypeError", ref.full + " is not a function");
+							if(ref instanceof KnownReferenceable)
+								throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable)ref).source() + " is not a function");
 							throw new net.nexustools.njs.Error.JavaException("TypeError", "is not a function");
 						}
-						if(ref.key != null)
-							return new Referenceable(func.call(ref.object instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)ref.object));
+						if(ref instanceof ParentedReferenceable)
+							return new ValueReferenceable(func.call(((ParentedReferenceable)ref).parent() instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)((ParentedReferenceable)ref).parent()));
 						else
-							return new Referenceable(func.call(global));
+							return new ValueReferenceable(func.call(global));
 					}
 				};
 			
@@ -231,19 +379,16 @@ public class InterpreterCompiler extends AbstractCompiler {
 							Referenceable ref = reference.run(global, scope);
 							BaseFunction func;
 							try {
-								if(ref.key != null)
-									func = ((BaseFunction)ref.resolve());
-								else
-									func = ((BaseFunction)ref.object);
-							} catch(ClassCastException ex) {
-								if(ref.full != null)
-									throw new net.nexustools.njs.Error.JavaException("TypeError", ref.full + " is not a function");
+								func = ((BaseFunction)ref.get());
+							} catch(Exception ex) {
+								if(ref instanceof KnownReferenceable)
+									throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable)ref).source() + " is not a function");
 								throw new net.nexustools.njs.Error.JavaException("TypeError", "is not a function");
 							}
-							if(ref.key != null)
-								return new Referenceable(func.call(ref.object instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)ref.object, argr[0].run(global, scope).resolve()));
+							if(ref instanceof ParentedReferenceable)
+								return new ValueReferenceable(func.call(((ParentedReferenceable)ref).parent() instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)((ParentedReferenceable)ref).parent(), argr[0].run(global, scope).get()));
 							else
-								return new Referenceable(func.call(global, argr[0].run(global, scope).resolve()));
+								return new ValueReferenceable(func.call(global, argr[0].run(global, scope).get()));
 						}
 					};
 					
@@ -254,19 +399,16 @@ public class InterpreterCompiler extends AbstractCompiler {
 							Referenceable ref = reference.run(global, scope);
 							BaseFunction func;
 							try {
-								if(ref.key != null)
-									func = ((BaseFunction)ref.resolve());
-								else
-									func = ((BaseFunction)ref.object);
+								func = ((BaseFunction)ref.get());
 							} catch(Exception ex) {
-								if(ref.full != null)
-									throw new net.nexustools.njs.Error.JavaException("TypeError", ref.full + " is not a function");
+								if(ref instanceof KnownReferenceable)
+									throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable)ref).source() + " is not a function");
 								throw new net.nexustools.njs.Error.JavaException("TypeError", "is not a function");
 							}
-							if(ref.key != null)
-								return new Referenceable(func.call(ref.object instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)ref.object, argr[0].run(global, scope).resolve(), argr[1].run(global, scope).resolve()));
+							if(ref instanceof ParentedReferenceable)
+								return new ValueReferenceable(func.call(((ParentedReferenceable)ref).parent() instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)((ParentedReferenceable)ref).parent(), argr[0].run(global, scope).get(), argr[1].run(global, scope).get()));
 							else
-								return new Referenceable(func.call(global, argr[0].run(global, scope).resolve(), argr[1].run(global, scope).resolve()));
+								return new ValueReferenceable(func.call(global, argr[0].run(global, scope).get(), argr[1].run(global, scope).get()));
 						}
 					};
 					
@@ -277,19 +419,16 @@ public class InterpreterCompiler extends AbstractCompiler {
 							Referenceable ref = reference.run(global, scope);
 							BaseFunction func;
 							try {
-								if(ref.key != null)
-									func = ((BaseFunction)ref.resolve());
-								else
-									func = ((BaseFunction)ref.object);
+								func = ((BaseFunction)ref.get());
 							} catch(Exception ex) {
-								if(ref.full != null)
-									throw new net.nexustools.njs.Error.JavaException("TypeError", ref.full + " is not a function");
+								if(ref instanceof KnownReferenceable)
+									throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable)ref).source() + " is not a function");
 								throw new net.nexustools.njs.Error.JavaException("TypeError", "is not a function");
 							}
-							if(ref.key != null)
-								return new Referenceable(func.call(ref.object instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)ref.object, argr[0].run(global, scope).resolve(), argr[1].run(global, scope).resolve(), argr[2].run(global, scope).resolve()));
+							if(ref instanceof ParentedReferenceable)
+								return new ValueReferenceable(func.call(((ParentedReferenceable)ref).parent() instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)((ParentedReferenceable)ref).parent(), argr[0].run(global, scope).get(), argr[1].run(global, scope).get(), argr[2].run(global, scope).get()));
 							else
-								return new Referenceable(func.call(global, argr[0].run(global, scope).resolve(), argr[1].run(global, scope).resolve(), argr[2].run(global, scope).resolve()));
+								return new ValueReferenceable(func.call(global, argr[0].run(global, scope).get(), argr[1].run(global, scope).get(), argr[2].run(global, scope).get()));
 						}
 					};
 					
@@ -300,22 +439,19 @@ public class InterpreterCompiler extends AbstractCompiler {
 							Referenceable ref = reference.run(global, scope);
 							BaseFunction func;
 							try {
-								if(ref.key != null)
-									func = ((BaseFunction)ref.resolve());
-								else
-									func = ((BaseFunction)ref.object);
+								func = ((BaseFunction)ref.get());
 							} catch(Exception ex) {
-								if(ref.full != null)
-									throw new net.nexustools.njs.Error.JavaException("TypeError", ref.full + " is not a function");
+								if(ref instanceof KnownReferenceable)
+									throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable)ref).source() + " is not a function");
 								throw new net.nexustools.njs.Error.JavaException("TypeError", "is not a function");
 							}
 							BaseObject[] args = new BaseObject[argr.length];
 							for(int i=0; i<args.length; i++)
-								args[i] = argr[i].run(global, scope).resolve();
-							if(ref.key != null)
-								return new Referenceable(func.call(ref.object instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)ref.object, args));
+								args[i] = argr[i].run(global, scope).get();
+							if(ref instanceof ParentedReferenceable)
+								return new ValueReferenceable(func.call(((ParentedReferenceable)ref).parent() instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)((ParentedReferenceable)ref).parent(), args));
 							else
-								return new Referenceable(func.call(global, args));
+								return new ValueReferenceable(func.call(global, args));
 						}
 					};
 			}
@@ -325,7 +461,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new Referenceable(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).resolve())).multiply(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).resolve()))));
+					return new ValueReferenceable(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).multiply(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
 				}
 			};
 		} else if(object instanceof LessThan) {
@@ -334,7 +470,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new Referenceable(global.wrap(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).resolve())).number < global.Number.from(JSHelper.valueOf(rhs.run(global, scope).resolve())).number));
+					return new ValueReferenceable(global.wrap(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).number < global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get())).number));
 				}
 			};
 		} else if(object instanceof MoreThan) {
@@ -343,7 +479,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new Referenceable(global.wrap(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).resolve())).number > global.Number.from(JSHelper.valueOf(rhs.run(global, scope).resolve())).number));
+					return new ValueReferenceable(global.wrap(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).number > global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get())).number));
 				}
 			};
 		} else if(object instanceof MultiplyEq) {
@@ -353,12 +489,10 @@ public class InterpreterCompiler extends AbstractCompiler {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
 					Referenceable ref = lhs.run(global, scope);
-					if(ref.key == null)
-						throw new net.nexustools.njs.Error.JavaException("SyntaxError", "");
 					
-					net.nexustools.njs.Number.Instance number = global.Number.from(JSHelper.valueOf(ref.resolve())).multiply(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).resolve())));
-					ref.object.set(ref.key, number);
-					return new Referenceable(number);
+					net.nexustools.njs.Number.Instance number = global.Number.from(JSHelper.valueOf(ref.get())).multiply(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get())));
+					ref.set(number);
+					return new ValueReferenceable(number);
 				}
 			};
 		} else if(object instanceof Plus) {
@@ -367,14 +501,14 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					BaseObject l = JSHelper.valueOf(lhs.run(global, scope).resolve());
+					BaseObject l = JSHelper.valueOf(lhs.run(global, scope).get());
 					if(l instanceof net.nexustools.njs.Number.Instance)
-						return new Referenceable(global.Number.from(l).plus(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).resolve()))));
+						return new ValueReferenceable(global.Number.from(l).plus(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
 					
 					StringBuilder builder = new StringBuilder();
 					builder.append(l.toString());
-					builder.append(JSHelper.valueOf(rhs.run(global, scope).resolve()).toString());
-					return new Referenceable(global.wrap(builder.toString()));
+					builder.append(JSHelper.valueOf(rhs.run(global, scope).get()).toString());
+					return new ValueReferenceable(global.wrap(builder.toString()));
 				}
 			};
 		} else if(object instanceof OpenBracket) {
@@ -383,15 +517,15 @@ public class InterpreterCompiler extends AbstractCompiler {
 			if(chain.isEmpty())
 				return contents;
 			
-			final java.lang.String full = Referenceable.join(chain.iterator());
+			final java.lang.String full = object.toString();
 			final java.lang.String key = chain.remove(chain.size()-1);
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					BaseObject obj = contents.run(global, scope).resolve();
+					BaseObject obj = contents.run(global, scope).get();
 					for(java.lang.String key : chain)
 						obj = obj.get(key);
-					return new Referenceable(key, full, obj);
+					return new StringKeyReferenceable(full, key, obj);
 				}
 			};
 		} else if(object instanceof Set) {
@@ -401,20 +535,17 @@ public class InterpreterCompiler extends AbstractCompiler {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
 					Referenceable ref = lhs.run(global, scope);
-					if(ref.key == null)
-						throw new net.nexustools.njs.Error.JavaException("ReferenceError", "Cannot set value without knowing its parent and key");
-					
-					BaseObject r = rhs.run(global, scope).resolve();
-					ref.object.set(ref.key, r);
-					return new Referenceable(r);
+					BaseObject r = rhs.run(global, scope).get();
+					ref.set(r);
+					return new ValueReferenceable(r);
 				}
 			};
 		} else if(object instanceof AbstractCompiler.Return) {
-			final Runnable ret = compile(((AbstractCompiler.Return)object).ret);
+			final Runnable ret = compile(((AbstractCompiler.Return)object).rhs);
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new Return(ret.run(global, scope).resolve());
+					return new Return(ret.run(global, scope).get());
 				}
 			};
 		} else if(object instanceof Var) {
@@ -437,13 +568,13 @@ public class InterpreterCompiler extends AbstractCompiler {
 					int i=0;
 					for(; i<len; i++) {
 						if(values[i] != null)
-							scope.var(keys[i], values[i].run(global, scope).resolve());
+							scope.var(keys[i], values[i].run(global, scope).get());
 						else
 							scope.var(keys[i]);
 					}
 					for(; i<keys.length; i++) {
 						if(values[i] != null)
-							scope.var(keys[i], values[i].run(global, scope).resolve());
+							scope.var(keys[i], values[i].run(global, scope).get());
 						else
 							scope.var(keys[i]);
 					}
@@ -498,21 +629,22 @@ public class InterpreterCompiler extends AbstractCompiler {
 					};
 					if(name != null)
 						scope.var(name, func);
-					return new Referenceable(func);
+					return new ValueReferenceable(func);
 				}
 			};
 		} else if(object instanceof RightReference) {
+			final java.lang.String source = object.toString();
 			final Runnable ref = compile(((RightReference)object).ref);
 			final Iterable<java.lang.String> keys = ((RightReference)object).chain;
 			final java.lang.String key = ((List<java.lang.String>)keys).remove(((List)keys).size()-1);
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					BaseObject lhs = ref.run(global, scope).resolve();
+					BaseObject lhs = ref.run(global, scope).get();
 					Iterator<java.lang.String> it = keys.iterator();
 					while(it.hasNext())
 						lhs = lhs.get(it.next());
-					return new Referenceable(key, lhs);
+					return new StringKeyReferenceable(source, key, lhs);
 				}
 			};
 		} else if(object instanceof OpenArray) {
@@ -524,8 +656,8 @@ public class InterpreterCompiler extends AbstractCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					GenericArray array = new GenericArray(global, entries.length);
 					for(int i=0; i<entries.length; i++)
-						array.set(i, entries[i].run(global, scope).resolve());
-					return new Referenceable(array);
+						array.set(i, entries[i].run(global, scope).get());
+					return new ValueReferenceable(array);
 				}
 			};
 		} else if(object instanceof Or) {
@@ -534,9 +666,9 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					BaseObject l = lhs.run(global, scope).resolve();
+					BaseObject l = lhs.run(global, scope).get();
 					if(JSHelper.isTrue(l))
-						return new Referenceable(l);
+						return new ValueReferenceable(l);
 					return rhs.run(global, scope);
 				}
 			};
@@ -547,12 +679,9 @@ public class InterpreterCompiler extends AbstractCompiler {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
 						Referenceable ref = lhs.run(global, scope);
-						if(ref.key == null)
-							throw new net.nexustools.njs.Error.JavaException("ReferenceError", "Cannot set value without knowing its parent and key");
-						
-						net.nexustools.njs.Number.Instance val = global.toNumber(ref.resolve());
-						ref.object.set(ref.key, global.wrap(val.number + 1));
-						return new Referenceable(val);
+						net.nexustools.njs.Number.Instance val = global.toNumber(ref.get());
+						ref.set(global.wrap(val.number + 1));
+						return new ValueReferenceable(val);
 					}
 				};
 			} else {
@@ -561,46 +690,13 @@ public class InterpreterCompiler extends AbstractCompiler {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
 						Referenceable ref = rhs.run(global, scope);
-						if(ref.key == null)
-							throw new net.nexustools.njs.Error.JavaException("ReferenceError", "Cannot set value without knowing its parent and key");
-						
-						net.nexustools.njs.Number.Instance val = global.toNumber(ref.resolve());
-						ref.object.set(ref.key, val = global.wrap(val.number+1));
-						return new Referenceable(val);
+						net.nexustools.njs.Number.Instance val = global.toNumber(ref.get());
+						ref.set(val = global.wrap(val.number+1));
+						return new ValueReferenceable(val);
 					}
 				};
 			}
-		} else if(object instanceof While) {
-			final Runnable condition = compile(((While)object).condition);
-			if(((While)object).simpleimpl != null) {
-				final Runnable impl = compile(((While)object).simpleimpl);
-				return new Runnable() {
-					@Override
-					public Referenceable run(Global global, Scope scope) {
-						while(JSHelper.isTrue(condition.run(global, scope).resolve())) {
-							Referenceable ref = impl.run(global, scope);
-							if(ref instanceof Return)
-								return ref;
-							ref.resolve();
-						}
-
-						return UNDEFINED_REFERENCE;
-					}
-				};
-			}
-			final Script impl = compileScript(((While)object).impl, ScriptType.Block);
-			return new Runnable() {
-				@Override
-				public Referenceable run(Global global, Scope scope) {
-					while(JSHelper.isTrue(condition.run(global, scope).resolve())) {
-						BaseObject ret = impl.exec(global, scope.extend());
-						if(ret != null)
-							return new Return(ret);
-					}
-					
-					return UNDEFINED_REFERENCE;
-				}
-			};
+		
 		} else if(object instanceof OpenGroup) {
 			final Map<java.lang.String, Runnable> compiled = new HashMap();
 			for(Map.Entry<java.lang.String, Part> entry : ((OpenGroup)object).entries.entrySet()) {
@@ -611,103 +707,165 @@ public class InterpreterCompiler extends AbstractCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					GenericObject object = new GenericObject(global);
 					for(Map.Entry<java.lang.String, Runnable> entry : compiled.entrySet()) {
-						object.setStorage(entry.getKey(), entry.getValue().run(global, scope).resolve(), true);
+						object.setStorage(entry.getKey(), entry.getValue().run(global, scope).get(), true);
 					}
-					return new Referenceable(object);
+					return new ValueReferenceable(object);
 				}
 			};
-		} else if(object instanceof Try) {
-			final Script impl = compileScript(((Try)object).impl, ScriptType.Block);
-			if(((Try)object).c != null && ((Try)object).f != null) {
-				final java.lang.String name = ((Reference)((Try)object).c.condition).ref;
-				final Script c = compileScript(((Try)object).c.impl, ScriptType.Block);
-				final Script f = compileScript(((Try)object).f.impl, ScriptType.Block);
-				return new Runnable() {
-					@Override
-					public Referenceable run(Global global, Scope scope) {
-						try {
-							BaseObject ret = impl.exec(global, scope.extend());
-							if(ret != null)
-								return new Return(ret);
-						} catch(Throwable t) {
-							Scope extended = scope.extend();
-							extended.var(name, JSHelper.javaToJS(global, t));
-							BaseObject ret = c.exec(global, extended);
-							if(ret != null)
-								return new Return(ret);
-						} finally {
-							BaseObject ret = f.exec(global, scope.extend());
-							if(ret != null)
-								return new Return(ret);
-						}
-						
-						return UNDEFINED_REFERENCE;
-					}
-				};
-			} else if(((Try)object).c != null) {
-				final java.lang.String name = ((Reference)((Try)object).c.condition).ref;
-				final Script c = compileScript(((Try)object).c.impl, ScriptType.Block);
-				return new Runnable() {
-					@Override
-					public Referenceable run(Global global, Scope scope) {
-						try {
-							BaseObject ret = impl.exec(global, scope.extend());
-							if(ret != null)
-								return new Return(ret);
-						} catch(Throwable t) {
-							Scope extended = scope.extend();
-							extended.var(name, JSHelper.javaToJS(global, t));
-							BaseObject ret = c.exec(global, extended);
-							if(ret != null)
-								return new Return(ret);
-						}
-						
-						return UNDEFINED_REFERENCE;
-					}
-				};
-			} else if(((Try)object).f != null) {
-				final Script f = compileScript(((Try)object).f.impl, ScriptType.Block);
-				return new Runnable() {
-					@Override
-					public Referenceable run(Global global, Scope scope) {
-						try {
-							BaseObject ret = impl.exec(global, scope.extend());
-							if(ret != null)
-								return new Return(ret);
-						} finally {
-							BaseObject ret = f.exec(global, scope.extend());
-							if(ret != null)
-								return new Return(ret);
-						}
-						
-						return UNDEFINED_REFERENCE;
-					}
-				};
-			}
 		} else if(object instanceof If) {
 			final Runnable condition = compile(((If)object).condition);
 			if(((If)object).simpleimpl != null) {
 				final Runnable impl = compile(((If)object).simpleimpl);
-				return new Runnable() {
-					@Override
-					public Referenceable run(Global global, Scope scope) {
-						if(JSHelper.isTrue(condition.run(global, scope).resolve())) {
-							Referenceable ref = impl.run(global, scope);
-							if(ref instanceof Return)
-								return ref;
-							ref.resolve();
-						}
+				if(((If)object).el != null) {
+					Else el = ((If)object).el;
+					if(el instanceof ElseIf) {
 						
-						return UNDEFINED_REFERENCE;
+					} else {
+						if(el.simpleimpl != null) {
+							final Runnable elimpl = compile(el.simpleimpl);
+							return new Runnable() {
+								@Override
+								public Referenceable run(Global global, Scope scope) {
+									if(JSHelper.isTrue(condition.run(global, scope).get())) {
+										Referenceable ref = impl.run(global, scope);
+										if(ref instanceof Return)
+											return ref;
+										ref.get();
+									} else {
+										Referenceable ref = elimpl.run(global, scope);
+										if(ref instanceof Return)
+											return ref;
+										ref.get();
+									}
+
+									return UNDEFINED_REFERENCE;
+								}
+							};
+						}
 					}
-				};
+				} else
+					return new Runnable() {
+						@Override
+						public Referenceable run(Global global, Scope scope) {
+							if(JSHelper.isTrue(condition.run(global, scope).get())) {
+								Referenceable ref = impl.run(global, scope);
+								if(ref instanceof Return)
+									return ref;
+								ref.get();
+							}
+
+							return UNDEFINED_REFERENCE;
+						}
+					};
 			}
 		} else if(object instanceof Boolean) {
 			final boolean value = ((Boolean)object).value;
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new Referenceable(global.wrap(value));
+					return new ValueReferenceable(global.wrap(value));
+				}
+			};
+		} else if(object instanceof VariableReference) {
+			final java.lang.String source = object.toString();
+			final Runnable lhs = compile(((VariableReference)object).lhs);
+			final Runnable ref = compile(((VariableReference)object).ref);
+			return new Runnable() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					return new ObjectKeyReferenceable(source, ref.run(global, scope).get(), lhs.run(global, scope).get());
+				}
+			};
+		} else if(object instanceof Delete) {
+			final Runnable ref = compile(((Delete)object).rhs);
+			return new Runnable() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					return new ValueReferenceable(global.wrap(ref.run(global, scope).delete()));
+				}
+			};
+		} else if(object instanceof IntegerReference) {
+			final int integer = ((IntegerReference)object).ref;
+			final java.lang.String source = object.toString();
+			final Runnable lhs = compile(((IntegerReference)object).lhs);
+			return new Runnable() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					return new IntegerKeyReferenceable(source, integer, lhs.run(global, scope).get());
+				}
+			};
+		} else if(object instanceof InstanceOf) {
+			final Runnable lhs = compile(((InstanceOf)object).lhs);
+			final Runnable rhs = compile(((InstanceOf)object).rhs);
+			return new Runnable() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					return new ValueReferenceable(global.wrap(lhs.run(global, scope).get().instanceOf((BaseFunction)rhs.run(global, scope).get())));
+				}
+			};
+		} else if(object instanceof Try) {
+			Try t = (Try)object;
+			final Script impl = compileScript(t.impl, ScriptType.Block);
+			if(t.c != null && t.f != null) {
+				final java.lang.String key = ((Reference)t.c.condition).ref;
+				final Script cimpl = compileScript(t.c.impl, ScriptType.Block);
+				final Script fimpl = compileScript(t.f.impl, ScriptType.Block);
+				return new Runnable() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						Scope extended = scope.extend();
+						try {
+							BaseObject ret = impl.exec(global, extended);
+							if(ret != null)
+								return new Return(ret);
+						} catch(Throwable t) {
+							if(t instanceof net.nexustools.njs.Error.InvisibleException)
+								throw (net.nexustools.njs.Error.InvisibleException)t;
+							
+							extended.set(key, global.wrap(t));
+							BaseObject ret = cimpl.exec(global, extended);
+							if(ret != null)
+								return new Return(ret);
+						} finally {
+							BaseObject ret = fimpl.exec(global, extended);
+							if(ret != null)
+								return new Return(ret);
+						}
+						
+						return UNDEFINED_REFERENCE;
+					}
+				};
+			} else if(t.c != null) {
+				final java.lang.String key = ((Reference)t.c.condition).ref;
+				final Script cimpl = compileScript(t.c.impl, ScriptType.Block);
+				return new Runnable() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						Scope extended = scope.extend();
+						try {
+							BaseObject ret = impl.exec(global, extended);
+							if(ret != null)
+								return new Return(ret);
+						} catch(Throwable t) {
+							if(t instanceof net.nexustools.njs.Error.InvisibleException)
+								throw (net.nexustools.njs.Error.InvisibleException)t;
+							
+							extended.set(key, global.wrap(t));
+							BaseObject ret = cimpl.exec(global, extended);
+							if(ret != null)
+								return new Return(ret);
+						}
+						
+						return UNDEFINED_REFERENCE;
+					}
+				};
+			}
+		} else if(object instanceof Throw) {
+			final Runnable rhs = compile(((Throw)object).rhs);
+			return new Runnable() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					throw new net.nexustools.njs.Error.ThrowException(rhs.run(global, scope).get());
 				}
 			};
 		} else if(object instanceof Undefined)
@@ -717,20 +875,28 @@ public class InterpreterCompiler extends AbstractCompiler {
 		
 		throw new UnsupportedOperationException("Cannot compile: " + object + " (" + object.getClass().getSimpleName() + ')');
 	}
-	
-	
-	@Override
-	protected Script compileScript(final Object[] script, boolean inFunction) {
-		return compileScript(script, inFunction ? ScriptType.Function : ScriptType.Global);
-	}
-	
-	public static enum ScriptType {
+	private static enum ScriptType {
 		Global,
 		Function,
 		Block
 	}
-	protected Script compileScript(final Object[] script, ScriptType type) {
-		if(script.length == 0)
+	@Override
+	protected Script compileScript(ScriptData script, boolean inFunction) {
+		return compileScript(script, inFunction ? ScriptType.Function : ScriptType.Global);
+	}
+	private final HashMap<java.lang.String, WeakReference<Script>> scriptCache = new HashMap();
+	protected Script compileScript(ScriptData script, ScriptType scriptType) {
+		Script compiled;
+		java.lang.String id = script.toString() + ':' + scriptType;
+		synchronized(scriptCache) {
+			WeakReference<Script> ref = scriptCache.get(id);
+			if(ref == null || (compiled = ref.get()) == null)
+				scriptCache.put(id, new WeakReference(compiled = compileScript0(script, scriptType)));
+			return compiled;
+		}
+	}
+	private Script compileScript0(final ScriptData script, final ScriptType scriptType) {
+		if(script.impl.length == 0)
 			return new Script() {
 				@Override
 				public BaseObject exec(Global global, Scope scope) {
@@ -738,79 +904,56 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 				@Override
 				public java.lang.String toString() {
-					return Arrays.toString(script);
+					return join(Arrays.asList(script.impl), ';');
 				}
 			};
 		
-		switch(type) {
-			case Function:
-			{
-				final Runnable[] parts = new Runnable[script.length];
-				for(int i=0; i<parts.length; i++)
-					parts[i] = compile(script[i]);
-				final int max = parts.length;
-				return new Script() {
-					@Override
-					public BaseObject exec(Global global, Scope scope) {
-						if(scope == null)
-							scope = new Scope.Extended(global);
-
-						for(int i=0; i<max; i++) {
-							Referenceable ref = parts[i].run(global, scope);
-							if(ref instanceof Return)
-								return ref.resolve();
-							ref.resolve();
-						}
-						return net.nexustools.njs.Undefined.INSTANCE;
-					}
-					@Override
-					public java.lang.String toString() {
-						return Arrays.toString(script);
-					}
-				};
-			}
-			case Block:
-			{
-				final Runnable[] parts = new Runnable[script.length];
-				for(int i=0; i<parts.length; i++)
-					parts[i] = compile(script[i]);
-				final int max = parts.length;
-				return new Script() {
-					@Override
-					public BaseObject exec(Global global, Scope scope) {
-						for(int i=0; i<max; i++) {
-							Referenceable ref = parts[i].run(global, scope);
-							if(ref instanceof Return)
-								return ref.resolve();
-							ref.resolve();
-						}
-						return null;
-					}
-					@Override
-					public java.lang.String toString() {
-						return Arrays.toString(script);
-					}
-				};
-			}
-		}
-		
-		if(script.length == 1) {
-			final Runnable impl = compile(script[0]);
+		if(scriptType != ScriptType.Global) {
+			final PrecompiledData precompiled = precompile(script);
+			final Runnable[] parts = new Runnable[script.impl.length];
+			for(int i=0; i<parts.length; i++)
+				parts[i] = compile(precompiled, script.impl[i]);
+			final int max = parts.length;
 			return new Script() {
 				@Override
 				public BaseObject exec(Global global, Scope scope) {
-					return impl.run(global, new Scope(global)).resolve();
+					if(scope == null)
+						scope = new Scope.Extended(global);
+
+					precompiled.exec(global, scope);
+					for(int i=0; i<max; i++) {
+						Referenceable ref = parts[i].run(global, scope);
+						if(ref instanceof Return)
+							return ref.get();
+						ref.get();
+					}
+					return scriptType == ScriptType.Block ? null : net.nexustools.njs.Undefined.INSTANCE;
 				}
 				@Override
 				public java.lang.String toString() {
-					return Arrays.toString(script);
+					return join(Arrays.asList(script.impl), ';');
 				}
 			};
 		}
 		
-		final Runnable[] parts = new Runnable[script.length];
+		if(script.impl.length == 1) {
+			final Runnable impl = compile(precompile(script), script.impl[0]);
+			return new Script() {
+				@Override
+				public BaseObject exec(Global global, Scope scope) {
+					return impl.run(global, new Scope(global)).get();
+				}
+				@Override
+				public java.lang.String toString() {
+					return join(Arrays.asList(script.impl), ';');
+				}
+			};
+		}
+		
+		final PrecompiledData precompiled = precompile(script);
+		final Runnable[] parts = new Runnable[script.impl.length];
 		for(int i=0; i<parts.length; i++)
-			parts[i] = compile(script[i]);
+			parts[i] = compile(precompiled, script.impl[i]);
 		switch(parts.length) {
 			case 2:
 				return new Script() {
@@ -819,12 +962,13 @@ public class InterpreterCompiler extends AbstractCompiler {
 						if(scope == null)
 							scope = new Scope(global);
 						
+						precompiled.exec(global, scope);
 						parts[0].run(global, scope);
-						return parts[1].run(global, scope).resolve();
+						return parts[1].run(global, scope).get();
 					}
 					@Override
 					public java.lang.String toString() {
-						return Arrays.toString(script);
+						return join(Arrays.asList(script.impl), ';');
 					}
 				};
 				
@@ -835,13 +979,14 @@ public class InterpreterCompiler extends AbstractCompiler {
 						if(scope == null)
 							scope = new Scope(global);
 						
+						precompiled.exec(global, scope);
 						parts[0].run(global, scope);
 						parts[1].run(global, scope);
-						return parts[2].run(global, scope).resolve();
+						return parts[2].run(global, scope).get();
 					}
 					@Override
 					public java.lang.String toString() {
-						return Arrays.toString(script);
+						return join(Arrays.asList(script.impl), ';');
 					}
 				};
 				
@@ -854,13 +999,14 @@ public class InterpreterCompiler extends AbstractCompiler {
 						if(scope == null)
 							scope = new Scope(global);
 						
+						precompiled.exec(global, scope);
 						for(int i=0; i<max; i++)
-							lastValue = parts[i].run(global, scope).resolve();
+							lastValue = parts[i].run(global, scope).get();
 						return lastValue;
 					}
 					@Override
 					public java.lang.String toString() {
-						return Arrays.toString(script);
+						return join(Arrays.asList(script.impl), ';');
 					}
 				};
 		}

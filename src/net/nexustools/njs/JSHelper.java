@@ -5,13 +5,6 @@
  */
 package net.nexustools.njs;
 
-import java.lang.ref.WeakReference;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 /**
  *
  * @author kate
@@ -138,6 +131,16 @@ public class JSHelper {
 		return object == null || object == Undefined.INSTANCE || object == Null.INSTANCE;
 	}
 	
+	public static BaseObject get(BaseObject _this, BaseObject key) {
+		if(key instanceof String.Instance)
+			return _this.get(((String.Instance) key).string);
+		else if(key instanceof Number.Instance && ((Number.Instance)key).number >= 0
+				 && ((Number.Instance)key).number <= Integer.MAX_VALUE && ((Number.Instance)key).number == (int)((Number.Instance)key).number)
+			return _this.get((int)((Number.Instance)key).number);
+		else
+			return _this.get(key.toString());
+	}
+	
 	public static void set(BaseObject _this, BaseObject key, BaseObject val) {
 		if(key instanceof String.Instance)
 			_this.set(((String.Instance) key).string, val);
@@ -148,14 +151,14 @@ public class JSHelper {
 			_this.set(key.toString(), val);
 	}
 	
-	public static BaseObject get(BaseObject _this, BaseObject key) {
+	public static boolean delete(BaseObject _this, BaseObject key) {
 		if(key instanceof String.Instance)
-			return _this.get(((String.Instance) key).string);
+			return _this.delete(((String.Instance) key).string);
 		else if(key instanceof Number.Instance && ((Number.Instance)key).number >= 0
 				 && ((Number.Instance)key).number <= Integer.MAX_VALUE && ((Number.Instance)key).number == (int)((Number.Instance)key).number)
-			return _this.get((int)((Number.Instance)key).number);
+			return _this.delete((int)((Number.Instance)key).number);
 		else
-			return _this.get(key.toString());
+			return _this.delete(key.toString());
 	}
 	
 	public static int toArrayIndex(java.lang.String input) {
@@ -183,5 +186,26 @@ public class JSHelper {
 		if(valueOf instanceof Number.Instance)
 			return ((Number.Instance)valueOf).number != 0;
 		return true;
+	}
+
+	public static java.lang.String convertStack(Throwable t) {
+		StringBuilder builder = new StringBuilder();
+		if(t instanceof Error.JavaException) {
+			builder.append(((Error.JavaException)t).type);
+			java.lang.String message = ((Error.JavaException)t).getUnderlyingMessage();
+			if(message != null) {
+				builder.append(": ");
+				builder.append(message);
+			}
+		} else
+			builder.append(t.toString());
+		for(StackTraceElement el : t.getStackTrace()) {
+			builder.append("\n\tat ");
+			
+			builder.append(el.getFileName());
+			builder.append(':');
+			builder.append(el.getLineNumber());
+		}
+		return builder.toString();
 	}
 }

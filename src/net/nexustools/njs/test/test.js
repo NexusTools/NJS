@@ -1,13 +1,7 @@
-print((function() {
+print((function(global) {
 	'strict';
 	
-	var test = 0;
-	//while(test < 10) {
-		print(test);
-		print(++test);
-		print(test++);
-	//}
-	print(test);
+	print("T".charCodeAt(0));
 
 	var Throwable = importClass("java.lang.Throwable");
 	print(Throwable);
@@ -24,6 +18,10 @@ print((function() {
 	var tester = new Uint16Array(2);
 	tester[0] = Math.random()*65535;
 	tester[1] = Math.random()*65535;
+	
+	function cheese() {
+		return tester;
+	}
 
 	function jesus(size) {
 		var horses = new Uint8Array(size || 10);
@@ -39,9 +37,7 @@ print((function() {
 			horses[8] = $()*255;
 			horses[9] = $()*255;
 			return horses;
-		}, function cheese() {
-			return tester;
-		}];
+		}, cheese];
 	}
 	
 	var solid = [jesus(5)[0](null, Math.random), jesus()[1]()];
@@ -57,7 +53,6 @@ print((function() {
 	
 	print(throwable.hashCode());
 	
-	
 	function tuna() {
 		
 	}
@@ -70,18 +65,28 @@ print((function() {
 	System.out.println((new tuna));
 	System.out.println((new tuna).horse());
 	
-	(function() {
-		while(test < 10) {
-			test++;
-		}
-		return test;
-	})();
+	try {
+		Symbol.iterator * 25;
+	} catch(e) {
+		print(e.stack);
+		importClass("javax.swing.JOptionPane").showMessageDialog(null, e);
+	}
 	
-	print(JSON.stringify({
+	if(true)
+		print("if true works!");
+	
+	if(false)
+		print("WRONG!");
+	else
+		print("If Else Right!");
+	
+	print(global.JSON.stringify({
 		"judas": (new tuna).horse(),
 		tuna: "fish",
 		farmer: 23
 	}));
+	
+	print(Throwable.prototype.constructor);
 	
 	/*if(throwable instanceof Throwable.prototype.constructor) {
 		print("tuna is a function!");
@@ -100,11 +105,46 @@ print((function() {
 		return 2;
 	})());
 	
-	while(true) {
-		while(test < 200)
-			++test;
-		return test;
+	var key = "sausage";
+	print((function() {
+		return {
+			sausage: (function() {
+				return this.hamster;
+			}).call({
+				hamster: "Jesus"
+			})
+		};
+	})()[key]);
+	
+	var solid = {
+		horses: 23,
+		loops: 43
+	};
+	
+	var horses = "horses";
+	
+	print(JSON.stringify(solid));
+	print(delete solid[horses]);
+	print(JSON.stringify(solid));
+	
+	print((function() {
+		return {
+			further: function seasoned() {
+				return 2000;
+			}
+		}
+	})().further());
+	
+	/*var JOptionPane = importClass("javax.swing.JOptionPane");
+	var number = JOptionPane.showInputDialog("How Many?")*1;
+	try {
+		new Uint8Array(number);
+	} catch(e) {
+		JOptionPane.showMessageDialog(null, e);
 	}
+	print(JSON.stringify(this));*/
+	
+	print(true);
 	
 	/*while(1) {
 		ExecutorService.execute(function() {
@@ -113,4 +153,4 @@ print((function() {
 			}
 		});
 	}*/
-})());
+}).call(this, this));

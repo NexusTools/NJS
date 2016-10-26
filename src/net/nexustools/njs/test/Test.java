@@ -8,6 +8,7 @@ package net.nexustools.njs.test;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.InputStreamReader;
+import java.util.Arrays;
 import net.nexustools.njs.Global;
 import net.nexustools.njs.JSHelper;
 import net.nexustools.njs.Undefined;
@@ -28,6 +29,8 @@ public class Test {
 				return Undefined.INSTANCE;
 			}
 		}, false);
+		
+		//global.compiler.eval("var test=frank;function frank(){return 24};console.log(test())", false).exec(global, null);
 		
 		global.compiler.eval(new InputStreamReader(Test.class.getResourceAsStream("/net/nexustools/njs/test/test.js")), false).exec(global, null);
 		//global.compiler.eval(new FileReader("/home/kate/Projects/SnappFu/JNode12/node/node.js"), false).exec(global, null);

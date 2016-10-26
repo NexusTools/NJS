@@ -12,28 +12,44 @@ package net.nexustools.njs;
 public class Symbol extends AbstractFunction {
 	public static class Instance extends GenericObject {
 		public final java.lang.String name;
-		public Instance(Global global, java.lang.String name) {
-			super(global);
+		public Instance(Symbol Symbol, java.lang.String name) {
+			super(Symbol.prototype(), Symbol);
 			this.name = name;
-		}
-		@Override
-		public java.lang.String toString() {
-			return "Symbol(" + name + ')';
 		}
 	}
 
-	private final Global global;
 	public final Instance iterator, unscopables;
-	public Symbol(Global global) {
+	public Symbol(final Global global) {
 		super(global);
-		this.global = global;
-		setStorage("iterator", iterator = new Instance(global, "Symbol.iterator"), false);
-		setStorage("unscopables", unscopables = new Instance(global, "Symbol.unscopables"), false);
+		setHidden("iterator", iterator = new Instance(this, "Symbol.iterator"));
+		setHidden("unscopables", unscopables = new Instance(this, "Symbol.unscopables"));
+		GenericObject prototype = prototype();
+		prototype.setHidden("toString", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return global.wrap("Symbol(" + ((Instance)_this).name + ')');
+			}
+			@Override
+			public java.lang.String name() {
+				return "Symbol_prototype_toString";
+			}
+		});
+		prototype.setHidden("valueOf", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				throw new Error.JavaException("TypeError", "Cannot convert a Symbol value to a number");
+			}
+			@Override
+			public java.lang.String name() {
+				return "Symbol_prototype_toString";
+			}
+		});
+		// Cannot convert a Symbol value to a number
 	}
 
 	@Override
 	public BaseObject construct(BaseObject... params) {
-		return new Instance(global, params[0].toString());
+		return new Instance(this, params[0].toString());
 	}
 
 	@Override

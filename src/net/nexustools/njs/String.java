@@ -33,7 +33,7 @@ public class String extends AbstractFunction {
 					if(i < 0 || i >= string.length())
 						return Undefined.INSTANCE;
 					
-					return String.wrap(string.substring(i, i));
+					return String.wrap(string.substring(i, i+1));
 				}
 
 				@Override
@@ -76,6 +76,12 @@ public class String extends AbstractFunction {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				return _this;
+			}
+		});
+		prototype.setHidden("charCodeAt", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return Number.wrap(((Instance)_this).string.charAt(params.length > 0 ? Number.from(params[0]).toInt() : 0));
 			}
 		});
 	}

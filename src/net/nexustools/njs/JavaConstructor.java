@@ -155,28 +155,30 @@ public class JavaConstructor extends AbstractFunction {
 							throw new Error.JavaException("JavaError", ex.toString(), ex);
 						}
 					java.lang.Object[] converted = new java.lang.Object[params.length];
-					for(Method method : byLength.get(params.length)) {
-						again:
-						while(true) {
-							Class[] types = method.getParameterTypes();
-							for(int i=0; i<params.length; i++)
+					List<Method> methods = byLength.get(params.length);
+					if(methods != null)
+						for(Method method : methods) {
+							again:
+							while(true) {
+								Class[] types = method.getParameterTypes();
+								for(int i=0; i<params.length; i++)
+									try {
+										converted[i] = JSHelper.jsToJava(params[i], types[i]);
+									} catch(ClassCastException ex) {
+										break again;
+									}
 								try {
-									converted[i] = JSHelper.jsToJava(params[i], types[i]);
-								} catch(ClassCastException ex) {
-									break again;
+									return global.wrap(method.invoke(null, converted));
+								} catch (IllegalAccessException ex) {
+									throw new Error.JavaException("JavaError", ex.toString(), ex);
+								} catch (IllegalArgumentException ex) {
+									throw new Error.JavaException("JavaError", ex.toString(), ex);
+								} catch (InvocationTargetException ex) {
+									throw new Error.JavaException("JavaError", ex.toString(), ex);
 								}
-							try {
-								return global.wrap(method.invoke(null, converted));
-							} catch (IllegalAccessException ex) {
-								throw new Error.JavaException("JavaError", ex.toString(), ex);
-							} catch (IllegalArgumentException ex) {
-								throw new Error.JavaException("JavaError", ex.toString(), ex);
-							} catch (InvocationTargetException ex) {
-								throw new Error.JavaException("JavaError", ex.toString(), ex);
 							}
 						}
-					}
-					throw new UnsupportedOperationException();
+					throw new Error.JavaException("ArgumentError", "Invalid arguments");
 				}
 				@Override
 				public java.lang.String name() {
@@ -254,7 +256,7 @@ public class JavaConstructor extends AbstractFunction {
 
 	@Override
 	public BaseObject call(BaseObject _this, BaseObject... params) {
-		throw new Error.JavaException("Error", "You must call new on this type of object");
+		throw new Error.JavaException("Error", "You must call new on Java Classes");
 	}
 
 	@Override

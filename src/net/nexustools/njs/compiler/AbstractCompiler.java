@@ -24,6 +24,17 @@ import net.nexustools.njs.Error;
  * @author kate
  */
 public abstract class AbstractCompiler implements Compiler {
+	public static final boolean DEBUG = System.getProperty("NJSDEBUG", "false").equals("true");
+	public static java.lang.String unparsed(java.lang.Object object) {
+		if(object == null)
+			return "<unparsed>";
+		return object.toString();
+	}
+	public static java.lang.String describe(java.lang.Object object) {
+		if(object == null)
+			return "null";
+		return "(@" + object.getClass().getSimpleName() + ":" + object + ")";
+	}
 	public static java.lang.String toString(java.lang.Object object) {
 		if(object == null)
 			return "";
@@ -54,6 +65,33 @@ public abstract class AbstractCompiler implements Compiler {
 			}
 		}
 	}
+	public static class ScriptData {
+		final Part[] impl;
+		final Function[] functions;
+		public ScriptData(Part[] impl) {
+			List<Part> imp = new ArrayList();
+			List<Function> funcs = new ArrayList();
+			for(int i=0; i<impl.length; i++) {
+				if(impl[i] instanceof Function && ((Function)impl[i]).name != null) {
+					funcs.add((Function)impl[i]);
+					continue;
+				}
+				
+				imp.add(impl[i]);
+			}
+			functions = funcs.toArray(new Function[funcs.size()]);
+			this.impl = imp.toArray(new Part[imp.size()]);
+		}
+		@Override
+		public java.lang.String toString() {
+			StringBuilder builder = new StringBuilder();
+			join(Arrays.asList(functions), ';', builder);
+			if(builder.length() > 0)
+				builder.append(':');
+			join(Arrays.asList(impl), ';', builder);
+			return builder.toString();
+		}
+	}
 	public static class CompleteException extends RuntimeException {
 		final Part part;
 		public CompleteException() {
@@ -61,6 +99,10 @@ public abstract class AbstractCompiler implements Compiler {
 		}
 		public CompleteException(Part part) {
 			this.part = part;
+		}
+		@Override
+		public java.lang.String toString() {
+			return describe(part);
 		}
 	}
 	public static class ParseFunction extends RuntimeException {
@@ -76,9 +118,9 @@ public abstract class AbstractCompiler implements Compiler {
 		}
 	}
 	public static class ParseComplete extends RuntimeException {
-		public final java.lang.Object[] impl;
+		public final ScriptData impl;
 		public final java.lang.String source;
-		public ParseComplete(java.lang.Object[] impl, java.lang.String source) {
+		public ParseComplete(ScriptData impl, java.lang.String source) {
 			this.impl = impl;
 			this.source = source;
 		}
@@ -91,17 +133,27 @@ public abstract class AbstractCompiler implements Compiler {
 	}
 	public static abstract class Referency implements Part {
 		public boolean newline;
-		public abstract Referency extend(DirectReference reference);
+		public Referency extend(DirectReference reference) {
+			return new RightReference(this, reference.ref);
+		}
+		public Referency extend(IntegerReference reference) {
+			return new IntegerReference(this, reference.ref);
+		}
 		@Override
 		public Part transform(Part part) {
+			if(DEBUG && !isIncomplete())
+				System.out.println('\t' + describe(this) + " -> " + describe(part));
+			
 			if(part instanceof SemiColon)
 				throw new CompleteException();
 			if(part instanceof NewLine)
 				newline = true;
 			
-			if(part instanceof DirectReference) {
+			if(part instanceof DirectReference)
 				return extend((DirectReference)part);
-			} else if(part instanceof OpenBracket)
+			else if(part instanceof IntegerReference)
+				return extend((IntegerReference)part);
+			else if(part instanceof OpenBracket)
 				return new Call(this);
 			else if(part instanceof InstanceOf)
 				return new InstanceOf(this);
@@ -113,6 +165,12 @@ public abstract class AbstractCompiler implements Compiler {
 				return new PlusPlus(this);
 			else if(part instanceof MoreThan)
 				return new MoreThan(this);
+			else if(part instanceof LessThan)
+				return new LessThan(this);
+			else if(part instanceof MoreEqual)
+				return new MoreEqual(this);
+			else if(part instanceof LessEqual)
+				return new LessEqual(this);
 			else if(part instanceof StrictEquals)
 				return new StrictEquals(this);
 			else if(part instanceof NotEquals)
@@ -121,12 +179,12 @@ public abstract class AbstractCompiler implements Compiler {
 				return new NotStrictEquals(this);
 			else if(part instanceof Equals)
 				return new Equals(this);
-			else if(part instanceof LessThan)
-				return new LessThan(this);
 			else if(part instanceof Multiply)
 				return new Multiply(this);
 			else if(part instanceof Plus)
 				return new Plus(this);
+			else if(part instanceof OpenArray)
+				return new VariableReference(this);
 			else if(part instanceof Set)
 				return new Set(this);
 			else if(part instanceof And)
@@ -137,7 +195,7 @@ public abstract class AbstractCompiler implements Compiler {
 			if(newline)
 				throw new CompleteException(part);
 			
-			throw new Error.JavaException("SyntaxError", "Unexpected " + part);
+			throw new Error.JavaException("SyntaxError", "Unexpected " + part + " after " + describe(this));
 		}
 
 		@Override
@@ -153,6 +211,62 @@ public abstract class AbstractCompiler implements Compiler {
 		public Part finish() {
 			return this;
 		}
+	}
+	public static class VolatileReferency extends Referency {
+		@Override
+		public Referency extend(DirectReference reference) {
+			throw new Error.JavaException("SyntaxError", "Unexpected " + reference);
+		}
+		@Override
+		public Referency extend(IntegerReference reference) {
+			throw new Error.JavaException("SyntaxError", "Unexpected " + reference);
+		}
+	}
+	public static class VariableReference extends Referency {
+		public Part ref;
+		private boolean closed;
+		public final Referency lhs;
+		public VariableReference(Referency lhs) {
+			this.lhs = lhs;
+		}
+
+		@Override
+		public Part transform(Part part) {
+			if(closed)
+				return super.transform(part);
+			
+			if(ref == null)
+				ref = part;
+			else {
+				if(!ref.isIncomplete()) {
+					if(part instanceof CloseArray) {
+						ref = ref.finish();
+						closed = true;
+						return this;
+					}
+				}
+				
+				ref = ref.transform(part);
+			}
+			
+			return this;
+		}
+
+		@Override
+		public boolean isIncomplete() {
+			return !closed || ref == null || ref.isIncomplete();
+		}
+
+		@Override
+		public java.lang.String toString() {
+			StringBuilder builder = new StringBuilder(unparsed(lhs));
+			builder.append('[');
+			builder.append(unparsed(ref));
+			if(closed)
+				builder.append(']');
+			return builder.toString();
+		}
+		
 	}
 	public static class Reference extends Referency {
 		public final java.lang.String ref;
@@ -219,8 +333,6 @@ public abstract class AbstractCompiler implements Compiler {
 		public java.lang.String toString() {
 			return ":";
 		}
-		
-		
 	}
 	public static class DirectReference implements Part {
 		public final java.lang.String ref;
@@ -229,6 +341,8 @@ public abstract class AbstractCompiler implements Compiler {
 		}
 		@Override
 		public Part transform(Part part) {
+			if(part instanceof OpenBracket)
+				return new Call(this);
 			throw new Error.JavaException("SyntaxError", "Unexpected " + part);
 		}
 		@Override
@@ -247,6 +361,33 @@ public abstract class AbstractCompiler implements Compiler {
 			return this;
 		}
 	}
+	public static class IntegerReference extends Referency {
+		public final Part lhs;
+		public final int ref;
+		public IntegerReference(Part lhs, int ref) {
+			this.lhs = lhs.finish();
+			this.ref = ref;
+		}
+		public IntegerReference(int ref) {
+			this.ref = ref;
+			lhs = null;
+		}
+		@Override
+		public java.lang.String toString() {
+			return lhs + "[" + ref + ']';
+		}
+		@Override
+		public boolean isStandalone() {
+			return false;
+		}
+		@Override
+		public boolean isIncomplete() {
+			return false;
+		}
+		public Part finish() {
+			return this;
+		}
+	}
 	public static class RightReference extends Referency {
 		public final Part ref;
 		public final List<java.lang.String> chain = new ArrayList();
@@ -256,7 +397,12 @@ public abstract class AbstractCompiler implements Compiler {
 		}
 		@Override
 		public java.lang.String toString() {
-			return ref.toString() + chain;
+			StringBuilder builder = new StringBuilder(ref.toString());
+			if(!chain.isEmpty()) {
+				builder.append('.');
+				join(chain, '.', builder);
+			}
+			return builder.toString();
 		}
 
 		@Override
@@ -318,11 +464,17 @@ public abstract class AbstractCompiler implements Compiler {
 
 		@Override
 		public java.lang.String toString() {
-			return reference.toString() + '(' + join(arguments, '.') + ')';
+			StringBuilder builder = new StringBuilder(reference.toString());
+			builder.append('(');
+			builder.append(join(arguments, '.'));
+			if(closed)
+				builder.append(')');
+			
+			return builder.toString();
 		}
 		
 		public Part finish() {
-			reference.finish();
+			reference = reference.finish();
 			if(arguments != null) {
 				ListIterator<Part> it = arguments.listIterator();
 				while(it.hasNext())
@@ -332,105 +484,51 @@ public abstract class AbstractCompiler implements Compiler {
 				throw new Error.JavaException("SyntaxError", "Unexpected EOF");
 			return this;
 		}
-
-		@Override
-		public Referency extend(DirectReference reference) {
-			return new RightReference(this, reference.ref);
-		}
 	}
-	public static class Return implements Part {
-		Part ret;
+	public static class Return extends Rh {
 		public Return() {}
 		@Override
+		public java.lang.String op() {
+			return "return";
+		}
+		@Override
 		public Part transform(Part part) {
-			if(part instanceof SemiColon)
+			if(rhs == null && part instanceof SemiColon)
 				throw new CompleteException();
 			
-			if(ret == null)
-				ret = part;
-			else
-				ret = ret.transform(part);
-			
-			return this;
-		}
-		@Override
-		public java.lang.String toString() {
-			return "return " + ret;
-		}
-		@Override
-		public boolean isStandalone() {
-			return true;
+			return super.transform(part);
 		}
 		@Override
 		public boolean isIncomplete() {
-			return ret != null && ret.isIncomplete();
-		}
-		public Part finish() {
-			return this;
+			return rhs != null && rhs.isIncomplete();
 		}
 	}
-	public static class Delete implements Part {
-		Part ref;
+	public static class Delete extends Rh {
 		public Delete() {}
 		@Override
-		public Part transform(Part part) {
-			if(part instanceof SemiColon)
-				throw new CompleteException();
-			
-			if(ref == null)
-				ref = part;
-			else
-				ref = ref.transform(part);
-			
-			return this;
-		}
-		@Override
-		public java.lang.String toString() {
-			return "delete " + ref;
-		}
-		@Override
-		public boolean isStandalone() {
-			return true;
-		}
-		@Override
-		public boolean isIncomplete() {
-			return ref != null && ref.isIncomplete();
-		}
-		public Part finish() {
-			if(ref != null)
-				ref.finish();
-			return this;
+		public java.lang.String op() {
+			return "delete";
 		}
 	}
-	public static class Yield implements Part {
-		Part ret;
+	public static class Yield extends Rh {
 		public Yield() {}
 		@Override
-		public Part transform(Part part) {
-			if(part instanceof SemiColon)
-				throw new CompleteException();
-			
-			if(ret == null)
-				ret = part;
-			else
-				ret = ret.transform(part);
-			
-			return this;
+		public java.lang.String op() {
+			return "yield";
 		}
+	}
+	public static class Throw extends Rh {
+		public Throw() {}
+		@Override
+		public java.lang.String op() {
+			return "throw";
+		}
+	}
+	public static class Case extends SubPart {
+		public Case() {}
 		@Override
 		public java.lang.String toString() {
-			return "return " + ret;
-		}
-		@Override
-		public boolean isStandalone() {
-			return true;
-		}
-		@Override
-		public boolean isIncomplete() {
-			return ret != null && ret.isIncomplete();
-		}
-		public Part finish() {
-			return this;
+			return "case";
 		}
 	}
 	public static class ReferenceChain extends Referency {
@@ -455,7 +553,7 @@ public abstract class AbstractCompiler implements Compiler {
 			return this;
 		}
 	}
-	public static class OpenBracket implements Part {
+	public static class OpenBracket extends Referency {
 		Part contents;
 		boolean closed;
 		List<java.lang.String> chain = new ArrayList();
@@ -465,11 +563,13 @@ public abstract class AbstractCompiler implements Compiler {
 		@Override
 		public java.lang.String toString() {
 			StringBuilder builder = new StringBuilder("(");
-			builder.append(contents);
-			builder.append(')');
-			if(!chain.isEmpty()) {
-				builder.append('.');
-				join(chain, '.', builder);
+			builder.append(unparsed(contents));
+			if(closed) {
+				builder.append(')');
+				if(!chain.isEmpty()) {
+					builder.append('.');
+					join(chain, '.', builder);
+				}
 			}
 			return builder.toString();
 		}
@@ -478,16 +578,8 @@ public abstract class AbstractCompiler implements Compiler {
 			if(closed) {
 				if(part instanceof SemiColon)
 					throw new CompleteException(part);
-				if(part instanceof DirectReference) {
-					chain.add(((DirectReference)part).ref);
-					return this;
-				}
-				if(part instanceof OpenBracket)
-					return new Call(this);
-				if(part instanceof Set)
-					return new Set(this);
 				
-				throw new Error.JavaException("SyntaxError", "Unexpected " + part);
+				return super.transform(part);
 			}
 			
 			if(contents == null)
@@ -518,6 +610,7 @@ public abstract class AbstractCompiler implements Compiler {
 				return contents;
 			return this;
 		}
+
 	}
 	public static abstract class Block implements Part {
 		enum State {
@@ -530,7 +623,7 @@ public abstract class AbstractCompiler implements Compiler {
 		State state;
 		Part condition;
 		Part simpleimpl;
-		java.lang.Object[] impl;
+		ScriptData impl;
 		public Block(State state) {
 			this.state = state;
 		}
@@ -579,7 +672,7 @@ public abstract class AbstractCompiler implements Compiler {
 						if(part instanceof SemiColon) {
 							state = State.Complete;
 							simpleimpl = simpleimpl.finish();
-							throw new CompleteException();
+							return this;
 						}
 					}
 					simpleimpl = simpleimpl.transform(part);
@@ -622,7 +715,7 @@ public abstract class AbstractCompiler implements Compiler {
 			builder.append(condition);
 			builder.append(") {");
 			if(impl == null)
-				builder.append("[unparsed]");
+				builder.append("<unparsed>");
 			else
 				join(Arrays.asList(impl), ';', builder);
 			builder.append("}");
@@ -645,7 +738,7 @@ public abstract class AbstractCompiler implements Compiler {
 		public java.lang.String toString() {
 			StringBuilder builder = new StringBuilder("try {");
 			if(impl == null)
-				builder.append("[unparsed]");
+				builder.append("<unparsed>");
 			else
 				join(Arrays.asList(impl), ';', builder);
 			builder.append("}");
@@ -672,14 +765,14 @@ public abstract class AbstractCompiler implements Compiler {
 						else if(part instanceof Finally)
 							f = (Finally)part;
 						else
-							throw new Error.JavaException("SyntaxError", "Unexpected " + part);
+							throw new CompleteException(part);
 					} else
-						throw new Error.JavaException("SyntaxError", "Unexpected " + part);
+						throw new CompleteException(part);
 				} else if(f != null) {
 					if(f.isIncomplete())
-						f = (Finally)c.transform(part);
+						f = (Finally)f.transform(part);
 					else 
-						throw new Error.JavaException("SyntaxError", "Unexpected " + part);
+						throw new CompleteException(part);
 				} else if(part instanceof Catch)
 					c = (Catch)part;
 				else if(part instanceof Finally)
@@ -707,7 +800,34 @@ public abstract class AbstractCompiler implements Compiler {
 			builder.append(condition);
 			builder.append(") {");
 			if(impl == null)
-				builder.append("[unparsed]");
+				builder.append("<unparsed>");
+			else
+				join(Arrays.asList(impl), ';', builder);
+			builder.append("}");
+			return builder.toString();
+		}
+
+		@Override
+		public boolean isStandalone() {
+			return false;
+		}
+		
+	}
+	public static class Switch extends Block {
+		public Switch() {}
+
+		@Override
+		public boolean allowSimpleImpl() {
+			return false;
+		}
+		
+		@Override
+		public java.lang.String toString() {
+			StringBuilder builder = new StringBuilder("catch (");
+			builder.append(condition);
+			builder.append(") {");
+			if(impl == null)
+				builder.append("<unparsed>");
 			else
 				join(Arrays.asList(impl), ';', builder);
 			builder.append("}");
@@ -726,7 +846,15 @@ public abstract class AbstractCompiler implements Compiler {
 			this.value = value;
 		}
 		@Override
+		public java.lang.String toString() {
+			return java.lang.String.valueOf(value);
+		}
+		@Override
 		public Referency extend(DirectReference reference) {
+			throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + reference);
+		}
+		@Override
+		public Referency extend(IntegerReference reference) {
 			throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + reference);
 		}
 	}
@@ -744,7 +872,7 @@ public abstract class AbstractCompiler implements Compiler {
 		public java.lang.String toString() {
 			StringBuilder builder = new StringBuilder("finally {");
 			if(impl == null)
-				builder.append("[unparsed]");
+				builder.append("<unparsed>");
 			else
 				join(Arrays.asList(impl), ';', builder);
 			builder.append("}");
@@ -765,7 +893,7 @@ public abstract class AbstractCompiler implements Compiler {
 			builder.append(condition);
 			builder.append(") {");
 			if(impl == null)
-				builder.append("[unparsed]");
+				builder.append("<unparsed>");
 			else
 				join(Arrays.asList(impl), ';', builder);
 			builder.append("}");
@@ -802,7 +930,7 @@ public abstract class AbstractCompiler implements Compiler {
 			builder.append(condition);
 			builder.append(") {");
 			if(impl == null)
-				builder.append("[unparsed]");
+				builder.append("<unparsed>");
 			else
 				join(Arrays.asList(impl), ';', builder);
 			builder.append("}");
@@ -838,7 +966,7 @@ public abstract class AbstractCompiler implements Compiler {
 		public java.lang.String toString() {
 			StringBuilder builder = new StringBuilder("else {");
 			if(impl == null)
-				builder.append("[unparsed]");
+				builder.append("<unparsed>");
 			else
 				join(Arrays.asList(impl), ';', builder);
 			builder.append("}");
@@ -849,15 +977,10 @@ public abstract class AbstractCompiler implements Compiler {
 			return false;
 		}
 	}
-	public static class CloseBracket implements Part {
-		public CloseBracket() {}
-		@Override
-		public java.lang.String toString() {
-			return ")";
-		}
+	public static class SubPart implements Part {
 		@Override
 		public Part transform(Part part) {
-				throw new Error.JavaException("SyntaxError", "Unexpected " + part);
+			throw new Error.JavaException("SyntaxError", "Unexpected " + part);
 		}
 		@Override
 		public boolean isStandalone() {
@@ -867,11 +990,19 @@ public abstract class AbstractCompiler implements Compiler {
 		public boolean isIncomplete() {
 			return true;
 		}
+		@Override
 		public Part finish() {
 			throw new Error.JavaException("SyntaxError", "Unexpected " + this);
 		}
 	}
-	public static class OpenGroup implements Part {
+	public static class CloseBracket extends SubPart {
+		public CloseBracket() {}
+		@Override
+		public java.lang.String toString() {
+			return ")";
+		}
+	}
+	public static class OpenGroup extends Referency {
 		public static enum State {
 			Idle,
 			NeedKey,
@@ -887,17 +1018,40 @@ public abstract class AbstractCompiler implements Compiler {
 		public OpenGroup() {}
 		@Override
 		public java.lang.String toString() {
-			return "{";
+			StringBuilder builder = new StringBuilder("{");
+			
+			Iterator<Map.Entry<java.lang.String, Part>> it = entries.entrySet().iterator();
+			if(it.hasNext()) {
+				Map.Entry<java.lang.String, Part> entry = it.next();
+				builder.append(entry.getKey());
+				builder.append(':');
+				builder.append(entry.getValue());
+				while(it.hasNext()) {
+					builder.append(',');
+					entry = it.next();
+					builder.append(entry.getKey());
+					builder.append(':');
+					builder.append(entry.getValue());
+				}
+			}
+			
+			if(state == State.Complete)
+				builder.append('}');
+			return builder.toString();
 		}
 		@Override
 		public Part transform(Part part) {
+			if(state == State.Complete)
+				return super.transform(part);
 			if(part instanceof NewLine)
 				return this;
 			
 			switch(state) {
 				case Idle:
-					if(part instanceof CloseGroup)
+					if(part instanceof CloseGroup) {
+						state = State.Complete;
 						return this;
+					}
 				case NeedKey:
 					if(part instanceof Reference)
 						currentEntryKey = ((Reference)part).ref;
@@ -938,6 +1092,7 @@ public abstract class AbstractCompiler implements Compiler {
 						currentEntry = currentEntry.transform(part);
 					}
 					return this;
+					
 			}
 			
 			
@@ -957,40 +1112,35 @@ public abstract class AbstractCompiler implements Compiler {
 			return this;
 		}
 	}
-	public static class CloseGroup implements Part {
+	public static class CloseGroup extends SubPart {
 		public CloseGroup() {}
 		@Override
 		public java.lang.String toString() {
 			return "}";
 		}
-		@Override
-		public Part transform(Part part) {
-			throw new Error.JavaException("SyntaxError", "Unexpected " + part);
-		}
-		@Override
-		public boolean isStandalone() {
-			return false;
-		}
-		@Override
-		public boolean isIncomplete() {
-			return true;
-		}
-		public Part finish() {
-			throw new Error.JavaException("SyntaxError", "Unexpected " + this);
-		}
 	}
-	public static class OpenArray implements Part {
+	public static class OpenArray extends Referency {
+		boolean closed;
 		Part currentEntry;
 		List<Part> entries = new ArrayList();
 		public OpenArray() {}
 		@Override
 		public java.lang.String toString() {
-			return entries.toString();
+			StringBuilder builder = new StringBuilder("[");
+			join(entries, ',', builder);
+			if(closed)
+				builder.append(']');
+			return builder.toString();
 		}
 		@Override
 		public Part transform(Part part) {
+			if(closed)
+				return super.transform(part);
+			
 			if(currentEntry == null) {
-				if(!(part instanceof CloseArray))
+				if(part instanceof CloseArray)
+					closed = true;
+				else
 					currentEntry = part;
 				return this;
 			} else {
@@ -1003,6 +1153,8 @@ public abstract class AbstractCompiler implements Compiler {
 							entries.add(currentEntry);
 							currentEntry = null;
 						}
+						if(part instanceof CloseArray)
+							closed = true;
 						return this;
 					}
 				}
@@ -1017,100 +1169,38 @@ public abstract class AbstractCompiler implements Compiler {
 		}
 		@Override
 		public boolean isIncomplete() {
-			return currentEntry != null;
+			return !closed && currentEntry != null;
 		}
 		public Part finish() {
 			return this;
 		}
 	}
-	public static class CloseArray implements Part {
+	public static class CloseArray extends SubPart {
 		public CloseArray() {}
 		@Override
 		public java.lang.String toString() {
 			return "]";
 		}
-		@Override
-		public Part transform(Part part) {
-				throw new Error.JavaException("SyntaxError", "Unexpected " + part);
-		}
-		@Override
-		public boolean isStandalone() {
-			return false;
-		}
-		@Override
-		public boolean isIncomplete() {
-			return true;
-		}
-		public Part finish() {
-			throw new Error.JavaException("SyntaxError", "Unexpected " + this);
-		}
 	}
-	public static class Comma implements Part {
+	public static class Comma extends SubPart {
 		public Comma() {}
 		@Override
 		public java.lang.String toString() {
 			return ",";
 		}
-		@Override
-		public Part transform(Part part) {
-				throw new Error.JavaException("SyntaxError", "Unexpected " + part);
-		}
-		@Override
-		public boolean isStandalone() {
-			return false;
-		}
-		@Override
-		public boolean isIncomplete() {
-			return false;
-		}
-		public Part finish() {
-			throw new Error.JavaException("SyntaxError", "Unexpected " + this);
-		}
 	}
-	public static class Null implements Part {
+	public static class Null extends VolatileReferency {
 		public Null() {}
 		@Override
 		public java.lang.String toString() {
 			return "null";
 		}
-		@Override
-		public Part transform(Part part) {
-			if(part instanceof SemiColon)
-				throw new CompleteException();
-			throw new Error.JavaException("SyntaxError", "Unexpected " + part);
-		}
-		@Override
-		public boolean isStandalone() {
-			return true;
-		}
-		@Override
-		public boolean isIncomplete() {
-			return false;
-		}
-		public Part finish() {
-			return this;
-		}
 	}
-	public static class Undefined implements Part {
+	public static class Undefined extends VolatileReferency {
 		public Undefined() {}
 		@Override
 		public java.lang.String toString() {
-			return "null";
-		}
-		@Override
-		public Part transform(Part part) {
-			throw new Error.JavaException("SyntaxError", "Unexpected " + part);
-		}
-		@Override
-		public boolean isStandalone() {
-			return true;
-		}
-		@Override
-		public boolean isIncomplete() {
-			return false;
-		}
-		public Part finish() {
-			return this;
+			return "undefined";
 		}
 	}
 	public static class Function implements Part {
@@ -1129,7 +1219,7 @@ public abstract class AbstractCompiler implements Compiler {
 		List<java.lang.String> arguments = new ArrayList();
 		State state = State.BeforeName;
 		java.lang.String source;
-		java.lang.Object[] impl;
+		ScriptData impl;
 		public Function() {}
 		@Override
 		public java.lang.String toString() {
@@ -1144,7 +1234,7 @@ public abstract class AbstractCompiler implements Compiler {
 			join(arguments, ',', builder);
 			builder.append("){");
 			if(impl == null)
-				builder.append("[unparsed]");
+				builder.append("<unparsed>");
 			else
 				join(Arrays.asList(impl), ';', builder);
 			builder.append("}");
@@ -1225,33 +1315,18 @@ public abstract class AbstractCompiler implements Compiler {
 			return this;
 		}
 	}
-	public static class SemiColon implements Part {
+	public static class SemiColon extends SubPart {
 		public SemiColon() {}
 		@Override
 		public java.lang.String toString() {
 			return ";";
-		}
-		@Override
-		public Part transform(Part part) {
-			return part;
-		}
-		@Override
-		public boolean isStandalone() {
-			return true;
-		}
-		@Override
-		public boolean isIncomplete() {
-			return false;
-		}
-		public Part finish() {
-			return null;
 		}
 	}
 	public static class NewLine implements Part {
 		public NewLine() {}
 		@Override
 		public java.lang.String toString() {
-			return "\n";
+			return "\\n";
 		}
 		@Override
 		public Part transform(Part part) {
@@ -1299,6 +1374,8 @@ public abstract class AbstractCompiler implements Compiler {
 		@Override
 		public Part transform(Part part) {
 			if(rhs == null) {
+				if(!part.isStandalone())
+					throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part);
 				rhs = part;
 				return this;
 			}
@@ -1316,7 +1393,8 @@ public abstract class AbstractCompiler implements Compiler {
 		}
 		@Override
 		public Part finish() {
-			rhs = rhs.finish();
+			if(rhs != null)
+				rhs = rhs.finish();
 			return this;
 		}
 		@Override
@@ -1468,7 +1546,7 @@ public abstract class AbstractCompiler implements Compiler {
 
 		@Override
 		public boolean isIncomplete() {
-			return (lhs != null && lhs.isIncomplete()) || (rhs != null && rhs.isIncomplete());
+			return (lhs != null && lhs.isIncomplete()) || (rhs != null && rhs.isIncomplete()) || (lhs == null && rhs == null);
 		}
 
 		@Override
@@ -1481,6 +1559,17 @@ public abstract class AbstractCompiler implements Compiler {
 			if(rhs != null)
 				rhs = rhs.finish();
 			return this;
+		}
+		
+		@Override
+		public java.lang.String toString() {
+			StringBuilder builder = new StringBuilder();
+			if(lhs != null)
+				builder.append(lhs);
+			builder.append("++");
+			if(rhs != null)
+				builder.append(rhs);
+			return builder.toString();
 		}
 		
 	}
@@ -1502,6 +1591,26 @@ public abstract class AbstractCompiler implements Compiler {
 		@Override
 		public java.lang.String op() {
 			return "<";
+		}
+	}
+	public static class MoreEqual extends RhLh {
+		public MoreEqual() {}
+		public MoreEqual(Part lhs) {
+			super(lhs);
+		}
+		@Override
+		public java.lang.String op() {
+			return ">=";
+		}
+	}
+	public static class LessEqual extends RhLh {
+		public LessEqual() {}
+		public LessEqual(Part lhs) {
+			super(lhs);
+		}
+		@Override
+		public java.lang.String op() {
+			return "<=";
 		}
 	}
 	public static class New extends Referency {
@@ -1550,7 +1659,8 @@ public abstract class AbstractCompiler implements Compiler {
 			if(arguments != null) {
 				buffer.append('(');
 				join(arguments, ',', buffer);
-				buffer.append(')');
+				if(closed)
+					buffer.append(')');
 			}
 			return buffer.toString();
 		}
@@ -1564,7 +1674,7 @@ public abstract class AbstractCompiler implements Compiler {
 		}
 		@Override
 		public Part finish() {
-			reference.finish();
+			reference = reference.finish();
 			if(arguments != null) {
 				ListIterator<Part> it = arguments.listIterator();
 				while(it.hasNext())
@@ -1574,11 +1684,6 @@ public abstract class AbstractCompiler implements Compiler {
 				throw new Error.JavaException("SyntaxError", "Unexpected EOF");
 			return this;
 		}
-
-		@Override
-		public Referency extend(DirectReference reference) {
-			return new RightReference(this, reference.ref);
-		}
 	}
 	public static class RegEx extends Referency {
 		
@@ -1586,11 +1691,6 @@ public abstract class AbstractCompiler implements Compiler {
 		public RegEx(java.lang.String pattern, java.lang.String flags) {
 			this.pattern = pattern;
 			this.flags = flags;
-		}
-
-		@Override
-		public Referency extend(DirectReference reference) {
-			return new RightReference(this, reference.ref);
 		}
 
 		@Override
@@ -1641,6 +1741,10 @@ public abstract class AbstractCompiler implements Compiler {
 			} else if(part instanceof AbstractCompiler.Set) {
 				currentSet.rhs = new SetPlaceholder();
 				return this;
+			} else if(part instanceof Comma) {
+				sets.add(currentSet);
+				currentSet = null;
+				return this;
 			} else if(part instanceof SemiColon)
 				throw new CompleteException();
 				
@@ -1670,30 +1774,11 @@ public abstract class AbstractCompiler implements Compiler {
 			return this;
 		}
 	}
-	public static class String implements Part {
+	public static class String extends Referency {
 		public final java.lang.String string;
 		public String(java.lang.String string) {
 			assert(string != null);
 			this.string = string;
-		}
-
-		@Override
-		public Part transform(Part part) {
-			if(part instanceof SemiColon)
-				throw new CompleteException();
-			throw new Error.JavaException("SyntaxError", "Unexpected " + part);
-		}
-		@Override
-		public boolean isStandalone() {
-			return true;
-		}
-		@Override
-		public boolean isIncomplete() {
-			return false;
-		}
-		@Override
-		public Part finish() {
-			return this;
 		}
 
 		@Override
@@ -1741,30 +1826,22 @@ public abstract class AbstractCompiler implements Compiler {
 			return this;
 		}
 	}
-	public static class Number implements Part {
+	public static class Number extends Referency {
 		public final double value;
 		public Number(double value) {
 			this.value = value;
-		}
-		@Override
-		public Part transform(Part part) {
-				throw new Error.JavaException("SyntaxError", "Unexpected " + part);
-		}
-		@Override
-		public boolean isStandalone() {
-			return true;
-		}
-		@Override
-		public boolean isIncomplete() {
-			return false;
 		}
 		@Override
 		public java.lang.String toString() {
 			return java.lang.String.valueOf(value);
 		}
 		@Override
-		public Part finish() {
-			return this;
+		public Referency extend(DirectReference reference) {
+			throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + reference);
+		}
+		@Override
+		public Referency extend(IntegerReference reference) {
+			throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + reference);
 		}
 	}
 	
@@ -1795,6 +1872,8 @@ public abstract class AbstractCompiler implements Compiler {
 	public static final Pattern MULTIPLY = Pattern.compile("^\\*");
 	public static final Pattern MORETHAN = Pattern.compile("^\\>");
 	public static final Pattern LESSTHAN = Pattern.compile("^\\<");
+	public static final Pattern MOREEQUAL = Pattern.compile("^\\>=");
+	public static final Pattern LESSEQUAL = Pattern.compile("^\\<=");
 	public static final Pattern PLUSEQ = Pattern.compile("^\\+=");
 	public static final Pattern SEMICOLON = Pattern.compile("^;");
 	public static final Pattern NOTEQUALS = Pattern.compile("^!=");
@@ -1870,10 +1949,7 @@ public abstract class AbstractCompiler implements Compiler {
 			return columns;
 		}
 	}
-	public static interface Parser {
-		public java.lang.Object[] parse(ParserReader reader) throws IOException;
-	}
-	public static abstract class RegexParser implements Parser {
+	public static abstract class RegexParser {
 		public static class PartExchange extends RuntimeException {
 			final int trim;
 			final Part part;
@@ -1894,13 +1970,20 @@ public abstract class AbstractCompiler implements Compiler {
 		public RegexParser(Pattern... patterns) {
 			this.patterns = patterns;
 		}
-		
+
 		@Override
-		public final java.lang.Object[] parse(ParserReader reader) throws IOException {
+		public java.lang.String toString() {
+			java.lang.String toString = super.toString();
+			return toString.substring(toString.lastIndexOf('$')+1);
+		}
+		
+		public final ScriptData parse(ParserReader reader) throws IOException {
 			return parse(reader, new StringBuilder());
 		}
 		
-		public final java.lang.Object[] parse(ParserReader reader, StringBuilder builder) throws IOException {
+		public final ScriptData parse(ParserReader reader, StringBuilder builder) throws IOException {
+			if(DEBUG)
+				System.out.println("[" + this + "] Parsing...");
 			FunctionParser functionParser = this instanceof FunctionParser ? (FunctionParser)this : new FunctionParser();
 			BlockParser blockParser = this instanceof BlockParser ? (BlockParser)this : new BlockParser(this == functionParser);
 			java.lang.String buffer;
@@ -1933,12 +2016,18 @@ public abstract class AbstractCompiler implements Compiler {
 												throw new Error.JavaException("SyntaxError", "Expected more after " + currentPart);
 											parts.add(currentPart);
 										}
+										if(DEBUG)
+											System.out.println("[" + this + "] End...");
 										end(parts, builder.toString());
 									}
 									
 									try {
+										if(DEBUG)
+											System.out.println("[" + this + "] " + describe(currentPart) + " -> " + describe(part.part));
 										currentPart = currentPart.transform(part.part);
 									} catch(CompleteException ex) {
+										if(DEBUG)
+											System.out.println("[" + this + "] Complete: " + ex);
 										currentPart = currentPart.finish();
 										if(currentPart != null) {
 											if(!currentPart.isStandalone())
@@ -1947,8 +2036,20 @@ public abstract class AbstractCompiler implements Compiler {
 												throw new Error.JavaException("SyntaxError", "Expected more after " + currentPart);
 											parts.add(currentPart);
 										}
-										if(ex.part instanceof CloseGroup)
-											end(parts, builder.toString());
+										if(ex.part != null) {
+											if(ex.part instanceof CloseGroup) {
+												if(DEBUG)
+													System.out.println("[" + this + "] End...");
+												end(parts, builder.toString());
+											}
+											if(!ex.part.isStandalone()) {
+												if(ex.part instanceof SemiColon) {
+													builder.append(reader.ltrim(part.trim));
+													break next;
+												}
+												throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + ex.part);
+											}
+										}
 										currentPart = ex.part;
 									} catch(ParseFunction ex) {
 										builder.append(reader.ltrim(part.trim));
@@ -1975,16 +2076,22 @@ public abstract class AbstractCompiler implements Compiler {
 										break next;
 									}
 								} else {
-									if(part.part instanceof CloseGroup)
+									if(part.part instanceof CloseGroup) {
+										if(DEBUG)
+											System.out.println("[" + this + "] End...");
 										end(parts, builder.toString());
+									}
 									currentPart = part.part;
 								}
 								builder.append(reader.ltrim(part.trim));
 							} catch(PartComplete part) {
 								currentPart = currentPart.finish();
 								if(currentPart != null) {
-									if(currentPart instanceof CloseGroup)
+									if(currentPart instanceof CloseGroup) {
+										if(DEBUG)
+											System.out.println("[" + this + "] End...");
 										end(parts, builder.toString());
+									}
 									if(!currentPart.isStandalone())
 										throw new Error.JavaException("SyntaxError", "Unexpected " + currentPart);
 									if(currentPart.isIncomplete())
@@ -1999,7 +2106,7 @@ public abstract class AbstractCompiler implements Compiler {
 					}
 					java.lang.String next;
 					if((next = reader.more()) == null)
-						throw new Error.JavaException("SyntaxError", "No matching patterns for " + getClass().getSimpleName() + ": " + buffer);
+						throw new Error.JavaException("SyntaxError", "No matching patterns for " + this + ": " + buffer);
 					buffer = next;
 				}
 			}
@@ -2014,7 +2121,7 @@ public abstract class AbstractCompiler implements Compiler {
 					currentPart = null;
 				}
 			}
-			return parts.toArray();
+			return new ScriptData(parts.toArray(new Part[parts.size()]));
 		}
 		
 		public void end(List<Part> parts, java.lang.String source) {
@@ -2026,7 +2133,7 @@ public abstract class AbstractCompiler implements Compiler {
 	}
 	public static class ScriptParser extends RegexParser {
 		public ScriptParser() {
-			super(NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, AND, OR, SET, PLUSPLUS, PLUSEQ, MULTIPLYEQ, PLUS, MULTIPLY, SEMICOLON, NEWLINE, NUMBER, VARIABLE, VARIABLEGET, SINGLELINE_COMMENT, MULTILINE_COMMENT, WHITESPACE, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, REGEX);
+			super(NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, AND, OR, SET, PLUSPLUS, PLUSEQ, MULTIPLYEQ, PLUS, MULTIPLY, SEMICOLON, NEWLINE, NUMBER, VARIABLE, VARIABLEGET, SINGLELINE_COMMENT, MULTILINE_COMMENT, WHITESPACE, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, REGEX);
 		}
 		@Override
 		public void match(Pattern pattern, Matcher matcher, ParserReader reader) {
@@ -2079,6 +2186,12 @@ public abstract class AbstractCompiler implements Compiler {
 					throw new PartExchange(new Boolean(true), ref.length());
 				else if(ref.equals("false"))
 					throw new PartExchange(new Boolean(false), ref.length());
+				else if(ref.equals("throw"))
+					throw new PartExchange(new Throw(), ref.length());
+				else if(ref.equals("switch"))
+					throw new PartExchange(new Switch(), ref.length());
+				else if(ref.equals("case"))
+					throw new PartExchange(new Case(), ref.length());
 				else if(ref.equals("return"))
 					ret(matcher);
 				else if(ref.equals("var"))
@@ -2130,6 +2243,10 @@ public abstract class AbstractCompiler implements Compiler {
 				throw new PartExchange(new MoreThan(), matcher.group().length());
 			if(pattern == LESSTHAN)
 				throw new PartExchange(new LessThan(), matcher.group().length());
+			if(pattern == MOREEQUAL)
+				throw new PartExchange(new MoreEqual(), matcher.group().length());
+			if(pattern == LESSEQUAL)
+				throw new PartExchange(new LessEqual(), matcher.group().length());
 			
 			if(pattern == SET)
 				throw new PartExchange(new Set(), matcher.group().length());
@@ -2140,8 +2257,13 @@ public abstract class AbstractCompiler implements Compiler {
 			if(pattern == COLON)
 				throw new PartExchange(new Colon(), matcher.group().length());
 			
-			if(pattern == NUMBERGET)
-				throw new PartExchange(new DirectReference(matcher.group(1)), matcher.group().length());
+			if(pattern == NUMBERGET) {
+				try {
+					throw new PartExchange(new IntegerReference(java.lang.Integer.valueOf(matcher.group(1))), matcher.group().length());
+				} catch(NumberFormatException ex) {
+					throw new PartExchange(new DirectReference(matcher.group(1)), matcher.group().length());
+				}
+			}
 			
 			if(pattern == STRINGGET) {
 				java.lang.String string = matcher.group(1);
@@ -2174,7 +2296,7 @@ public abstract class AbstractCompiler implements Compiler {
 			this.inFunction = inFunction;
 		}
 		public void end(List<Part> parts, java.lang.String source) {
-			throw new ParseComplete(parts.toArray(), source);
+			throw new ParseComplete(new ScriptData(parts.toArray(new Part[parts.size()])), source);
 		}
 		@Override
 		public void ret(Matcher matcher) {
@@ -2189,7 +2311,7 @@ public abstract class AbstractCompiler implements Compiler {
 			throw new PartExchange(new Return(), matcher.group().length());
 		}
 		public void end(List<Part> parts, java.lang.String source) {
-			throw new ParseComplete(parts.toArray(), source);
+			throw new ParseComplete(new ScriptData(parts.toArray(new Part[parts.size()])), source);
 		}
 	}
 
@@ -2203,7 +2325,10 @@ public abstract class AbstractCompiler implements Compiler {
 		ParserReader reader = null;
 		RegexParser parser = inFunction ? new FunctionParser() : new ScriptParser();
 		try {
-			return compileScript(parser.parse(reader = new ParserReader(source)), inFunction);
+			ScriptData script = parser.parse(reader = new ParserReader(source));
+			if(DEBUG)
+				System.out.println("Compiling " + join(Arrays.asList(script), ';'));
+			return compileScript(script, inFunction);
 		} catch(net.nexustools.njs.Error.JavaException ex) {
 			if(ex.type.equals("SyntaxError") && reader != null)
 				throw new net.nexustools.njs.Error.JavaException("SyntaxError", ex.getUnderlyingMessage() + " (" + reader.columns() + ')', ex);
@@ -2213,6 +2338,6 @@ public abstract class AbstractCompiler implements Compiler {
 		}
 	}
 	
-	protected abstract Script compileScript(java.lang.Object[] script, boolean inFunction);
+	protected abstract Script compileScript(ScriptData script, boolean inFunction);
 	
 }

@@ -24,6 +24,7 @@ public class Global extends GenericObject {
 	public final Number Number = new Number();
 	public final Boolean Boolean;
 	public final Symbol Symbol;
+	public final Error Error;
 	public final Array Array;
 	
 	public final Number.Instance NaN;
@@ -54,6 +55,7 @@ public class Global extends GenericObject {
 		
 		Boolean = new Boolean(this);
 		Symbol = new Symbol(this);
+		Error = new Error(this);
 		Array = new Array(this);
 		
 		NaN = Number.wrap(Double.NaN);
@@ -80,6 +82,7 @@ public class Global extends GenericObject {
 		setStorage("String", String, false);
 		setStorage("Number", Number, false);
 		setStorage("Symbol", Symbol, false);
+		setStorage("Error", Error, false);
 		setStorage("Array", Array, false);
 	}
 	
@@ -113,6 +116,14 @@ public class Global extends GenericObject {
 			CONSTRUCTORS.add(new WeakReference(constructor));
 			return constructor;
 		}
+	}
+	
+	public BaseObject wrap(Throwable t) {
+		if(t instanceof Error.ThrowException)
+			return ((Error.ThrowException)t).what;
+		if(t instanceof Error.JavaException)
+			return new Error.Instance(String, Error, ((Error.JavaException)t).type, ((Error.JavaException) t).getUnderlyingMessage(), JSHelper.convertStack(t));
+		return new Error.Instance(String, Error, "JavaError", t.toString(), JSHelper.convertStack(t));
 	}
 
 	private static final List<WeakReference<JavaObjectWrapper>> WRAPS = new ArrayList();

@@ -115,6 +115,9 @@ public class Number extends AbstractFunction {
 	}
 	
 	public Instance from(BaseObject param) {
+		BaseObject valueOf = param.get("valueOf");
+		if(valueOf != null && valueOf instanceof BaseFunction)
+			param = ((BaseFunction)valueOf).call(param);
 		if(param instanceof Instance)
 			return (Instance)param;
 		
