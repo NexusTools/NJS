@@ -1,4 +1,4 @@
-print((function main(global) {
+(function main(global) {
 	'strict';
 	
 	print("T".charCodeAt(0));
@@ -147,6 +147,7 @@ print((function main(global) {
 	print(true);
 	
 	function muffin() {
+		cheese.call(this);
 		throw new Error("Farmers Dress");
 	}
 	
@@ -157,7 +158,13 @@ print((function main(global) {
 		JOptionPane.showMessageDialog(null, e);
 	}
 	
-	return "Solid!";
+	function 侷() {
+		throw new Error("Tuba Fish");
+	}
+	
+	侷();
+	
+	
 	
 	/*while(1) {
 		ExecutorService.execute(function() {
@@ -166,4 +173,4 @@ print((function main(global) {
 			}
 		});
 	}*/
-}).call(this, this));
+}).call(this, this);

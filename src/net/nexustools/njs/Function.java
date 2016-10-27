@@ -118,7 +118,7 @@ public class Function extends AbstractFunction {
 					}
 				};
 				scope.enter();
-				JSHelper.renameCall(name(), "Function", 0);
+				JSHelper.renameCall(name(), "Function", 0, 0);
 				try {
 					return compiled.exec(global, scope);
 				} finally {

@@ -6,6 +6,7 @@
 package net.nexustools.njs.compiler;
 
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import net.nexustools.njs.AbstractFunction;
 import net.nexustools.njs.BaseFunction;
 import net.nexustools.njs.BaseObject;
@@ -23,6 +24,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import static net.nexustools.njs.compiler.AbstractCompiler.join;
+import static net.nexustools.njs.compiler.AbstractCompiler.join;
+import static net.nexustools.njs.compiler.AbstractCompiler.join;
+import static net.nexustools.njs.compiler.AbstractCompiler.join;
 import static net.nexustools.njs.compiler.AbstractCompiler.join;
 import static net.nexustools.njs.compiler.AbstractCompiler.join;
 import static net.nexustools.njs.compiler.AbstractCompiler.join;
@@ -50,11 +55,34 @@ public class RuntimeCompiler extends AbstractCompiler {
 			}
 		}
 	}
+	private final ArrayList<java.lang.String> methodNameStack = new ArrayList();
 	private ScriptCompilerData precompile(ScriptData script, java.lang.String fileName) {
 		Runnable[] functionImpls = new Runnable[script.functions.length];
-		for(int i=0; i<functionImpls.length; i++)
-			functionImpls[i] = compile(new ScriptCompilerData(null, fileName, script.functions[i].name), script.functions[i]);
-		return new ScriptCompilerData(functionImpls, fileName, "");
+		for(int i=0; i<functionImpls.length; i++) {
+			StringBuilder builder = new StringBuilder();
+			for(java.lang.String methodName : methodNameStack) {
+				if(methodName.startsWith("<"))
+					continue;
+				if(builder.length() > 0)
+					builder.append('.');
+				builder.append(methodName);
+			}
+			if(builder.length() > 0)
+				builder.append('.');
+			builder.append(script.functions[i].name);
+			functionImpls[i] = compile(new ScriptCompilerData(null, fileName, builder.toString()), script.functions[i]);
+		}
+		int min = methodNameStack.size()-1;
+		StringBuilder builder = new StringBuilder();
+		for(int i=0; i<methodNameStack.size(); i++) {
+			java.lang.String methodName = methodNameStack.get(i);
+			if(methodName.startsWith("<") && i < min)
+				continue;
+			if(builder.length() > 0)
+				builder.append('.');
+			builder.append(methodName);
+		}
+		return new ScriptCompilerData(functionImpls, fileName, builder.toString());
 	}
 	public static interface Referenceable {
 		public BaseObject get();
@@ -244,13 +272,14 @@ public class RuntimeCompiler extends AbstractCompiler {
 		if(DEBUG)
 			System.out.println("Compiling " + describe(object));
 		
-		final int lineNumber = object.rows;
+		final int rows = object.rows;
+		final int columns = object.columns;
 		if(object instanceof Integer) {
 			final double number = ((Integer)object).value;
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						return new ValueReferenceable(global.wrap(number));
 					} finally {
@@ -263,7 +292,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						return new ValueReferenceable(global.wrap(number));
 					} finally {
@@ -276,7 +305,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						return new ValueReferenceable(global.wrap(string));
 					} finally {
@@ -289,7 +318,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						return new StringKeyReferenceable(ref, ref, scope);
 					} finally {
@@ -305,7 +334,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						return new StringKeyReferenceable(full, key, scope.resolve(chain));
 					} catch(net.nexustools.njs.Error.JavaException err) {
@@ -328,7 +357,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+						JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 						try {
 							return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct());
 						} finally {
@@ -347,7 +376,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+							JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 							try {
 								return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct(argr[0].run(global, scope).get()));
 							} finally {
@@ -360,7 +389,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+							JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 							try {
 								return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct(argr[0].run(global, scope).get(), argr[1].run(global, scope).get()));
 							} finally {
@@ -373,7 +402,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+							JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 							try {
 								return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct(argr[0].run(global, scope).get(), argr[1].run(global, scope).get(), argr[2].run(global, scope).get()));
 							} finally {
@@ -387,7 +416,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
 							BaseObject[] args = new BaseObject[argr.length];
-							JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+							JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 							try {
 								for(int i=0; i<args.length; i++)
 									args[i] = argr[i].run(global, scope).get();
@@ -405,7 +434,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+						JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 						try {
 							Referenceable ref = reference.run(global, scope);
 							BaseFunction func;
@@ -436,7 +465,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+							JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 							try {
 								Referenceable ref = reference.run(global, scope);
 								BaseFunction func;
@@ -461,7 +490,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+							JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 							try {
 								Referenceable ref = reference.run(global, scope);
 								BaseFunction func;
@@ -486,7 +515,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+							JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 							try {
 								Referenceable ref = reference.run(global, scope);
 								BaseFunction func;
@@ -511,7 +540,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+							JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 							try {
 								Referenceable ref = reference.run(global, scope);
 								BaseFunction func;
@@ -541,7 +570,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						return new ValueReferenceable(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).multiply(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
 					} finally {
@@ -555,7 +584,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						return new ValueReferenceable(global.wrap(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).number < global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get())).number));
 					} finally {
@@ -569,7 +598,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						return new ValueReferenceable(global.wrap(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).number > global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get())).number));
 					} finally {
@@ -583,7 +612,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						Referenceable ref = lhs.run(global, scope);
 
@@ -601,7 +630,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						BaseObject l = JSHelper.valueOf(lhs.run(global, scope).get());
 						if(l instanceof net.nexustools.njs.Number.Instance)
@@ -627,7 +656,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						BaseObject obj = contents.run(global, scope).get();
 						for(java.lang.String key : chain)
@@ -644,7 +673,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						Referenceable ref = lhs.run(global, scope);
 						BaseObject r = rhs.run(global, scope).get();
@@ -660,7 +689,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						return new Return(ret.run(global, scope).get());
 					} finally {
@@ -685,7 +714,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						int i=0;
 						for(; i<len; i++) {
@@ -721,15 +750,23 @@ public class RuntimeCompiler extends AbstractCompiler {
 				}
 			}
 			final java.lang.String arguments = argBuilder.toString();
-			final Script impl = compileScript(((Function)object).impl, data.fileName, true);
-			final int subLineNumber = ((Function)object).impl.rows;
+			final Script impl;
+			methodNameStack.add(name);
+			try {
+				impl = compileScript(((Function)object).impl, data.fileName, true);
+			} finally {
+				methodNameStack.remove(methodNameStack.size()-1);
+			}
+			final int subRows = ((Function)object).impl.rows;
+			final int subColumns = ((Function)object).impl.columns;
+			final java.lang.String stackName = methodNameStack.isEmpty() ? name : join(methodNameStack, '.') + '.' + name;
 			return new Runnable() {
 				@Override
 				public Referenceable run(final Global global, final Scope scope) {
 					AbstractFunction func = new ConstructableFunction(global) {
 						@Override
 						public BaseObject call(BaseObject _this, BaseObject... params) {
-							JSHelper.renameCall(name(), data.fileName, subLineNumber);
+							JSHelper.renameCall(stackName, data.fileName, subRows, subColumns);
 							try {
 								Scope s = scope.extend(_this);
 								s.var("arguments", new net.nexustools.njs.Arguments(global, this, params));
@@ -774,7 +811,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						BaseObject lhs = ref.run(global, scope).get();
 						Iterator<java.lang.String> it = keys.iterator();
@@ -793,7 +830,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						GenericArray array = new GenericArray(global, entries.length);
 						for(int i=0; i<entries.length; i++)
@@ -810,7 +847,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						BaseObject l = lhs.run(global, scope).get();
 						if(JSHelper.isTrue(l))
@@ -827,7 +864,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+						JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 						try {
 							Referenceable ref = lhs.run(global, scope);
 							net.nexustools.njs.Number.Instance val = global.toNumber(ref.get());
@@ -844,7 +881,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+						JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 						try {
 							Referenceable ref = rhs.run(global, scope);
 							net.nexustools.njs.Number.Instance val = global.toNumber(ref.get());
@@ -866,7 +903,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						GenericObject object = new GenericObject(global);
 						for(Map.Entry<java.lang.String, Runnable> entry : compiled.entrySet()) {
@@ -892,7 +929,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 							return new Runnable() {
 								@Override
 								public Referenceable run(Global global, Scope scope) {
-									JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+									JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 									try {
 										if(JSHelper.isTrue(condition.run(global, scope).get())) {
 											Referenceable ref = impl.run(global, scope);
@@ -918,7 +955,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+							JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 							try {
 								if(JSHelper.isTrue(condition.run(global, scope).get())) {
 									Referenceable ref = impl.run(global, scope);
@@ -945,7 +982,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 							return new Runnable() {
 								@Override
 								public Referenceable run(Global global, Scope scope) {
-									JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+									JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 									try {
 										if(JSHelper.isTrue(condition.run(global, scope).get())) {
 											BaseObject ret = impl.exec(global, scope);
@@ -970,7 +1007,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+							JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 							try {
 								if(JSHelper.isTrue(condition.run(global, scope).get())) {
 									BaseObject ret = impl.exec(global, scope);
@@ -990,7 +1027,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						return new ValueReferenceable(global.wrap(value));
 					} finally {
@@ -1005,7 +1042,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						return new ObjectKeyReferenceable(source, ref.run(global, scope).get(), lhs.run(global, scope).get());
 					} finally {
@@ -1018,7 +1055,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						return new ValueReferenceable(global.wrap(ref.run(global, scope).delete()));
 					} finally {
@@ -1033,7 +1070,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						return new IntegerKeyReferenceable(source, integer, lhs.run(global, scope).get());
 					} finally {
@@ -1047,7 +1084,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						return new ValueReferenceable(global.wrap(lhs.run(global, scope).get().instanceOf((BaseFunction)rhs.run(global, scope).get())));
 					} finally {
@@ -1065,7 +1102,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+						JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 						try {
 							Scope extended = scope.extend();
 							try {
@@ -1098,7 +1135,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+						JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 						try {
 							Scope extended = scope.extend();
 							try {
@@ -1126,7 +1163,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+						JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 						try {
 							Scope extended = scope.extend();
 							try {
@@ -1151,7 +1188,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						throw new net.nexustools.njs.Error.ThrowException(rhs.run(global, scope).get());
 					} finally {
@@ -1165,7 +1202,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					JSHelper.renameCall(data.methodName, data.fileName, lineNumber);
+					JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						Scope extended = scope.extend();
 						extended.enter();
@@ -1233,7 +1270,8 @@ public class RuntimeCompiler extends AbstractCompiler {
 				}
 			};
 		
-		final int lineNumber = script.rows;
+		final int rows = script.rows;
+		final int columns = script.columns;
 		if(scriptType != ScriptType.Global) {
 			final ScriptCompilerData precompiled = precompile(script, fileName);
 			final Runnable[] parts = new Runnable[script.impl.length];
@@ -1247,7 +1285,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 						scope = new Scope.Extended(global);
 					
 					scope.enter();
-					JSHelper.renameCall(precompiled.methodName, precompiled.fileName, lineNumber);
+					JSHelper.renameCall(precompiled.methodName, precompiled.fileName, rows, columns);
 					try {
 						precompiled.exec(global, scope);
 						for(int i=0; i<max; i++) {
@@ -1278,7 +1316,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 					if(scope == null)
 						scope = new Scope(global);
 					scope.enter();
-					JSHelper.renameCall(precompiled.methodName, precompiled.fileName, lineNumber);
+					JSHelper.renameCall(precompiled.methodName, precompiled.fileName, rows, columns);
 					try {
 						precompiled.exec(global, scope);
 						return impl.run(global, scope).get();
@@ -1307,7 +1345,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 							scope = new Scope(global);
 						
 						scope.enter();
-						JSHelper.renameCall(precompiled.methodName, precompiled.fileName, lineNumber);
+						JSHelper.renameCall(precompiled.methodName, precompiled.fileName, rows, columns);
 						try {
 							precompiled.exec(global, scope);
 							parts[0].run(global, scope);
@@ -1331,7 +1369,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 							scope = new Scope(global);
 						
 						scope.enter();
-						JSHelper.renameCall(precompiled.methodName, precompiled.fileName, lineNumber);
+						JSHelper.renameCall(precompiled.methodName, precompiled.fileName, rows, columns);
 						try {
 							precompiled.exec(global, scope);
 							parts[0].run(global, scope);
@@ -1358,7 +1396,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 							scope = new Scope(global);
 						
 						scope.enter();
-						JSHelper.renameCall(precompiled.methodName, precompiled.fileName, lineNumber);
+						JSHelper.renameCall(precompiled.methodName, precompiled.fileName, rows, columns);
 						try {
 							precompiled.exec(global, scope);
 							for(int i=0; i<max; i++)

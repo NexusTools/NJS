@@ -6,7 +6,6 @@
 package net.nexustools.njs;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -218,7 +217,7 @@ public class JSHelper {
 						el0.original.getMethodName().equals(el.getMethodName()) &&
 						el.getLineNumber() >= el0.original.getLineNumber() && 
 						el.getLineNumber() <= el0.maxLineNumber)
-					el = el0.replacement;
+					el = el0.replacement.toStackTraceElement();
 			}
 			
 			converted[stack.length-stackRemaining-1] = el;
@@ -227,11 +226,27 @@ public class JSHelper {
 		return converted;
 	}
 
+	public static class ReplacementStackTraceElement {
+		
+		final int rows, columns;
+		final java.lang.String methodName, fileName;
+		public ReplacementStackTraceElement(java.lang.String methodName, java.lang.String fileName, int rows, int columns) {
+			this.methodName = methodName;
+			this.fileName = fileName;
+			this.rows = rows;
+			this.columns = columns;
+		}
+
+		private StackTraceElement toStackTraceElement() {
+			return new StackTraceElement("NJS", methodName, fileName, rows);
+		}
+		
+	}
 	private static class StackElementReplace {
-		StackTraceElement replacement;
+		ReplacementStackTraceElement replacement;
 		final StackTraceElement original;
 		int maxLineNumber = Integer.MAX_VALUE;
-		public StackElementReplace(StackTraceElement original, StackTraceElement replacement) {
+		public StackElementReplace(StackTraceElement original, ReplacementStackTraceElement replacement) {
 			this.original = original;
 			this.replacement = replacement;
 		}
@@ -259,37 +274,69 @@ public class JSHelper {
 			
 			if(stackRemaining < target) {
 				StackElementReplace el0 = list.get(stackRemaining);
-				if(el0 != null) {
-					if(el0.original.getClassName().equals(el.getClassName()) &&
-							el0.original.getFileName().equals(el.getFileName()) &&
-							el0.original.getMethodName().equals(el.getMethodName()) &&
-							el.getLineNumber() >= el0.original.getLineNumber() && 
-							el.getLineNumber() <= el0.maxLineNumber)
-						el = el0.replacement;
+				if(el0 != null && el0.original.getClassName().equals(el.getClassName()) &&
+						el0.original.getFileName().equals(el.getFileName()) &&
+						el0.original.getMethodName().equals(el.getMethodName()) &&
+						el.getLineNumber() >= el0.original.getLineNumber() && 
+						el.getLineNumber() <= el0.maxLineNumber) {
+					
+					ReplacementStackTraceElement rel = el0.replacement;
+					
+					java.lang.String method = rel.methodName;
+					boolean hasMethod = method != null && !method.isEmpty();
+					if(hasMethod) {
+						builder.append(method);
+						builder.append(" (");
+					}
+
+					java.lang.String fileName = rel.fileName;
+					if(fileName == null)
+						builder.append("<unknown source>");
+					else {
+						builder.append(fileName);
+						if(rel.rows > 0) {
+							builder.append(':');
+							builder.append(rel.rows);
+							if(rel.columns > 0) {
+								builder.append(':');
+								builder.append(rel.columns);
+							}
+						}
+					}
+
+					if(hasMethod)
+						builder.append(')');
+					
+					stackRemaining--;
+					continue;
 				}
 			}
 			
-			java.lang.String method = el.getMethodName();
-			boolean hasMethod = method != null && !method.isEmpty();
-			if(hasMethod) {
-				builder.append(method);
-				builder.append(" (");
-			}
-			
-			java.lang.String fileName = el.getFileName();
-			if(fileName == null)
+			if(el.getClassName().startsWith("net.nexustools.njs.compiler.RuntimeCompiler")) {
 				builder.append("<unknown source>");
-			else {
-				builder.append(el.getFileName());
-				int lineNumber = el.getLineNumber();
-				if(lineNumber > 0) {
-					builder.append(':');
-					builder.append(lineNumber);
+			} else {
+				java.lang.String method = el.getMethodName();
+				boolean hasMethod = method != null && !method.isEmpty();
+				if(hasMethod) {
+					builder.append(method);
+					builder.append(" (");
 				}
+
+				java.lang.String fileName = el.getFileName();
+				if(fileName == null)
+					builder.append("<unknown source>");
+				else {
+					builder.append(fileName);
+					int lineNumber = el.getLineNumber();
+					if(lineNumber > 0) {
+						builder.append(':');
+						builder.append(lineNumber);
+					}
+				}
+
+				if(hasMethod)
+					builder.append(')');
 			}
-			
-			if(hasMethod)
-				builder.append(')');
 			
 			stackRemaining--;
 		}
@@ -302,21 +349,21 @@ public class JSHelper {
 		if(list.size() <= leftPad) {
 			while(list.size() < leftPad)
 				list.add(null);
-			list.add(new StackElementReplace(stack[1], new StackTraceElement("NJS", methodName, stack[1].getFileName(), stack[1].getLineNumber())));
+			list.add(new StackElementReplace(stack[1], new ReplacementStackTraceElement(methodName, stack[1].getFileName(), stack[1].getLineNumber(), 0)));
 		} else
-			list.set(leftPad, new StackElementReplace(stack[1], new StackTraceElement("NJS", methodName, stack[1].getFileName(), stack[1].getLineNumber())));
+			list.set(leftPad, new StackElementReplace(stack[1], new ReplacementStackTraceElement(methodName, stack[1].getFileName(), stack[1].getLineNumber(), 0)));
 		STACK_POSITION.set(leftPad);
 	}
-	public static void renameCall(java.lang.String methodName, java.lang.String fileName, int lineNumber) {
+	public static void renameCall(java.lang.String methodName, java.lang.String fileName, int rows, int columns) {
 		StackTraceElement[] stack = new Throwable().getStackTrace();
 		List<StackElementReplace> list = STACK_REPLACEMENTS.get();
 		int leftPad = stack.length-2;
 		if(list.size() <= leftPad) {
 			while(list.size() < leftPad)
 				list.add(null);
-			list.add(new StackElementReplace(stack[1], new StackTraceElement("NJS", methodName, fileName, lineNumber)));
+			list.add(new StackElementReplace(stack[1], new ReplacementStackTraceElement(methodName, fileName, rows, columns)));
 		} else
-			list.set(leftPad, new StackElementReplace(stack[1], new StackTraceElement("NJS", methodName, fileName, lineNumber)));
+			list.set(leftPad, new StackElementReplace(stack[1], new ReplacementStackTraceElement(methodName, fileName, rows, columns)));
 		STACK_POSITION.set(leftPad);
 	}
 

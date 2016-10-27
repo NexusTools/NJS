@@ -69,7 +69,7 @@ public abstract class AbstractCompiler implements Compiler {
 		final Part[] impl;
 		final int rows, columns;
 		final Function[] functions;
-		java.lang.String methodStack = null;
+		java.lang.String methodName = null;
 		public ScriptData(Part[] impl, int rows, int columns) {
 			List<Part> imp = new ArrayList();
 			List<Function> funcs = new ArrayList();
@@ -136,12 +136,12 @@ public abstract class AbstractCompiler implements Compiler {
 		public abstract boolean isIncomplete();
 		public abstract Part finish();
 	}
-	public static abstract class Referency extends Part {
+	public static abstract class PrimitiveReferency extends Part {
 		public boolean newline;
-		public Referency extend(DirectReference reference) {
+		public PrimitiveReferency extend(DirectReference reference) {
 			return new RightReference(this, reference.ref);
 		}
-		public Referency extend(IntegerReference reference) {
+		public PrimitiveReferency extend(IntegerReference reference) {
 			return new IntegerReference(this, reference.ref);
 		}
 		@Override
@@ -188,15 +188,17 @@ public abstract class AbstractCompiler implements Compiler {
 				return new Multiply(this);
 			else if(part instanceof Plus)
 				return new Plus(this);
-			else if(part instanceof OpenArray)
-				return new VariableReference(this);
 			else if(part instanceof Set)
 				return new Set(this);
 			else if(part instanceof And)
 				return new And(this);
 			else if(part instanceof Or)
 				return new Or(this);
-			
+			else
+				return transformFallback(part);
+		}
+		
+		public Part transformFallback(Part part) {
 			if(newline)
 				throw new CompleteException(part);
 			
@@ -216,6 +218,16 @@ public abstract class AbstractCompiler implements Compiler {
 		public Part finish() {
 			return this;
 		}
+	}
+	public static abstract class Referency extends PrimitiveReferency {
+
+		@Override
+		public Part transformFallback(Part part) {
+			if(part instanceof OpenArray)
+				return new VariableReference(this);
+			return super.transformFallback(part); //To change body of generated methods, choose Tools | Templates.
+		}
+		
 	}
 	public static class VolatileReferency extends Referency {
 		@Override
@@ -605,6 +617,7 @@ public abstract class AbstractCompiler implements Compiler {
 			InCondition,
 			AfterCondition,
 			InSimpleImpl,
+			InImpl,
 			Complete
 		}
 		State state;
@@ -645,7 +658,7 @@ public abstract class AbstractCompiler implements Compiler {
 					if(part instanceof NewLine)
 						return this;
 					if(part instanceof OpenGroup)
-						throw new ParseBlock(this);
+						return parse();
 					else if(part instanceof If && this instanceof Else)
 						return new ElseIf();
 					else if(allowSimpleImpl()) {
@@ -654,6 +667,8 @@ public abstract class AbstractCompiler implements Compiler {
 						return this;
 					}
 					break;
+				case InImpl:
+					return transformImpl(part);
 				case InSimpleImpl:
 					if(!simpleimpl.isIncomplete()) {
 						if(part instanceof SemiColon) {
@@ -669,6 +684,12 @@ public abstract class AbstractCompiler implements Compiler {
 			}
 			
 			throw new Error.JavaException("SyntaxError", "Unexpected " + part + " (" + state + ":" + getClass().getSimpleName() + ")");
+		}
+		public Part transformImpl(Part part) {
+			throw new UnsupportedOperationException();
+		}
+		public Part parse() {
+			throw new ParseBlock(this);
 		}
 		public Part complete(Part part) {
 			throw new CompleteException(part);
@@ -801,7 +822,46 @@ public abstract class AbstractCompiler implements Compiler {
 		
 	}
 	public static class Switch extends Block {
+		public static enum CaseState {
+			NeedCase,
+			InCase,
+			HaveCase,
+			InImpl
+		}
+		public static class Case {
+		}
+		
+		List<Case> cases = new ArrayList();
+		CaseState caseState = CaseState.NeedCase;
 		public Switch() {}
+
+		@Override
+		public Part transformImpl(Part part) {
+			if(part instanceof NewLine)
+				return this;
+			
+			switch(caseState) {
+				case NeedCase:
+					if(part instanceof AbstractCompiler.Case) {
+						caseState = CaseState.InCase;
+						return this;
+					}
+					break;
+				case InCase:
+					if(part instanceof PrimitiveReferency) {
+						caseState = CaseState.HaveCase;
+						return this;
+					}
+			}
+			
+			throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part);
+		}
+
+		@Override
+		public Part parse() {
+			state = State.InImpl;
+			return this;
+		}
 
 		@Override
 		public boolean allowSimpleImpl() {
@@ -1772,14 +1832,16 @@ public abstract class AbstractCompiler implements Compiler {
 				currentSet = null;
 			}
 			for(Set set : sets) {
-				set.rhs = set.rhs.finish();
-				if(set.rhs instanceof Function && ((Function)set.rhs).name == null)
-					((Function)set.rhs).name = set.lhs;
+				if(set.rhs != null) {
+					set.rhs = set.rhs.finish();
+					if(set.rhs instanceof Function && ((Function)set.rhs).name == null)
+						((Function)set.rhs).name = set.lhs;
+				}
 			}
 			return this;
 		}
 	}
-	public static class String extends Referency {
+	public static class String extends PrimitiveReferency {
 		public final java.lang.String string;
 		public String(java.lang.String string) {
 			assert(string != null);
@@ -1792,7 +1854,7 @@ public abstract class AbstractCompiler implements Compiler {
 		}
 		
 	}
-	public static class Integer extends Referency {
+	public static class Integer extends PrimitiveReferency {
 		public final int value;
 		public Integer(int value) {
 			this.value = value;
@@ -1802,7 +1864,7 @@ public abstract class AbstractCompiler implements Compiler {
 			return java.lang.String.valueOf(value);
 		}
 	}
-	public static class Number extends Referency {
+	public static class Number extends PrimitiveReferency {
 		public final double value;
 		public Number(double value) {
 			this.value = value;
@@ -1992,12 +2054,14 @@ public abstract class AbstractCompiler implements Compiler {
 					for(Pattern pat : patterns) {
 						matcher = pat.matcher(buffer);
 						if(matcher.find()) {
+							int rows = reader.rows;
+							int columns = reader.columns;
 							try {
 								match(pat, matcher, reader);
 								builder.append(reader.ltrim(matcher.group().length()));
 							} catch(PartExchange part) {
-								part.part.rows = reader.rows;
-								part.part.columns = reader.columns;
+								part.part.rows = rows;
+								part.part.columns = columns;
 								if(currentPart != null) {
 									if(!currentPart.isIncomplete() && part.part instanceof CloseGroup) {
 										currentPart = currentPart.finish();
@@ -2323,8 +2387,19 @@ public abstract class AbstractCompiler implements Compiler {
 				System.out.println("Compiling " + join(Arrays.asList(script), ';'));
 			return compileScript(script, fileName, inFunction);
 		} catch(net.nexustools.njs.Error.JavaException ex) {
-			if(ex.type.equals("SyntaxError") && reader != null)
-				throw new net.nexustools.njs.Error.JavaException("SyntaxError", ex.getUnderlyingMessage() + " (" + reader.rows() + ':' + reader.columns() + ')', ex);
+			if(ex.type.equals("SyntaxError") && reader != null) {
+				StringBuilder builder = new StringBuilder(ex.getUnderlyingMessage());
+				builder.append(" (");
+				if(fileName != null) {
+					builder.append(fileName);
+					builder.append(':');
+				}
+				builder.append(reader.rows());
+				builder.append(':');
+				builder.append(reader.columns());
+				builder.append(')');
+				throw new net.nexustools.njs.Error.JavaException("SyntaxError", builder.toString(), ex);
+			}
 			throw ex;
 		} catch(IOException ex) {
 			throw new Error.JavaException("EvalError", "IO Exception While Evaluating Script: " + ex.getMessage(), ex);

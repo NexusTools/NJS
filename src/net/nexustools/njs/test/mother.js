@@ -1,7 +1,7 @@
 (function mother(muffin) {
 	(function daughter() {
 		(function sister() {
-			(function child() {
+			(function () {
 				try {
 					new muffin();
 				} catch(e) {

@@ -48,6 +48,6 @@ public class Test {
 		});
 		
 		global.compiler.eval(new InputStreamReader(Test.class.getResourceAsStream("/net/nexustools/njs/test/test.js")), "test.js", false).exec(global, null);
-		//global.compiler.eval(new FileReader("/home/kate/Projects/SnappFu/JNode12/node/node.js"), null, false).exec(global, null);
+		//global.compiler.eval(new FileReader("/home/kate/Projects/SnappFu/JNode12/node/node.js"), "node.js", false).exec(global, null);
 	}
 }
