@@ -32,7 +32,7 @@ public class Test {
 		
 		//global.compiler.eval("var test=frank;function frank(){return 24};console.log(test())", false).exec(global, null);
 		
-		global.compiler.eval(new InputStreamReader(Test.class.getResourceAsStream("/net/nexustools/njs/test/test.js")), false).exec(global, null);
+		global.compiler.eval(new InputStreamReader(Test.class.getResourceAsStream("/net/nexustools/njs/test/test.js")), "test.js", false).exec(global, null);
 		//global.compiler.eval(new FileReader("/home/kate/Projects/SnappFu/JNode12/node/node.js"), false).exec(global, null);
 	}
 }

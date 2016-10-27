@@ -135,14 +135,14 @@ print((function(global) {
 		}
 	})().further());
 	
-	/*var JOptionPane = importClass("javax.swing.JOptionPane");
-	var number = JOptionPane.showInputDialog("How Many?")*1;
+	var JOptionPane = importClass("javax.swing.JOptionPane");
 	try {
-		new Uint8Array(number);
+		print(new Uint8Array(JOptionPane.showInputDialog("How Many?")*1));
 	} catch(e) {
+		print(e.stack);
 		JOptionPane.showMessageDialog(null, e);
 	}
-	print(JSON.stringify(this));*/
+	print(JSON.stringify(this));
 	
 	print(true);
 	

@@ -29,10 +29,12 @@ import static net.nexustools.njs.compiler.AbstractCompiler.join;
  * @author kate
  */
 public class InterpreterCompiler extends AbstractCompiler {
-	private static class PrecompiledData {
+	private static class ScriptCompilerData {
+		final java.lang.String fileName;
 		final Runnable[] functionImpls;
-		private PrecompiledData(Runnable[] functionImpls) {
+		private ScriptCompilerData(Runnable[] functionImpls, java.lang.String fileName) {
 			this.functionImpls = functionImpls;
+			this.fileName = fileName;
 		}
 		private void exec(Global global, Scope scope) {
 			for(Runnable impl : functionImpls) {
@@ -41,11 +43,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 			}
 		}
 	}
-	private PrecompiledData precompile(ScriptData script) {
+	private ScriptCompilerData precompile(ScriptData script, java.lang.String fileName) {
 		Runnable[] functionImpls = new Runnable[script.functions.length];
+		ScriptCompilerData dummy = new ScriptCompilerData(null, fileName);
 		for(int i=0; i<functionImpls.length; i++)
-			functionImpls[i] = compile(script.functions[i]);
-		return new PrecompiledData(functionImpls);
+			functionImpls[i] = compile(dummy, script.functions[i]);
+		return new ScriptCompilerData(functionImpls, fileName);
 	}
 	public static interface Referenceable {
 		public BaseObject get();
@@ -231,10 +234,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 		}
 	};
 	
-	private Runnable compile(Object object) {
-		return compile(null, object);
-	}
-	private Runnable compile(PrecompiledData data, Object object) {
+	private Runnable compile(final ScriptCompilerData data, Object object) {
 		if(DEBUG)
 			System.out.println("Compiling " + describe(object));
 		
@@ -292,7 +292,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 			};
 		} else if(object instanceof New) {
-			final Runnable reference = compile(((New)object).reference);
+			final Runnable reference = compile(data, ((New)object).reference);
 			
 			if(((New)object).arguments == null || ((New)object).arguments.isEmpty())
 				return new Runnable() {
@@ -305,7 +305,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 			Object[] args = ((New)object).arguments.toArray();
 			final Runnable[] argr = new Runnable[args.length];
 			for(int i=0; i<args.length; i++)
-				argr[i] = compile(args[i]);
+				argr[i] = compile(data, args[i]);
 			
 			switch(args.length) {
 				case 1:
@@ -344,7 +344,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 					};
 			}
 		} else if(object instanceof Call) {
-			final Runnable reference = compile(((Call)object).reference);
+			final Runnable reference = compile(data, ((Call)object).reference);
 			
 			if(((Call)object).arguments.isEmpty())
 				return new Runnable() {
@@ -369,7 +369,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 			Object[] args = ((Call)object).arguments.toArray();
 			final Runnable[] argr = new Runnable[args.length];
 			for(int i=0; i<args.length; i++)
-				argr[i] = compile(args[i]);
+				argr[i] = compile(data, args[i]);
 			
 			switch(args.length) {
 				case 1:
@@ -456,8 +456,8 @@ public class InterpreterCompiler extends AbstractCompiler {
 					};
 			}
 		} else if(object instanceof Multiply) {
-			final Runnable lhs = compile(((Multiply)object).lhs);
-			final Runnable rhs = compile(((Multiply)object).rhs);
+			final Runnable lhs = compile(data, ((Multiply)object).lhs);
+			final Runnable rhs = compile(data, ((Multiply)object).rhs);
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -465,8 +465,8 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 			};
 		} else if(object instanceof LessThan) {
-			final Runnable lhs = compile(((LessThan)object).lhs);
-			final Runnable rhs = compile(((LessThan)object).rhs);
+			final Runnable lhs = compile(data, ((LessThan)object).lhs);
+			final Runnable rhs = compile(data, ((LessThan)object).rhs);
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -474,8 +474,8 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 			};
 		} else if(object instanceof MoreThan) {
-			final Runnable lhs = compile(((MoreThan)object).lhs);
-			final Runnable rhs = compile(((MoreThan)object).rhs);
+			final Runnable lhs = compile(data, ((MoreThan)object).lhs);
+			final Runnable rhs = compile(data, ((MoreThan)object).rhs);
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -483,8 +483,8 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 			};
 		} else if(object instanceof MultiplyEq) {
-			final Runnable lhs = compile(((MultiplyEq)object).lhs);
-			final Runnable rhs = compile(((MultiplyEq)object).rhs);
+			final Runnable lhs = compile(data, ((MultiplyEq)object).lhs);
+			final Runnable rhs = compile(data, ((MultiplyEq)object).rhs);
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -496,8 +496,8 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 			};
 		} else if(object instanceof Plus) {
-			final Runnable lhs = compile(((Plus)object).lhs);
-			final Runnable rhs = compile(((Plus)object).rhs);
+			final Runnable lhs = compile(data, ((Plus)object).lhs);
+			final Runnable rhs = compile(data, ((Plus)object).rhs);
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -512,7 +512,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 			};
 		} else if(object instanceof OpenBracket) {
-			final Runnable contents = compile(((OpenBracket)object).contents);
+			final Runnable contents = compile(data, ((OpenBracket)object).contents);
 			final List<java.lang.String> chain = ((OpenBracket)object).chain;
 			if(chain.isEmpty())
 				return contents;
@@ -529,8 +529,8 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 			};
 		} else if(object instanceof Set) {
-			final Runnable lhs = compile(((Set)object).lhs);
-			final Runnable rhs = compile(((Set)object).rhs);
+			final Runnable lhs = compile(data, ((Set)object).lhs);
+			final Runnable rhs = compile(data, ((Set)object).rhs);
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -541,7 +541,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 			};
 		} else if(object instanceof AbstractCompiler.Return) {
-			final Runnable ret = compile(((AbstractCompiler.Return)object).rhs);
+			final Runnable ret = compile(data, ((AbstractCompiler.Return)object).rhs);
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -559,7 +559,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 				Var.Set set = ret.get(i);
 				keys[i] = set.lhs;
 				if(set.rhs != null)
-					values[i] = compile(set.rhs);
+					values[i] = compile(data, set.rhs);
 			}
 			
 			return new Runnable() {
@@ -596,23 +596,33 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 			}
 			final java.lang.String arguments = argBuilder.toString();
-			final Script impl = compileScript(((Function)object).impl, true);
+			final Script impl = compileScript(((Function)object).impl, data.fileName, true);
 			return new Runnable() {
 				@Override
 				public Referenceable run(final Global global, final Scope scope) {
 					AbstractFunction func = new ConstructableFunction(global) {
 						@Override
 						public BaseObject call(BaseObject _this, BaseObject... params) {
-							Scope s = scope.extend(_this);
-							s.var("arguments", new net.nexustools.njs.Arguments(global, this, params));
-							int max = Math.min(args.length, params.length);
-							int i=0;
-							for(; i<max; i++)
-								s.var(args[i], params[i]);
-							for(; i<args.length; i++)
-								s.var(args[i]);
-							s.var("callee", this);
-							return impl.exec(global, s);
+							JSHelper.renameCall(name(), data.fileName, 0);
+							try {
+								Scope s = scope.extend(_this);
+								s.var("arguments", new net.nexustools.njs.Arguments(global, this, params));
+								int max = Math.min(args.length, params.length);
+								int i=0;
+								for(; i<max; i++)
+									s.var(args[i], params[i]);
+								for(; i<args.length; i++)
+									s.var(args[i]);
+								s.var("callee", this);
+								s.enter();
+								try {
+									return impl.exec(global, s);
+								} finally {
+									s.exit();
+								}
+							} finally {
+								JSHelper.finishCall();
+							}
 						}
 						@Override
 						public java.lang.String source() {
@@ -634,7 +644,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 			};
 		} else if(object instanceof RightReference) {
 			final java.lang.String source = object.toString();
-			final Runnable ref = compile(((RightReference)object).ref);
+			final Runnable ref = compile(data, ((RightReference)object).ref);
 			final Iterable<java.lang.String> keys = ((RightReference)object).chain;
 			final java.lang.String key = ((List<java.lang.String>)keys).remove(((List)keys).size()-1);
 			return new Runnable() {
@@ -650,7 +660,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 		} else if(object instanceof OpenArray) {
 			final Runnable[] entries = new Runnable[((OpenArray)object).entries.size()];
 			for(int i=0; i<entries.length; i++)
-				entries[i] = compile(((OpenArray)object).entries.get(i));
+				entries[i] = compile(data, ((OpenArray)object).entries.get(i));
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -661,8 +671,8 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 			};
 		} else if(object instanceof Or) {
-			final Runnable lhs = compile(((Or)object).lhs);
-			final Runnable rhs = compile(((Or)object).rhs);
+			final Runnable lhs = compile(data, ((Or)object).lhs);
+			final Runnable rhs = compile(data, ((Or)object).rhs);
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -674,23 +684,25 @@ public class InterpreterCompiler extends AbstractCompiler {
 			};
 		} else if(object instanceof PlusPlus) {
 			if(((PlusPlus)object).lhs != null) {
-				final Runnable lhs = compile(((PlusPlus)object).lhs);
+				final Runnable lhs = compile(data, ((PlusPlus)object).lhs);
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
 						Referenceable ref = lhs.run(global, scope);
 						net.nexustools.njs.Number.Instance val = global.toNumber(ref.get());
+						System.out.println("Currently: " + val);
 						ref.set(global.wrap(val.number + 1));
 						return new ValueReferenceable(val);
 					}
 				};
 			} else {
-				final Runnable rhs = compile(((PlusPlus)object).rhs);
+				final Runnable rhs = compile(data, ((PlusPlus)object).rhs);
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
 						Referenceable ref = rhs.run(global, scope);
 						net.nexustools.njs.Number.Instance val = global.toNumber(ref.get());
+						System.out.println("Currently: " + val);
 						ref.set(val = global.wrap(val.number+1));
 						return new ValueReferenceable(val);
 					}
@@ -700,7 +712,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 		} else if(object instanceof OpenGroup) {
 			final Map<java.lang.String, Runnable> compiled = new HashMap();
 			for(Map.Entry<java.lang.String, Part> entry : ((OpenGroup)object).entries.entrySet()) {
-				compiled.put(entry.getKey(), compile(entry.getValue()));
+				compiled.put(entry.getKey(), compile(data, entry.getValue()));
 			}
 			return new Runnable() {
 				@Override
@@ -713,16 +725,16 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 			};
 		} else if(object instanceof If) {
-			final Runnable condition = compile(((If)object).condition);
+			final Runnable condition = compile(data, ((If)object).condition);
 			if(((If)object).simpleimpl != null) {
-				final Runnable impl = compile(((If)object).simpleimpl);
+				final Runnable impl = compile(data, ((If)object).simpleimpl);
 				if(((If)object).el != null) {
 					Else el = ((If)object).el;
 					if(el instanceof ElseIf) {
 						
 					} else {
 						if(el.simpleimpl != null) {
-							final Runnable elimpl = compile(el.simpleimpl);
+							final Runnable elimpl = compile(data, el.simpleimpl);
 							return new Runnable() {
 								@Override
 								public Referenceable run(Global global, Scope scope) {
@@ -768,8 +780,8 @@ public class InterpreterCompiler extends AbstractCompiler {
 			};
 		} else if(object instanceof VariableReference) {
 			final java.lang.String source = object.toString();
-			final Runnable lhs = compile(((VariableReference)object).lhs);
-			final Runnable ref = compile(((VariableReference)object).ref);
+			final Runnable lhs = compile(data, ((VariableReference)object).lhs);
+			final Runnable ref = compile(data, ((VariableReference)object).ref);
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -777,7 +789,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 			};
 		} else if(object instanceof Delete) {
-			final Runnable ref = compile(((Delete)object).rhs);
+			final Runnable ref = compile(data, ((Delete)object).rhs);
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -787,7 +799,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 		} else if(object instanceof IntegerReference) {
 			final int integer = ((IntegerReference)object).ref;
 			final java.lang.String source = object.toString();
-			final Runnable lhs = compile(((IntegerReference)object).lhs);
+			final Runnable lhs = compile(data, ((IntegerReference)object).lhs);
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -795,8 +807,8 @@ public class InterpreterCompiler extends AbstractCompiler {
 				}
 			};
 		} else if(object instanceof InstanceOf) {
-			final Runnable lhs = compile(((InstanceOf)object).lhs);
-			final Runnable rhs = compile(((InstanceOf)object).rhs);
+			final Runnable lhs = compile(data, ((InstanceOf)object).lhs);
+			final Runnable rhs = compile(data, ((InstanceOf)object).rhs);
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -805,11 +817,11 @@ public class InterpreterCompiler extends AbstractCompiler {
 			};
 		} else if(object instanceof Try) {
 			Try t = (Try)object;
-			final Script impl = compileScript(t.impl, ScriptType.Block);
+			final Script impl = compileScript(t.impl, data.fileName, ScriptType.Block);
 			if(t.c != null && t.f != null) {
 				final java.lang.String key = ((Reference)t.c.condition).ref;
-				final Script cimpl = compileScript(t.c.impl, ScriptType.Block);
-				final Script fimpl = compileScript(t.f.impl, ScriptType.Block);
+				final Script cimpl = compileScript(t.c.impl, data.fileName, ScriptType.Block);
+				final Script fimpl = compileScript(t.f.impl, data.fileName, ScriptType.Block);
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
@@ -821,7 +833,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 						} catch(Throwable t) {
 							if(t instanceof net.nexustools.njs.Error.InvisibleException)
 								throw (net.nexustools.njs.Error.InvisibleException)t;
-							
+
 							extended.set(key, global.wrap(t));
 							BaseObject ret = cimpl.exec(global, extended);
 							if(ret != null)
@@ -837,7 +849,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 				};
 			} else if(t.c != null) {
 				final java.lang.String key = ((Reference)t.c.condition).ref;
-				final Script cimpl = compileScript(t.c.impl, ScriptType.Block);
+				final Script cimpl = compileScript(t.c.impl, data.fileName, ScriptType.Block);
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
@@ -849,9 +861,28 @@ public class InterpreterCompiler extends AbstractCompiler {
 						} catch(Throwable t) {
 							if(t instanceof net.nexustools.njs.Error.InvisibleException)
 								throw (net.nexustools.njs.Error.InvisibleException)t;
-							
-							extended.set(key, global.wrap(t));
+
+							extended.var(key, global.wrap(t));
 							BaseObject ret = cimpl.exec(global, extended);
+							if(ret != null)
+								return new Return(ret);
+						}
+						
+						return UNDEFINED_REFERENCE;
+					}
+				};
+			} else if(t.f != null) {
+				final Script fimpl = compileScript(t.f.impl, data.fileName, ScriptType.Block);
+				return new Runnable() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						Scope extended = scope.extend();
+						try {
+							BaseObject ret = impl.exec(global, extended);
+							if(ret != null)
+								return new Return(ret);
+						} finally {
+							BaseObject ret = fimpl.exec(global, extended);
 							if(ret != null)
 								return new Return(ret);
 						}
@@ -861,11 +892,32 @@ public class InterpreterCompiler extends AbstractCompiler {
 				};
 			}
 		} else if(object instanceof Throw) {
-			final Runnable rhs = compile(((Throw)object).rhs);
+			final Runnable rhs = compile(data, ((Throw)object).rhs);
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
 					throw new net.nexustools.njs.Error.ThrowException(rhs.run(global, scope).get());
+				}
+			};
+		} else if(object instanceof While) {
+			final Runnable condition = compile(data, ((While)object).condition);
+			final Script impl = compileScript(((While)object).impl, data.fileName, ScriptType.Block);
+			return new Runnable() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					Scope extended = scope.extend();
+					extended.enter();
+					try {
+						while(JSHelper.isTrue(condition.run(global, scope).get())) {
+							BaseObject ret = impl.exec(global, scope);
+							if(ret != null)
+								return new ValueReferenceable(ret);
+						}
+
+						return UNDEFINED_REFERENCE;
+					} finally {
+						extended.exit();
+					}
 				}
 			};
 		} else if(object instanceof Undefined)
@@ -881,21 +933,21 @@ public class InterpreterCompiler extends AbstractCompiler {
 		Block
 	}
 	@Override
-	protected Script compileScript(ScriptData script, boolean inFunction) {
-		return compileScript(script, inFunction ? ScriptType.Function : ScriptType.Global);
+	protected Script compileScript(ScriptData script, java.lang.String fileName, boolean inFunction) {
+		return compileScript(script, fileName, inFunction ? ScriptType.Function : ScriptType.Global);
 	}
 	private final HashMap<java.lang.String, WeakReference<Script>> scriptCache = new HashMap();
-	protected Script compileScript(ScriptData script, ScriptType scriptType) {
+	protected Script compileScript(ScriptData script, java.lang.String fileName, ScriptType scriptType) {
 		Script compiled;
 		java.lang.String id = script.toString() + ':' + scriptType;
 		synchronized(scriptCache) {
 			WeakReference<Script> ref = scriptCache.get(id);
 			if(ref == null || (compiled = ref.get()) == null)
-				scriptCache.put(id, new WeakReference(compiled = compileScript0(script, scriptType)));
+				scriptCache.put(id, new WeakReference(compiled = compileScript0(script, fileName, scriptType)));
 			return compiled;
 		}
 	}
-	private Script compileScript0(final ScriptData script, final ScriptType scriptType) {
+	private Script compileScript0(final ScriptData script, java.lang.String fileName, final ScriptType scriptType) {
 		if(script.impl.length == 0)
 			return new Script() {
 				@Override
@@ -909,7 +961,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 			};
 		
 		if(scriptType != ScriptType.Global) {
-			final PrecompiledData precompiled = precompile(script);
+			final ScriptCompilerData precompiled = precompile(script, fileName);
 			final Runnable[] parts = new Runnable[script.impl.length];
 			for(int i=0; i<parts.length; i++)
 				parts[i] = compile(precompiled, script.impl[i]);
@@ -919,15 +971,19 @@ public class InterpreterCompiler extends AbstractCompiler {
 				public BaseObject exec(Global global, Scope scope) {
 					if(scope == null)
 						scope = new Scope.Extended(global);
-
-					precompiled.exec(global, scope);
-					for(int i=0; i<max; i++) {
-						Referenceable ref = parts[i].run(global, scope);
-						if(ref instanceof Return)
-							return ref.get();
-						ref.get();
+					scope.enter();
+					try {
+						precompiled.exec(global, scope);
+						for(int i=0; i<max; i++) {
+							Referenceable ref = parts[i].run(global, scope);
+							if(ref instanceof Return)
+								return ref.get();
+							ref.get();
+						}
+						return scriptType == ScriptType.Block ? null : net.nexustools.njs.Undefined.INSTANCE;
+					} finally {
+						scope.exit();
 					}
-					return scriptType == ScriptType.Block ? null : net.nexustools.njs.Undefined.INSTANCE;
 				}
 				@Override
 				public java.lang.String toString() {
@@ -937,11 +993,20 @@ public class InterpreterCompiler extends AbstractCompiler {
 		}
 		
 		if(script.impl.length == 1) {
-			final Runnable impl = compile(precompile(script), script.impl[0]);
+			final ScriptCompilerData precompiled = precompile(script, fileName);
+			final Runnable impl = compile(precompiled, script.impl[0]);
 			return new Script() {
 				@Override
 				public BaseObject exec(Global global, Scope scope) {
-					return impl.run(global, new Scope(global)).get();
+					if(scope == null)
+						scope = new Scope(global);
+					scope.enter();
+					try {
+						precompiled.exec(global, scope);
+						return impl.run(global, scope).get();
+					} finally {
+						scope.exit();
+					}
 				}
 				@Override
 				public java.lang.String toString() {
@@ -950,7 +1015,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 			};
 		}
 		
-		final PrecompiledData precompiled = precompile(script);
+		final ScriptCompilerData precompiled = precompile(script, fileName);
 		final Runnable[] parts = new Runnable[script.impl.length];
 		for(int i=0; i<parts.length; i++)
 			parts[i] = compile(precompiled, script.impl[i]);
@@ -962,9 +1027,14 @@ public class InterpreterCompiler extends AbstractCompiler {
 						if(scope == null)
 							scope = new Scope(global);
 						
-						precompiled.exec(global, scope);
-						parts[0].run(global, scope);
-						return parts[1].run(global, scope).get();
+						scope.enter();
+						try {
+							precompiled.exec(global, scope);
+							parts[0].run(global, scope);
+							return parts[1].run(global, scope).get();
+						} finally {
+							scope.exit();
+						}
 					}
 					@Override
 					public java.lang.String toString() {
@@ -979,10 +1049,15 @@ public class InterpreterCompiler extends AbstractCompiler {
 						if(scope == null)
 							scope = new Scope(global);
 						
-						precompiled.exec(global, scope);
-						parts[0].run(global, scope);
-						parts[1].run(global, scope);
-						return parts[2].run(global, scope).get();
+						scope.enter();
+						try {
+							precompiled.exec(global, scope);
+							parts[0].run(global, scope);
+							parts[1].run(global, scope);
+							return parts[2].run(global, scope).get();
+						} finally {
+							scope.exit();
+						}
 					}
 					@Override
 					public java.lang.String toString() {
@@ -999,10 +1074,15 @@ public class InterpreterCompiler extends AbstractCompiler {
 						if(scope == null)
 							scope = new Scope(global);
 						
-						precompiled.exec(global, scope);
-						for(int i=0; i<max; i++)
-							lastValue = parts[i].run(global, scope).get();
-						return lastValue;
+						scope.enter();
+						try {
+							precompiled.exec(global, scope);
+							for(int i=0; i<max; i++)
+								lastValue = parts[i].run(global, scope).get();
+							return lastValue;
+						} finally {
+							scope.exit();
+						}
 					}
 					@Override
 					public java.lang.String toString() {

@@ -18,18 +18,18 @@ import java.util.Set;
 public class GenericObject implements BaseObject {
 
 	public static interface ArrayOverride {
-		public BaseObject get(int i, Or<BaseObject> or);
-		public boolean delete(int i, Or<java.lang.Boolean> or);
-		public void set(int i, BaseObject val);
-		public boolean has(int i);
-		public int length();
+		public BaseObject get(int i, BaseObject _this, Or<BaseObject> or);
+		public boolean delete(int i, BaseObject _this, Or<java.lang.Boolean> or);
+		public void set(int i, BaseObject _this, BaseObject val);
+		public boolean has(int i, BaseObject _this);
+		public int length(BaseObject _this);
 	}
 	public static interface Property {
-		public BaseObject get();
+		public BaseObject get(BaseObject _this);
 		public BaseObject getValue();
 		public BaseFunction getSetter();
 		public BaseFunction getGetter();
-		public void set(BaseObject val);
+		public void set(BaseObject val, BaseObject _this);
 		public boolean configurable();
 		public boolean enumerable();
 	}
@@ -40,7 +40,7 @@ public class GenericObject implements BaseObject {
 			value = val;
 		}
 		@Override
-		public final BaseObject get() {
+		public final BaseObject get(BaseObject _this) {
 			return value;
 		}
 		@Override
@@ -48,7 +48,7 @@ public class GenericObject implements BaseObject {
 			return value;
 		}
 		@Override
-		public final void set(BaseObject val) {
+		public final void set(BaseObject val, BaseObject _this) {
 			value = val;
 		}
 		@Override
@@ -89,7 +89,7 @@ public class GenericObject implements BaseObject {
 		}
 
 		@Override
-		public BaseObject get() {
+		public BaseObject get(BaseObject _this) {
 			return value;
 		}
 
@@ -109,7 +109,7 @@ public class GenericObject implements BaseObject {
 		}
 
 		@Override
-		public void set(BaseObject val) {
+		public void set(BaseObject val, BaseObject _this) {
 		}
 
 		@Override
@@ -117,7 +117,7 @@ public class GenericObject implements BaseObject {
 			return false;
 		}
 	}
-	public class ExtendedProperty implements Property {
+	public static class ExtendedProperty implements Property {
 		public BaseObject value;
 		public BaseFunction getter;
 		public BaseFunction setter;
@@ -130,9 +130,9 @@ public class GenericObject implements BaseObject {
 			this.enumerable = enumerable;
 		}
 		@Override
-		public final BaseObject get() {
+		public final BaseObject get(BaseObject _this) {
 			if(getter != null)
-				return getter.call(GenericObject.this);
+				return getter.call(_this);
 			return value;
 		}
 		@Override
@@ -140,9 +140,9 @@ public class GenericObject implements BaseObject {
 			return value;
 		}
 		@Override
-		public final void set(BaseObject val) {
+		public final void set(BaseObject val, BaseObject _this) {
 			if(setter != null)
-				setter.call(GenericObject.this, val);
+				setter.call(_this, val);
 			else
 				value = val;
 		}
@@ -191,6 +191,12 @@ public class GenericObject implements BaseObject {
 		assert(!JSHelper.isUndefined(__proto__));
 		setHidden("constructor", constructor);
 		setHidden("__proto__", __proto__);
+		
+		if(__proto__ instanceof GenericObject) {
+			GenericObject ge = (GenericObject)__proto__;
+			if(ge.hasArrayOverride)
+				setArrayOverride(ge.arrayOverride);
+		}
 	}
 	
 	public final void setArrayOverride(ArrayOverride override) {
@@ -201,7 +207,7 @@ public class GenericObject implements BaseObject {
 	public final void defineGetter(java.lang.String key, BaseFunction impl) {
 		Property prop = properties.get(key);
 		if(prop == null)
-			prop = new ExtendedProperty();
+			properties.put(key, prop = new ExtendedProperty());
 		else if(!(prop instanceof ExtendedProperty)) {
 			ExtendedProperty newProp = new ExtendedProperty();
 			newProp.setter = prop.getSetter();
@@ -216,7 +222,7 @@ public class GenericObject implements BaseObject {
 	public final void defineSetter(java.lang.String key, BaseFunction impl) {
 		Property prop = properties.get(key);
 		if(prop == null)
-			prop = new ExtendedProperty();
+			properties.put(key, prop = new ExtendedProperty());
 		else if(!(prop instanceof ExtendedProperty)) {
 			ExtendedProperty newProp = new ExtendedProperty();
 			newProp.setter = prop.getSetter();
@@ -234,10 +240,14 @@ public class GenericObject implements BaseObject {
 		setProperty(key, property);
 	}
 	
-	
 	@Override
 	public void set(int i, BaseObject val) {
-		set(i, val, OR_VOID);
+		set(i, val, this, OR_VOID);
+	}
+	
+	@Override
+	public void set(int i, BaseObject val, BaseObject _this) {
+		set(i, val, _this, OR_VOID);
 	}
 
 	@Override
@@ -246,7 +256,17 @@ public class GenericObject implements BaseObject {
 	}
 
 	@Override
+	public final void set(java.lang.String key, BaseObject val, BaseObject _this) {
+		set(key, val, _this, OR_VOID);
+	}
+
+	@Override
 	public final void set(java.lang.String key, BaseObject val, Or<Void> or) {
+		set(key, val, this, or);
+	}
+
+	@Override
+	public final void set(java.lang.String key, BaseObject val, BaseObject _this, Or<Void> or) {
 		if(hasArrayOverride) {
 			while(true) {
 				int i;
@@ -255,7 +275,7 @@ public class GenericObject implements BaseObject {
 				} catch(NumberFormatException ex) {
 					break;
 				}
-				arrayOverride.set(i, val);
+				arrayOverride.set(i, val, _this);
 				return;
 			}
 		}
@@ -265,7 +285,7 @@ public class GenericObject implements BaseObject {
 		while(it.hasNext()) {
 			Map.Entry<java.lang.String, Property> entry = it.next();
 			if(entry.getKey().equals(key)) {
-				entry.getValue().set(val);
+				entry.getValue().set(val, _this);
 			}
 		}
 		if(sealed)
@@ -302,14 +322,29 @@ public class GenericObject implements BaseObject {
 
 	@Override
 	public final void set(int i, BaseObject val, Or<Void> or) {
+		set(i, val, this, or);
+	}
+
+	@Override
+	public final void set(int i, BaseObject val, BaseObject _this, Or<Void> or) {
 		if(hasArrayOverride)
-			arrayOverride.set(i, val);
+			arrayOverride.set(i, val, _this);
 		
-		set(java.lang.String.valueOf(i), val, or);
+		set(java.lang.String.valueOf(i), val, _this, or);
+	}
+
+	@Override
+	public final BaseObject get(java.lang.String key, BaseObject _this) {
+		return get(key, _this, OR_UNDEFINED);
 	}
 
 	@Override
 	public final BaseObject get(java.lang.String key, Or<BaseObject> or) {
+		return get(key, this, or);
+	}
+
+	@Override
+	public final BaseObject get(java.lang.String key, BaseObject _this, Or<BaseObject> or) {
 		if(hasArrayOverride)
 			while(true) {
 				int i;
@@ -318,7 +353,7 @@ public class GenericObject implements BaseObject {
 				} catch(NumberFormatException ex) {
 					break;
 				}
-				return arrayOverride.get(i, or);
+				return arrayOverride.get(i, _this, or);
 			}
 		
 		if(key.equals("__proto__")) {
@@ -326,7 +361,7 @@ public class GenericObject implements BaseObject {
 			while(it.hasNext()) {
 				Map.Entry<java.lang.String, Property> entry = it.next();
 				if(entry.getKey().equals(key))
-					return entry.getValue().get();
+					return entry.getValue().get(_this);
 			}
 		} else {
 			BaseObject __proto__ = null;
@@ -335,13 +370,13 @@ public class GenericObject implements BaseObject {
 				Map.Entry<java.lang.String, Property> entry = it.next();
 				java.lang.String k = entry.getKey();
 				if(k.equals(key))
-					return entry.getValue().get();
+					return entry.getValue().get(_this);
 				else if(k.equals("__proto__"))
-					__proto__ = entry.getValue().get();
+					__proto__ = entry.getValue().get(_this);
 			}
 			
 			if(!JSHelper.isUndefined(__proto__))
-				return __proto__.get(key, or);
+				return __proto__.get(key, _this, or);
 		}
 		
 		return or.or(key);
@@ -351,27 +386,37 @@ public class GenericObject implements BaseObject {
 	public final BaseObject get(java.lang.String key) {
 		return get(key, OR_UNDEFINED);
 	}
-
+	
 	@Override
 	public final BaseObject get(int i) {
+		return get(i, this);
+	}
+
+	@Override
+	public final BaseObject get(int i, BaseObject _this) {
 		if(hasArrayOverride)
-			return arrayOverride.get(i, OR_UNDEFINED);
+			return arrayOverride.get(i, _this, OR_UNDEFINED);
 		
-		return get(java.lang.String.valueOf(i), OR_UNDEFINED);
+		return get(java.lang.String.valueOf(i), _this, OR_UNDEFINED);
 	}
 
 	@Override
 	public final BaseObject get(int i, Or<BaseObject> or) {
+		return get(i, this, or);
+	}
+
+	@Override
+	public final BaseObject get(int i, BaseObject _this, Or<BaseObject> or) {
 		if(hasArrayOverride)
-			return arrayOverride.get(i, or);
+			return arrayOverride.get(i, _this, or);
 		
-		return get(java.lang.String.valueOf(i), or);
+		return get(java.lang.String.valueOf(i),  _this, or);
 	}
 	
 	@Override
 	public final boolean delete(int i) {
 		if(hasArrayOverride)
-			return arrayOverride.delete(i, OR_TRUE);
+			return arrayOverride.delete(i, this, OR_TRUE);
 		else
 			return delete(java.lang.String.valueOf(i), OR_TRUE);
 	}
@@ -379,7 +424,7 @@ public class GenericObject implements BaseObject {
 	@Override
 	public final boolean delete(int i, Or<java.lang.Boolean> or) {
 		if(hasArrayOverride)
-			return arrayOverride.delete(i, or);
+			return arrayOverride.delete(i, this, or);
 		else
 			return delete(java.lang.String.valueOf(i), or);
 	}
@@ -399,7 +444,7 @@ public class GenericObject implements BaseObject {
 				} catch(NumberFormatException ex) {
 					break;
 				}
-				return arrayOverride.delete(i, or);
+				return arrayOverride.delete(i, this, or);
 			}
 		
 		Iterator<Map.Entry<java.lang.String, Property>> it = properties.entrySet().iterator();
@@ -430,10 +475,10 @@ public class GenericObject implements BaseObject {
 				} catch(NumberFormatException ex) {
 					break;
 				}
-				return arrayOverride.get(i, or);
+				return arrayOverride.get(i, this, or);
 			}
 		
-		return properties.get(key).get();
+		return properties.get(key).get(this);
 	}
 	
 	public final Property getProperty(java.lang.String key) {
@@ -446,7 +491,7 @@ public class GenericObject implements BaseObject {
 			return new AbstractSet<java.lang.String>() {
 				@Override
 				public Iterator<java.lang.String> iterator() {
-					final int max = arrayOverride.length();
+					final int max = arrayOverride.length(GenericObject.this);
 					final Iterator<Map.Entry<java.lang.String, Property>> it = properties.entrySet().iterator();
 					return new Iterator<java.lang.String>() {
 						int pos;
@@ -481,7 +526,7 @@ public class GenericObject implements BaseObject {
 					for(Property prop : properties.values())
 						if(prop.enumerable())
 							size ++;
-					return size + arrayOverride.length();
+					return size + arrayOverride.length(GenericObject.this);
 				}
 			};
 		return new AbstractSet<java.lang.String>() {
@@ -526,7 +571,7 @@ public class GenericObject implements BaseObject {
 			return new AbstractSet<java.lang.String>() {
 				@Override
 				public Iterator<java.lang.String> iterator() {
-					final int max = arrayOverride.length();
+					final int max = arrayOverride.length(GenericObject.this);
 					final Iterator<java.lang.String> it = properties.keySet().iterator();
 					return new Iterator<java.lang.String>() {
 						int pos;
@@ -552,7 +597,7 @@ public class GenericObject implements BaseObject {
 
 				@Override
 				public int size() {
-					return properties.keySet().size() + arrayOverride.length();
+					return properties.keySet().size() + arrayOverride.length(GenericObject.this);
 				}
 			};
 		return properties.keySet();
@@ -593,10 +638,20 @@ public class GenericObject implements BaseObject {
 	}
 	
 	@Override
+	public boolean hasProperty(java.lang.String name, BaseObject _this) {
+		if(hasArrayOverride)
+			try {
+				if(arrayOverride.has(JSHelper.toArrayIndex(name), _this))
+					return true;
+			} catch(NumberFormatException ex) {}
+		return properties.containsKey(name);
+	}
+	
+	@Override
 	public boolean hasProperty(java.lang.String name) {
 		if(hasArrayOverride)
 			try {
-				if(arrayOverride.has(JSHelper.toArrayIndex(name)))
+				if(arrayOverride.has(JSHelper.toArrayIndex(name), this))
 					return true;
 			} catch(NumberFormatException ex) {}
 		return properties.containsKey(name);

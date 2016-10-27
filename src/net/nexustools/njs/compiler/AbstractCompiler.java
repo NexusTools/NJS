@@ -2045,6 +2045,7 @@ public abstract class AbstractCompiler implements Compiler {
 											if(!ex.part.isStandalone()) {
 												if(ex.part instanceof SemiColon) {
 													builder.append(reader.ltrim(part.trim));
+													currentPart = null;
 													break next;
 												}
 												throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + ex.part);
@@ -2316,28 +2317,28 @@ public abstract class AbstractCompiler implements Compiler {
 	}
 
 	@Override
-	public final Script eval(java.lang.String source, boolean inFunction) {
-		return eval(new StringReader(source), inFunction);
+	public final Script eval(java.lang.String source, java.lang.String fileName, boolean inFunction) {
+		return eval(new StringReader(source), fileName, inFunction);
 	}
 
 	@Override
-	public final Script eval(Reader source, boolean inFunction) {
+	public final Script eval(Reader source, java.lang.String fileName, boolean inFunction) {
 		ParserReader reader = null;
 		RegexParser parser = inFunction ? new FunctionParser() : new ScriptParser();
 		try {
 			ScriptData script = parser.parse(reader = new ParserReader(source));
 			if(DEBUG)
 				System.out.println("Compiling " + join(Arrays.asList(script), ';'));
-			return compileScript(script, inFunction);
+			return compileScript(script, fileName, inFunction);
 		} catch(net.nexustools.njs.Error.JavaException ex) {
 			if(ex.type.equals("SyntaxError") && reader != null)
-				throw new net.nexustools.njs.Error.JavaException("SyntaxError", ex.getUnderlyingMessage() + " (" + reader.columns() + ')', ex);
+				throw new net.nexustools.njs.Error.JavaException("SyntaxError", ex.getUnderlyingMessage() + " (" + (reader.columns()+1) + ')', ex);
 			throw ex;
 		} catch(IOException ex) {
 			throw new Error.JavaException("EvalError", "IO Exception While Evaluating Script: " + ex.getMessage(), ex);
 		}
 	}
 	
-	protected abstract Script compileScript(ScriptData script, boolean inFunction);
+	protected abstract Script compileScript(ScriptData script, java.lang.String fileName, boolean inFunction);
 	
 }

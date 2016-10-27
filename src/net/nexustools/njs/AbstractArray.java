@@ -44,7 +44,7 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 		});
 		setArrayOverride(new ArrayOverride() {
 			@Override
-			public BaseObject get(int i, Or<BaseObject> or) {
+			public BaseObject get(int i, BaseObject _this, Or<BaseObject> or) {
 				try {
 					return get0(i);
 				} catch(ArrayIndexOutOfBoundsException ex) {
@@ -52,7 +52,8 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 				}
 			}
 			@Override
-			public void set(int i, BaseObject val) {
+			public void set(int i, BaseObject val, BaseObject _this) {
+				assert(val != AbstractArray.this);
 				try {
 					put0(i, val);
 					actualLength = java.lang.Math.max(actualLength, i+1);
@@ -65,10 +66,9 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 					arrayStorage = newArray;
 					put0(i, val);
 				}
-				
 			}
 			@Override
-			public boolean delete(int i, Or<java.lang.Boolean> or) {
+			public boolean delete(int i, BaseObject _this, Or<java.lang.Boolean> or) {
 				if(i > actualLength)
 					return true;
 				
@@ -76,12 +76,12 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 				return or.or(java.lang.String.valueOf(i));
 			}
 			@Override
-			public int length() {
+			public int length(BaseObject _this) {
 				return actualLength;
 			}
 
 			@Override
-			public boolean has(int i) {
+			public boolean has(int i, BaseObject _this) {
 				try {
 					return get0(i) != null;
 				} catch(ArrayIndexOutOfBoundsException ex) {

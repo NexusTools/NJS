@@ -27,33 +27,6 @@ public class String extends AbstractFunction {
 			this.string = string;
 			
 			setReadOnly("length", length);
-			setArrayOverride(new ArrayOverride() {
-				@Override
-				public BaseObject get(int i, Or<BaseObject> or) {
-					if(i < 0 || i >= string.length())
-						return Undefined.INSTANCE;
-					
-					return String.wrap(string.substring(i, i+1));
-				}
-
-				@Override
-				public boolean delete(int i, Or<java.lang.Boolean> or) {
-					return false;
-				}
-
-				@Override
-				public void set(int i, BaseObject val) {}
-
-				@Override
-				public boolean has(int i) {
-					return i >= 0 && i < string.length();
-				}
-
-				@Override
-				public int length() {
-					return string.length();
-				}
-			});
 		}
 		@Override
 		public Instance clone() {
@@ -82,6 +55,33 @@ public class String extends AbstractFunction {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				return Number.wrap(((Instance)_this).string.charAt(params.length > 0 ? Number.from(params[0]).toInt() : 0));
+			}
+		});
+		prototype.setArrayOverride(new ArrayOverride() {
+			@Override
+			public BaseObject get(int i, BaseObject _this, Or<BaseObject> or) {
+				if(i < 0 || i >= ((Instance)_this).string.length())
+					return Undefined.INSTANCE;
+
+				return wrap(((Instance)_this).string.substring(i, i+1));
+			}
+
+			@Override
+			public boolean delete(int i, BaseObject _this, Or<java.lang.Boolean> or) {
+				return false;
+			}
+
+			@Override
+			public void set(int i, BaseObject val, BaseObject _this) {}
+
+			@Override
+			public boolean has(int i, BaseObject _this) {
+				return i >= 0 && i < ((Instance)_this).string.length();
+			}
+
+			@Override
+			public int length(BaseObject _this) {
+				return ((Instance)_this).string.length();
 			}
 		});
 	}

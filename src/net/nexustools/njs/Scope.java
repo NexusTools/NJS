@@ -5,8 +5,10 @@
  */
 package net.nexustools.njs;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -14,6 +16,7 @@ import java.util.Map;
  * @author kate
  */
 public class Scope implements Scopeable {
+
 	public static class Extended extends Scope {
 		private final HashMap<java.lang.String, BaseObject> storage = new HashMap();
 		public Extended(BaseObject _this, Global global, Scopeable... scopeables) {
@@ -176,6 +179,27 @@ public class Scope implements Scopeable {
 		}
 		
 		return _this;
+	}
+	
+	private static final ThreadLocal<List<Scope>> SCOPE_STACK = new ThreadLocal<List<Scope>>() {
+		@Override
+		protected List<Scope> initialValue() {
+			return new ArrayList();
+		}
+	};
+	public void enter() {
+		List<Scope> stack = SCOPE_STACK.get();
+		stack.add(this);
+	}
+	public void exit() {
+		List<Scope> stack = SCOPE_STACK.get();
+		assert(stack.remove(stack.size()-1) == this);
+	}
+	public static Scope getCurrent() {
+		List<Scope> stack = SCOPE_STACK.get();
+		if(stack.isEmpty())
+			return null;
+		return stack.get(stack.size()-1);
 	}
 
 }

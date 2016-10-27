@@ -67,6 +67,17 @@ public class Object extends AbstractFunction {
 				return "Object_prototype_toString";
 			}
 		});
+		prototype.setHidden("__defineGetter__", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				_this.defineGetter(params[0].toString(), (BaseFunction)params[1]);
+				return Undefined.INSTANCE;
+			}
+			@Override
+			public java.lang.String name() {
+				return "Object_prototype_valueOf";
+			}
+		});
 		prototype.setHidden("valueOf", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {

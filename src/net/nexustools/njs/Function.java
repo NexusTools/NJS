@@ -12,7 +12,7 @@ import net.nexustools.njs.compiler.Script;
  * @author kate
  */
 public class Function extends AbstractFunction {
-	private Global global;
+	private final Global global;
 	public Function(Global global) {
 		this.global = global;
 	}
@@ -22,9 +22,29 @@ public class Function extends AbstractFunction {
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				if(_this instanceof BaseFunction)
-					return global.wrap("function " + ((BaseFunction)_this).name() + "(" + ((BaseFunction)_this).arguments() + ") { " + ((BaseFunction)_this).source() + " }");
-				throw new Error.JavaException("TypeError", "this is not instance of Function");
+				JSHelper.renameMethodCall(name());
+				try {
+					if(_this instanceof BaseFunction) {
+						StringBuilder builder = new StringBuilder("function ");
+						builder.append(((BaseFunction)_this).name());
+						builder.append('(');
+						builder.append(((BaseFunction)_this).arguments());
+						builder.append("){");
+						java.lang.String source = ((BaseFunction)_this).source();
+						if(source.indexOf('\n') > -1)
+							builder.append(source);
+						else {
+							builder.append(' ');
+							builder.append(source);
+							builder.append(' ');
+						}
+						builder.append('}');
+						return global.wrap(builder.toString());
+					}
+					throw new Error.JavaException("TypeError", "this is not instance of Function");
+				} finally {
+					JSHelper.finishCall();
+				}
 			}
 			@Override
 			public java.lang.String toString() {
@@ -47,19 +67,19 @@ public class Function extends AbstractFunction {
 				switch(params.length) {
 					case 0:
 						return ((BaseFunction)_this).call(Undefined.INSTANCE);
-						
+
 					case 1:
 						return ((BaseFunction)_this).call(params[0]);
-						
+
 					case 2:
 						return ((BaseFunction)_this).call(params[0], params[1]);
-						
+
 					case 3:
 						return ((BaseFunction)_this).call(params[0], params[1], params[2]);
-						
+
 					case 4:
 						return ((BaseFunction)_this).call(params[0], params[1], params[2], params[3]);
-					
+
 					default:
 						final BaseObject target = params[0];
 						final BaseObject[] ps = new BaseObject[params.length-1];
@@ -85,14 +105,20 @@ public class Function extends AbstractFunction {
 			@Override
 			public BaseObject call(BaseObject _this, final BaseObject... params) {
 				final AbstractFunction self = this;
-				return compiled.exec(global, new Scope.Extended(_this, global) {
+				Scope scope = new Scope.Extended(_this, global) {
 					{
 						var("callee", self);
 						for(int i=0; i<java.lang.Math.min(params.length, args.length); i++)
 							var(args[i], params[i]);
 						var("arguments", new Arguments(global, self, params));
 					}
-				});
+				};
+				scope.enter();
+				try {
+					return compiled.exec(global, scope);
+				} finally {
+					scope.exit();
+				}
 			}
 			@Override
 			public java.lang.String source() {

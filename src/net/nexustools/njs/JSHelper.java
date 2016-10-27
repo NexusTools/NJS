@@ -5,6 +5,10 @@
  */
 package net.nexustools.njs;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 /**
  *
  * @author kate
@@ -75,10 +79,10 @@ public class JSHelper {
 			return global.wrap(javaObject);
 	}
 	public static Global createStandardGlobal() {
-		return createGlobal("Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float64Array");
+		return createGlobal("eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float64Array");
 	}
 	public static Global createExtendedGlobal() {
-		return createGlobal("Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float64Array", "importClass");
+		return createGlobal("eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float64Array", "importClass");
 	}
 	public static Global createGlobal(java.lang.String... standards) {
 		final Global global = new Global();
@@ -106,6 +110,17 @@ public class JSHelper {
 				global.setHidden("Int32Array", new Int32Array(global));
 			else if(standard.equals("Float64Array"))
 				global.setHidden("Float64Array", new Float64Array(global));
+			else if(standard.equals("eval"))
+				global.setHidden("eval", new AbstractFunction(global) {
+					@Override
+					public BaseObject call(BaseObject _this, BaseObject... params) {
+						return global.compiler.eval(params[0].toString(), "eval", false).exec(global, Scope.getCurrent());
+					}
+					@Override
+					public java.lang.String name() {
+						return "eval";
+					}
+				});
 			else if(standard.equals("importClass"))
 				global.setHidden("importClass", new AbstractFunction(global) {
 					@Override
@@ -185,9 +200,17 @@ public class JSHelper {
 			return ((Boolean.Instance)valueOf).value;
 		if(valueOf instanceof Number.Instance)
 			return ((Number.Instance)valueOf).number != 0;
+		if(valueOf instanceof String.Instance)
+			return !((String.Instance)valueOf).string.isEmpty();
 		return true;
 	}
 
+	private static final ThreadLocal<List<StackTraceElement>> STACK_REPLACEMENTS = new ThreadLocal<List<StackTraceElement>>() {
+		@Override
+		protected List<StackTraceElement> initialValue() {
+			return new ArrayList();
+		}
+	};
 	public static java.lang.String convertStack(Throwable t) {
 		StringBuilder builder = new StringBuilder();
 		if(t instanceof Error.JavaException) {
@@ -199,13 +222,56 @@ public class JSHelper {
 			}
 		} else
 			builder.append(t.toString());
+		
+		Iterator<StackTraceElement> it = STACK_REPLACEMENTS.get().iterator();
 		for(StackTraceElement el : t.getStackTrace()) {
 			builder.append("\n\tat ");
+			
+			if(it.hasNext()) {
+				StackTraceElement el0 = it.next();
+				if(el0 != null)
+					el = el0;
+			}
+			
+			java.lang.String method = el.getMethodName();
+			if(method != null) {
+				builder.append(method);
+				builder.append(" (");
+			}
 			
 			builder.append(el.getFileName());
 			builder.append(':');
 			builder.append(el.getLineNumber());
+			
+			if(method != null)
+				builder.append(')');
 		}
 		return builder.toString();
+	}
+
+	public static void renameMethodCall(java.lang.String methodName) {
+		StackTraceElement[] stack = new Throwable().getStackTrace();
+		List<StackTraceElement> list = STACK_REPLACEMENTS.get();
+		int leftPad = stack.length-2;
+		while(list.size() < leftPad)
+			list.add(null);
+		list.add(new StackTraceElement(stack[1].getClassName(), methodName,
+                             stack[1].getFileName(), stack[1].getLineNumber()));
+	}
+
+	public static void renameCall(java.lang.String methodName, java.lang.String fileName, int lineNumber) {
+		StackTraceElement[] stack = new Throwable().getStackTrace();
+		List<StackTraceElement> list = STACK_REPLACEMENTS.get();
+		int leftPad = stack.length-2;
+		while(list.size() < leftPad)
+			list.add(null);
+		list.add(new StackTraceElement(stack[1].getClassName(), methodName, fileName, lineNumber));
+	}
+
+	public static void finishCall() {
+		List<StackTraceElement> list = STACK_REPLACEMENTS.get();
+		list.remove(list.size()-1);
+		while(!list.isEmpty() && list.get(list.size()-1) == null)
+			list.remove(list.size()-1);
 	}
 }

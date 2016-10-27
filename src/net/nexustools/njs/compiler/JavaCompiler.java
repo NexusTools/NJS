@@ -12,7 +12,7 @@ package net.nexustools.njs.compiler;
 public class JavaCompiler extends AbstractCompiler {
 
 	@Override
-	protected Script compileScript(ScriptData script, boolean inFunction) {
+	protected Script compileScript(ScriptData script, java.lang.String fileName, boolean inFunction) {
 		throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
 	}
 	

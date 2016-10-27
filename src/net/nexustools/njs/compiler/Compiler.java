@@ -12,6 +12,6 @@ import java.io.Reader;
  * @author kate
  */
 public interface Compiler {
-	public Script eval(String source, boolean inFunction);
-	public Script eval(Reader source, boolean inFunction);
+	public Script eval(String source, String fileName, boolean inFunction);
+	public Script eval(Reader source, String fileName, boolean inFunction);
 }
