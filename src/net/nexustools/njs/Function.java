@@ -25,8 +25,12 @@ public class Function extends AbstractFunction {
 				JSHelper.renameMethodCall("toString");
 				try {
 					if(_this instanceof BaseFunction) {
-						StringBuilder builder = new StringBuilder("function ");
-						builder.append(((BaseFunction)_this).name());
+						StringBuilder builder = new StringBuilder("function");
+						java.lang.String name = ((BaseFunction)_this).name();
+						if(name != null && !name.startsWith("<")) {
+							builder.append(' ');
+							builder.append(name);
+						}
 						builder.append('(');
 						builder.append(((BaseFunction)_this).arguments());
 						builder.append("){");
@@ -96,12 +100,12 @@ public class Function extends AbstractFunction {
 
 	@Override
 	public BaseObject construct(BaseObject... params) {
-		final java.lang.String source = params[1].toString().replace("\\\"", "\"").replace("\\\\", "\\");
+		final java.lang.String source = params[1].toString();
 		final java.lang.String arguments = params[0].toString();
 		final Script compiled = global.compiler.eval(source, "Function", true);
 		final java.lang.String[] args = arguments.split("\\s*,\\s*");
 		
-		return new AbstractFunction(global, "anonymous") {
+		return new AbstractFunction(global, "<Function>") {
 			@Override
 			public BaseObject call(BaseObject _this, final BaseObject... params) {
 				final AbstractFunction self = this;

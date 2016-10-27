@@ -205,6 +205,28 @@ public class JSHelper {
 		return true;
 	}
 
+	public static StackTraceElement[] convertStackTrace(StackTraceElement[] stack) {
+		final List<StackElementReplace> list = STACK_REPLACEMENTS.get();
+		final StackTraceElement[] converted = new StackTraceElement[stack.length];
+		int stackRemaining = stack.length-1;
+		final int target = list.size();
+		for(StackTraceElement el : stack) {
+			if(stackRemaining < target) {
+				StackElementReplace el0 = list.get(stackRemaining);
+				if(el0 != null && el0.original.getClassName().equals(el.getClassName()) &&
+						el0.original.getFileName().equals(el.getFileName()) &&
+						el0.original.getMethodName().equals(el.getMethodName()) &&
+						el.getLineNumber() >= el0.original.getLineNumber() && 
+						el.getLineNumber() <= el0.maxLineNumber)
+					el = el0.replacement;
+			}
+			
+			converted[stack.length-stackRemaining-1] = el;
+			stackRemaining--;
+		}
+		return converted;
+	}
+
 	private static class StackElementReplace {
 		StackTraceElement replacement;
 		final StackTraceElement original;
@@ -237,7 +259,6 @@ public class JSHelper {
 			
 			if(stackRemaining < target) {
 				StackElementReplace el0 = list.get(stackRemaining);
-				System.out.println(stackRemaining + ": " + el0);
 				if(el0 != null) {
 					if(el0.original.getClassName().equals(el.getClassName()) &&
 							el0.original.getFileName().equals(el.getFileName()) &&
@@ -278,13 +299,12 @@ public class JSHelper {
 		StackTraceElement[] stack = new Throwable().getStackTrace();
 		List<StackElementReplace> list = STACK_REPLACEMENTS.get();
 		int leftPad = stack.length-2;
-		System.out.println(methodName + ": " + leftPad);
 		if(list.size() <= leftPad) {
 			while(list.size() < leftPad)
 				list.add(null);
-			list.add(new StackElementReplace(stack[1], new StackTraceElement(stack[1].getClassName(), methodName, stack[1].getFileName(), stack[1].getLineNumber())));
+			list.add(new StackElementReplace(stack[1], new StackTraceElement("NJS", methodName, stack[1].getFileName(), stack[1].getLineNumber())));
 		} else
-			list.set(leftPad, new StackElementReplace(stack[1], new StackTraceElement(stack[1].getClassName(), methodName, stack[1].getFileName(), stack[1].getLineNumber())));
+			list.set(leftPad, new StackElementReplace(stack[1], new StackTraceElement("NJS", methodName, stack[1].getFileName(), stack[1].getLineNumber())));
 		STACK_POSITION.set(leftPad);
 	}
 	public static void renameCall(java.lang.String methodName, java.lang.String fileName, int lineNumber) {
@@ -294,9 +314,9 @@ public class JSHelper {
 		if(list.size() <= leftPad) {
 			while(list.size() < leftPad)
 				list.add(null);
-			list.add(new StackElementReplace(stack[1], new StackTraceElement(stack[1].getClassName(), methodName, fileName, lineNumber)));
+			list.add(new StackElementReplace(stack[1], new StackTraceElement("NJS", methodName, fileName, lineNumber)));
 		} else
-			list.set(leftPad, new StackElementReplace(stack[1], new StackTraceElement(stack[1].getClassName(), methodName, fileName, lineNumber)));
+			list.set(leftPad, new StackElementReplace(stack[1], new StackTraceElement("NJS", methodName, fileName, lineNumber)));
 		STACK_POSITION.set(leftPad);
 	}
 
@@ -304,7 +324,7 @@ public class JSHelper {
 		int pos = STACK_POSITION.get();
 		List<StackElementReplace> list = STACK_REPLACEMENTS.get();
 		list.get(pos).maxLineNumber = new Throwable().getStackTrace()[1].getLineNumber();
-		while(pos >=0 && list.get(--pos) == null);
+		while(pos >= 1 && list.get(--pos) == null);
 		STACK_POSITION.set(pos);
 	}
 }

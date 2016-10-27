@@ -610,12 +610,12 @@ public class GenericObject implements BaseObject {
 	
 	@Override
 	public final BaseObject __proto__() {
-		return get("__proto__", OR_REFERENCE_ERROR_BO);
+		return get("__proto__", OR_NULL);
 	}
 
 	@Override
 	public final BaseFunction constructor() {
-		return (BaseFunction)get("constructor", OR_REFERENCE_ERROR_BO);
+		return (BaseFunction)get("constructor", OR_NULL);
 	}
 	
 	@Override

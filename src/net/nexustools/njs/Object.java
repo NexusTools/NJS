@@ -5,8 +5,6 @@
  */
 package net.nexustools.njs;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,6 +36,16 @@ public class Object extends AbstractFunction {
 			@Override
 			public java.lang.String name() {
 				return "Object_getOwnPropertyNames";
+			}
+		});
+		setHidden("create", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return new GenericObject(params[0], params[0].constructor());
+			}
+			@Override
+			public java.lang.String name() {
+				return "Object_create";
 			}
 		});
 		

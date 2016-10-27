@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import net.nexustools.njs.compiler.Compiler;
-import net.nexustools.njs.compiler.InterpreterCompiler;
+import net.nexustools.njs.compiler.RuntimeCompiler;
 
 /**
  *
@@ -32,7 +32,7 @@ public class Global extends GenericObject {
 	public final Number.Instance NegativeInfinity;
 	
 	public Global() {
-		this(new InterpreterCompiler());
+		this(new RuntimeCompiler());
 	}
 	
 	public Global(Compiler compiler) {

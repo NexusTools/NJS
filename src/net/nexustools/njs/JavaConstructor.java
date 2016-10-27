@@ -228,30 +228,32 @@ public class JavaConstructor extends AbstractFunction {
 	@Override
 	public BaseObject construct(BaseObject... params) {
 		java.lang.Object[] converted = new java.lang.Object[params.length];
-		for(Constructor constructor : constructors.get(params.length)) {
-			next:
-			while(true) {
-				Class[] types = constructor.getParameterTypes();
-				for(int i=0; i<params.length; i++)
+		List<Constructor> cons = constructors.get(params.length);
+		if(cons != null)
+			for(Constructor constructor : cons) {
+				next:
+				while(true) {
+					Class[] types = constructor.getParameterTypes();
+					for(int i=0; i<params.length; i++)
+						try {
+							converted[i] = JSHelper.jsToJava(params[i], types[i]);
+						} catch(ClassCastException ex) {
+							break next;
+						}
 					try {
-						converted[i] = JSHelper.jsToJava(params[i], types[i]);
-					} catch(ClassCastException ex) {
-						break next;
+						return global.wrap(constructor.newInstance(converted));
+					} catch (InstantiationException ex) {
+						throw new Error.JavaException("JavaError", ex.toString(), ex);
+					} catch (IllegalAccessException ex) {
+						throw new Error.JavaException("JavaError", ex.toString(), ex);
+					} catch (IllegalArgumentException ex) {
+						throw new Error.JavaException("JavaError", ex.toString(), ex);
+					} catch (InvocationTargetException ex) {
+						throw new Error.JavaException("JavaError", ex.toString(), ex);
 					}
-				try {
-					return global.wrap(constructor.newInstance(converted));
-				} catch (InstantiationException ex) {
-					throw new Error.JavaException("JavaError", ex.toString(), ex);
-				} catch (IllegalAccessException ex) {
-					throw new Error.JavaException("JavaError", ex.toString(), ex);
-				} catch (IllegalArgumentException ex) {
-					throw new Error.JavaException("JavaError", ex.toString(), ex);
-				} catch (InvocationTargetException ex) {
-					throw new Error.JavaException("JavaError", ex.toString(), ex);
 				}
 			}
-		}
-		throw new UnsupportedOperationException();
+		throw new Error.JavaException("ArgumentError", "Invalid arguments");
 	}
 
 	@Override

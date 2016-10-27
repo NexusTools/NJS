@@ -7,6 +7,7 @@ package net.nexustools.njs;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
@@ -45,16 +46,57 @@ public class String extends AbstractFunction {
 	protected void initPrototypeFunctions(Global global) {
 		Number = global.Number;
 		GenericObject prototype = prototype();
+		prototype.setHidden("match", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return _this;
+			}
+			@Override
+			public java.lang.String name() {
+				return "String_prototype_match";
+			}
+		});
+		prototype.setHidden("substring", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				if(params.length > 1)
+					return wrap(((Instance)_this).string.substring(Number.from(params[0]).toInt(), Number.from(params[1]).toInt()));
+				else
+					return wrap(((Instance)_this).string.substring(Number.from(params[0]).toInt()));
+			}
+			@Override
+			public java.lang.String name() {
+				return "String_prototype_substring";
+			}
+		});
+		prototype.setHidden("indexOf", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return Number.wrap(((Instance)_this).string.indexOf(params[0].toString()));
+			}
+			@Override
+			public java.lang.String name() {
+				return "String_prototype_indexOf";
+			}
+		});
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				return _this;
+			}
+			@Override
+			public java.lang.String name() {
+				return "String_prototype_toString";
 			}
 		});
 		prototype.setHidden("charCodeAt", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				return Number.wrap(((Instance)_this).string.charAt(params.length > 0 ? Number.from(params[0]).toInt() : 0));
+			}
+			@Override
+			public java.lang.String name() {
+				return "String_prototype_charCodeAt";
 			}
 		});
 		prototype.setArrayOverride(new ArrayOverride() {

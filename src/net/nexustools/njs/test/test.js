@@ -1,4 +1,4 @@
-print((function(global) {
+print((function main(global) {
 	'strict';
 	
 	print("T".charCodeAt(0));
@@ -150,19 +150,14 @@ print((function(global) {
 		throw new Error("Farmers Dress");
 	}
 	
-	(function daughter() {
-		(function sister() {
-			(function child() {
-				try {
-					new muffin();
-				} catch(e) {
-					print(e.stack);
-					JOptionPane.showMessageDialog(null, e);
-				}
-			})();
-		})();
-	})();
-				
+	try {
+		require("mother.js")(muffin, JOptionPane);
+	} catch(e) {
+		print(e.stack);
+		JOptionPane.showMessageDialog(null, e);
+	}
+	
+	return "Solid!";
 	
 	/*while(1) {
 		ExecutorService.execute(function() {
