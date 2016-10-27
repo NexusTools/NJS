@@ -146,6 +146,24 @@ print((function(global) {
 	
 	print(true);
 	
+	function muffin() {
+		throw new Error("Farmers Dress");
+	}
+	
+	(function daughter() {
+		(function sister() {
+			(function child() {
+				try {
+					new muffin();
+				} catch(e) {
+					print(e.stack);
+					JOptionPane.showMessageDialog(null, e);
+				}
+			})();
+		})();
+	})();
+				
+	
 	/*while(1) {
 		ExecutorService.execute(function() {
 			while(1) {

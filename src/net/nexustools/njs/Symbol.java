@@ -37,7 +37,12 @@ public class Symbol extends AbstractFunction {
 		prototype.setHidden("valueOf", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				throw new Error.JavaException("TypeError", "Cannot convert a Symbol value to a number");
+				JSHelper.renameMethodCall("Symbol.prototype.valueOf");
+				try {
+					throw new Error.JavaException("TypeError", "Cannot convert a Symbol value to a number");
+				} finally {
+					JSHelper.finishCall();
+				}
 			}
 			@Override
 			public java.lang.String name() {

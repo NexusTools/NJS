@@ -6,9 +6,8 @@
 package net.nexustools.njs.test;
 
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.InputStreamReader;
-import java.util.Arrays;
+
 import net.nexustools.njs.Global;
 import net.nexustools.njs.JSHelper;
 import net.nexustools.njs.Undefined;

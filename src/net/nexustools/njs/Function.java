@@ -22,7 +22,7 @@ public class Function extends AbstractFunction {
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				JSHelper.renameMethodCall(name());
+				JSHelper.renameMethodCall("toString");
 				try {
 					if(_this instanceof BaseFunction) {
 						StringBuilder builder = new StringBuilder("function ");
@@ -96,9 +96,9 @@ public class Function extends AbstractFunction {
 
 	@Override
 	public BaseObject construct(BaseObject... params) {
-		final java.lang.String source = params[1].toString();
+		final java.lang.String source = params[1].toString().replace("\\\"", "\"").replace("\\\\", "\\");
 		final java.lang.String arguments = params[0].toString();
-		final Script compiled = global.compiler.eval(source, true);
+		final Script compiled = global.compiler.eval(source, "Function", true);
 		final java.lang.String[] args = arguments.split("\\s*,\\s*");
 		
 		return new AbstractFunction(global, "anonymous") {
@@ -114,9 +114,11 @@ public class Function extends AbstractFunction {
 					}
 				};
 				scope.enter();
+				JSHelper.renameCall(name(), "Function", 0);
 				try {
 					return compiled.exec(global, scope);
 				} finally {
+					JSHelper.finishCall();
 					scope.exit();
 				}
 			}

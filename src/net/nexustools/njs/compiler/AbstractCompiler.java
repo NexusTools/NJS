@@ -68,6 +68,7 @@ public abstract class AbstractCompiler implements Compiler {
 	public static class ScriptData {
 		final Part[] impl;
 		final Function[] functions;
+		java.lang.String methodStack = null;
 		public ScriptData(Part[] impl) {
 			List<Part> imp = new ArrayList();
 			List<Function> funcs = new ArrayList();
@@ -1638,13 +1639,19 @@ public abstract class AbstractCompiler implements Compiler {
 					}
 					currentPart = part;
 				} else {
-					if(!currentPart.isIncomplete())
+					if(!currentPart.isIncomplete()) {
 						if(part instanceof CloseBracket) {
 							arguments.add(currentPart);
 							currentPart = null;
 							closed = true;
 							return this;
 						}
+						if(part instanceof Comma) {
+							arguments.add(currentPart);
+							currentPart = null;
+							return this;
+						}
+					}
 					currentPart = currentPart.transform(part);
 				}
 			} else if(part instanceof OpenBracket)

@@ -205,73 +205,106 @@ public class JSHelper {
 		return true;
 	}
 
-	private static final ThreadLocal<List<StackTraceElement>> STACK_REPLACEMENTS = new ThreadLocal<List<StackTraceElement>>() {
+	private static class StackElementReplace {
+		StackTraceElement replacement;
+		final StackTraceElement original;
+		int maxLineNumber = Integer.MAX_VALUE;
+		public StackElementReplace(StackTraceElement original, StackTraceElement replacement) {
+			this.original = original;
+			this.replacement = replacement;
+		}
+	}
+	private static final ThreadLocal<Integer> STACK_POSITION = new ThreadLocal<Integer>() {
 		@Override
-		protected List<StackTraceElement> initialValue() {
+		protected Integer initialValue() {
+			return 0;
+		}
+	};
+	private static final ThreadLocal<List<StackElementReplace>> STACK_REPLACEMENTS = new ThreadLocal<List<StackElementReplace>>() {
+		@Override
+		protected List<StackElementReplace> initialValue() {
 			return new ArrayList();
 		}
 	};
-	public static java.lang.String convertStack(Throwable t) {
-		StringBuilder builder = new StringBuilder();
-		if(t instanceof Error.JavaException) {
-			builder.append(((Error.JavaException)t).type);
-			java.lang.String message = ((Error.JavaException)t).getUnderlyingMessage();
-			if(message != null) {
-				builder.append(": ");
-				builder.append(message);
-			}
-		} else
-			builder.append(t.toString());
-		
-		Iterator<StackTraceElement> it = STACK_REPLACEMENTS.get().iterator();
-		for(StackTraceElement el : t.getStackTrace()) {
+	public static java.lang.String convertStack(java.lang.String header, Throwable t) {
+		StringBuilder builder = new StringBuilder(header);
+		final StackTraceElement[] stack = t.getStackTrace();
+		final List<StackElementReplace> list = STACK_REPLACEMENTS.get();
+		int stackRemaining = stack.length-1;
+		final int target = list.size();
+		for(StackTraceElement el : stack) {
 			builder.append("\n\tat ");
 			
-			if(it.hasNext()) {
-				StackTraceElement el0 = it.next();
-				if(el0 != null)
-					el = el0;
+			if(stackRemaining < target) {
+				StackElementReplace el0 = list.get(stackRemaining);
+				System.out.println(stackRemaining + ": " + el0);
+				if(el0 != null) {
+					if(el0.original.getClassName().equals(el.getClassName()) &&
+							el0.original.getFileName().equals(el.getFileName()) &&
+							el0.original.getMethodName().equals(el.getMethodName()) &&
+							el.getLineNumber() >= el0.original.getLineNumber() && 
+							el.getLineNumber() <= el0.maxLineNumber)
+						el = el0.replacement;
+				}
 			}
 			
 			java.lang.String method = el.getMethodName();
-			if(method != null) {
+			boolean hasMethod = method != null && !method.isEmpty();
+			if(hasMethod) {
 				builder.append(method);
 				builder.append(" (");
 			}
 			
-			builder.append(el.getFileName());
-			builder.append(':');
-			builder.append(el.getLineNumber());
+			java.lang.String fileName = el.getFileName();
+			if(fileName == null)
+				builder.append("<unknown source>");
+			else {
+				builder.append(el.getFileName());
+				int lineNumber = el.getLineNumber();
+				if(lineNumber > 0) {
+					builder.append(':');
+					builder.append(lineNumber);
+				}
+			}
 			
-			if(method != null)
+			if(hasMethod)
 				builder.append(')');
+			
+			stackRemaining--;
 		}
 		return builder.toString();
 	}
-
 	public static void renameMethodCall(java.lang.String methodName) {
 		StackTraceElement[] stack = new Throwable().getStackTrace();
-		List<StackTraceElement> list = STACK_REPLACEMENTS.get();
+		List<StackElementReplace> list = STACK_REPLACEMENTS.get();
 		int leftPad = stack.length-2;
-		while(list.size() < leftPad)
-			list.add(null);
-		list.add(new StackTraceElement(stack[1].getClassName(), methodName,
-                             stack[1].getFileName(), stack[1].getLineNumber()));
+		System.out.println(methodName + ": " + leftPad);
+		if(list.size() <= leftPad) {
+			while(list.size() < leftPad)
+				list.add(null);
+			list.add(new StackElementReplace(stack[1], new StackTraceElement(stack[1].getClassName(), methodName, stack[1].getFileName(), stack[1].getLineNumber())));
+		} else
+			list.set(leftPad, new StackElementReplace(stack[1], new StackTraceElement(stack[1].getClassName(), methodName, stack[1].getFileName(), stack[1].getLineNumber())));
+		STACK_POSITION.set(leftPad);
 	}
-
 	public static void renameCall(java.lang.String methodName, java.lang.String fileName, int lineNumber) {
 		StackTraceElement[] stack = new Throwable().getStackTrace();
-		List<StackTraceElement> list = STACK_REPLACEMENTS.get();
+		List<StackElementReplace> list = STACK_REPLACEMENTS.get();
 		int leftPad = stack.length-2;
-		while(list.size() < leftPad)
-			list.add(null);
-		list.add(new StackTraceElement(stack[1].getClassName(), methodName, fileName, lineNumber));
+		if(list.size() <= leftPad) {
+			while(list.size() < leftPad)
+				list.add(null);
+			list.add(new StackElementReplace(stack[1], new StackTraceElement(stack[1].getClassName(), methodName, fileName, lineNumber)));
+		} else
+			list.set(leftPad, new StackElementReplace(stack[1], new StackTraceElement(stack[1].getClassName(), methodName, fileName, lineNumber)));
+		STACK_POSITION.set(leftPad);
 	}
 
 	public static void finishCall() {
-		List<StackTraceElement> list = STACK_REPLACEMENTS.get();
-		list.remove(list.size()-1);
-		while(!list.isEmpty() && list.get(list.size()-1) == null)
-			list.remove(list.size()-1);
+		int pos = STACK_POSITION.get();
+		List<StackElementReplace> list = STACK_REPLACEMENTS.get();
+		list.get(pos).maxLineNumber = new Throwable().getStackTrace()[1].getLineNumber();
+		while(pos >=0 && list.get(--pos) == null);
+		STACK_POSITION.set(pos);
 	}
 }

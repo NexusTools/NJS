@@ -31,9 +31,12 @@ import static net.nexustools.njs.compiler.AbstractCompiler.join;
 public class InterpreterCompiler extends AbstractCompiler {
 	private static class ScriptCompilerData {
 		final java.lang.String fileName;
+		final java.lang.String methodName;
 		final Runnable[] functionImpls;
-		private ScriptCompilerData(Runnable[] functionImpls, java.lang.String fileName) {
+		private ScriptCompilerData(Runnable[] functionImpls, java.lang.String fileName, java.lang.String methodName) {
+			assert(methodName != null);
 			this.functionImpls = functionImpls;
+			this.methodName = methodName;
 			this.fileName = fileName;
 		}
 		private void exec(Global global, Scope scope) {
@@ -45,10 +48,9 @@ public class InterpreterCompiler extends AbstractCompiler {
 	}
 	private ScriptCompilerData precompile(ScriptData script, java.lang.String fileName) {
 		Runnable[] functionImpls = new Runnable[script.functions.length];
-		ScriptCompilerData dummy = new ScriptCompilerData(null, fileName);
 		for(int i=0; i<functionImpls.length; i++)
-			functionImpls[i] = compile(dummy, script.functions[i]);
-		return new ScriptCompilerData(functionImpls, fileName);
+			functionImpls[i] = compile(new ScriptCompilerData(null, fileName, script.functions[i].name), script.functions[i]);
+		return new ScriptCompilerData(functionImpls, fileName, "");
 	}
 	public static interface Referenceable {
 		public BaseObject get();
@@ -243,7 +245,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new ValueReferenceable(global.wrap(number));
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						return new ValueReferenceable(global.wrap(number));
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof Number) {
@@ -251,7 +258,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new ValueReferenceable(global.wrap(number));
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						return new ValueReferenceable(global.wrap(number));
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof String) {
@@ -259,7 +271,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new ValueReferenceable(global.wrap(string));
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						return new ValueReferenceable(global.wrap(string));
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof Reference) {
@@ -267,7 +284,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new StringKeyReferenceable(ref, ref, scope);
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						return new StringKeyReferenceable(ref, ref, scope);
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof ReferenceChain) {
@@ -278,6 +300,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
 					try {
 						return new StringKeyReferenceable(full, key, scope.resolve(chain));
 					} catch(net.nexustools.njs.Error.JavaException err) {
@@ -288,6 +311,8 @@ public class InterpreterCompiler extends AbstractCompiler {
 								throw new net.nexustools.njs.Error.JavaException("TypeError", "Cannot read property \"" + key + "\" from \"" + base + "\" which is undefined");
 						}
 						throw err;
+					} finally {
+						JSHelper.finishCall();
 					}
 				}
 			};
@@ -298,7 +323,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct());
+						JSHelper.renameCall(data.methodName, data.fileName, 0);
+						try {
+							return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct());
+						} finally {
+							JSHelper.finishCall();
+						}
 					}
 				};
 			
@@ -312,7 +342,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct(argr[0].run(global, scope).get()));
+							JSHelper.renameCall(data.methodName, data.fileName, 0);
+							try {
+								return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct(argr[0].run(global, scope).get()));
+							} finally {
+								JSHelper.finishCall();
+							}
 						}
 					};
 					
@@ -320,7 +355,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct(argr[0].run(global, scope).get(), argr[1].run(global, scope).get()));
+							JSHelper.renameCall(data.methodName, data.fileName, 0);
+							try {
+								return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct(argr[0].run(global, scope).get(), argr[1].run(global, scope).get()));
+							} finally {
+								JSHelper.finishCall();
+							}
 						}
 					};
 					
@@ -328,7 +368,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct(argr[0].run(global, scope).get(), argr[1].run(global, scope).get(), argr[2].run(global, scope).get()));
+							JSHelper.renameCall(data.methodName, data.fileName, 0);
+							try {
+								return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct(argr[0].run(global, scope).get(), argr[1].run(global, scope).get(), argr[2].run(global, scope).get()));
+							} finally {
+								JSHelper.finishCall();
+							}
 						}
 					};
 					
@@ -337,9 +382,14 @@ public class InterpreterCompiler extends AbstractCompiler {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
 							BaseObject[] args = new BaseObject[argr.length];
-							for(int i=0; i<args.length; i++)
-								args[i] = argr[i].run(global, scope).get();
-							return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct(args));
+							JSHelper.renameCall(data.methodName, data.fileName, 0);
+							try {
+								for(int i=0; i<args.length; i++)
+									args[i] = argr[i].run(global, scope).get();
+								return new ValueReferenceable(((BaseFunction)reference.run(global, scope).get()).construct(args));
+							} finally {
+								JSHelper.finishCall();
+							}
 						}
 					};
 			}
@@ -350,19 +400,24 @@ public class InterpreterCompiler extends AbstractCompiler {
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						Referenceable ref = reference.run(global, scope);
-						BaseFunction func;
+						JSHelper.renameCall(data.methodName, data.fileName, 0);
 						try {
-							func = ((BaseFunction)ref.get());
-						} catch(Exception ex) {
-							if(ref instanceof KnownReferenceable)
-								throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable)ref).source() + " is not a function");
-							throw new net.nexustools.njs.Error.JavaException("TypeError", "is not a function");
+							Referenceable ref = reference.run(global, scope);
+							BaseFunction func;
+							try {
+								func = ((BaseFunction)ref.get());
+							} catch(ClassCastException ex) {
+								if(ref instanceof KnownReferenceable)
+									throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable)ref).source() + " is not a function");
+								throw new net.nexustools.njs.Error.JavaException("TypeError", "is not a function");
+							}
+							if(ref instanceof ParentedReferenceable)
+								return new ValueReferenceable(func.call(((ParentedReferenceable)ref).parent() instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)((ParentedReferenceable)ref).parent()));
+							else
+								return new ValueReferenceable(func.call(global));
+						} finally {
+							JSHelper.finishCall();
 						}
-						if(ref instanceof ParentedReferenceable)
-							return new ValueReferenceable(func.call(((ParentedReferenceable)ref).parent() instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)((ParentedReferenceable)ref).parent()));
-						else
-							return new ValueReferenceable(func.call(global));
 					}
 				};
 			
@@ -376,19 +431,24 @@ public class InterpreterCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							Referenceable ref = reference.run(global, scope);
-							BaseFunction func;
+							JSHelper.renameCall(data.methodName, data.fileName, 0);
 							try {
-								func = ((BaseFunction)ref.get());
-							} catch(Exception ex) {
-								if(ref instanceof KnownReferenceable)
-									throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable)ref).source() + " is not a function");
-								throw new net.nexustools.njs.Error.JavaException("TypeError", "is not a function");
+								Referenceable ref = reference.run(global, scope);
+								BaseFunction func;
+								try {
+									func = ((BaseFunction)ref.get());
+								} catch(Exception ex) {
+									if(ref instanceof KnownReferenceable)
+										throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable)ref).source() + " is not a function");
+									throw new net.nexustools.njs.Error.JavaException("TypeError", "is not a function");
+								}
+								if(ref instanceof ParentedReferenceable)
+									return new ValueReferenceable(func.call(((ParentedReferenceable)ref).parent() instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)((ParentedReferenceable)ref).parent(), argr[0].run(global, scope).get()));
+								else
+									return new ValueReferenceable(func.call(global, argr[0].run(global, scope).get()));
+							} finally {
+								JSHelper.finishCall();
 							}
-							if(ref instanceof ParentedReferenceable)
-								return new ValueReferenceable(func.call(((ParentedReferenceable)ref).parent() instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)((ParentedReferenceable)ref).parent(), argr[0].run(global, scope).get()));
-							else
-								return new ValueReferenceable(func.call(global, argr[0].run(global, scope).get()));
 						}
 					};
 					
@@ -396,19 +456,24 @@ public class InterpreterCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							Referenceable ref = reference.run(global, scope);
-							BaseFunction func;
+							JSHelper.renameCall(data.methodName, data.fileName, 0);
 							try {
-								func = ((BaseFunction)ref.get());
-							} catch(Exception ex) {
-								if(ref instanceof KnownReferenceable)
-									throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable)ref).source() + " is not a function");
-								throw new net.nexustools.njs.Error.JavaException("TypeError", "is not a function");
+								Referenceable ref = reference.run(global, scope);
+								BaseFunction func;
+								try {
+									func = ((BaseFunction)ref.get());
+								} catch(Exception ex) {
+									if(ref instanceof KnownReferenceable)
+										throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable)ref).source() + " is not a function");
+									throw new net.nexustools.njs.Error.JavaException("TypeError", "is not a function");
+								}
+								if(ref instanceof ParentedReferenceable)
+									return new ValueReferenceable(func.call(((ParentedReferenceable)ref).parent() instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)((ParentedReferenceable)ref).parent(), argr[0].run(global, scope).get(), argr[1].run(global, scope).get()));
+								else
+									return new ValueReferenceable(func.call(global, argr[0].run(global, scope).get(), argr[1].run(global, scope).get()));
+							} finally {
+								JSHelper.finishCall();
 							}
-							if(ref instanceof ParentedReferenceable)
-								return new ValueReferenceable(func.call(((ParentedReferenceable)ref).parent() instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)((ParentedReferenceable)ref).parent(), argr[0].run(global, scope).get(), argr[1].run(global, scope).get()));
-							else
-								return new ValueReferenceable(func.call(global, argr[0].run(global, scope).get(), argr[1].run(global, scope).get()));
 						}
 					};
 					
@@ -416,19 +481,24 @@ public class InterpreterCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							Referenceable ref = reference.run(global, scope);
-							BaseFunction func;
+							JSHelper.renameCall(data.methodName, data.fileName, 0);
 							try {
-								func = ((BaseFunction)ref.get());
-							} catch(Exception ex) {
-								if(ref instanceof KnownReferenceable)
-									throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable)ref).source() + " is not a function");
-								throw new net.nexustools.njs.Error.JavaException("TypeError", "is not a function");
+								Referenceable ref = reference.run(global, scope);
+								BaseFunction func;
+								try {
+									func = ((BaseFunction)ref.get());
+								} catch(Exception ex) {
+									if(ref instanceof KnownReferenceable)
+										throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable)ref).source() + " is not a function");
+									throw new net.nexustools.njs.Error.JavaException("TypeError", "is not a function");
+								}
+								if(ref instanceof ParentedReferenceable)
+									return new ValueReferenceable(func.call(((ParentedReferenceable)ref).parent() instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)((ParentedReferenceable)ref).parent(), argr[0].run(global, scope).get(), argr[1].run(global, scope).get(), argr[2].run(global, scope).get()));
+								else
+									return new ValueReferenceable(func.call(global, argr[0].run(global, scope).get(), argr[1].run(global, scope).get(), argr[2].run(global, scope).get()));
+							} finally {
+								JSHelper.finishCall();
 							}
-							if(ref instanceof ParentedReferenceable)
-								return new ValueReferenceable(func.call(((ParentedReferenceable)ref).parent() instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)((ParentedReferenceable)ref).parent(), argr[0].run(global, scope).get(), argr[1].run(global, scope).get(), argr[2].run(global, scope).get()));
-							else
-								return new ValueReferenceable(func.call(global, argr[0].run(global, scope).get(), argr[1].run(global, scope).get(), argr[2].run(global, scope).get()));
 						}
 					};
 					
@@ -436,22 +506,27 @@ public class InterpreterCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							Referenceable ref = reference.run(global, scope);
-							BaseFunction func;
+							JSHelper.renameCall(data.methodName, data.fileName, 0);
 							try {
-								func = ((BaseFunction)ref.get());
-							} catch(Exception ex) {
-								if(ref instanceof KnownReferenceable)
-									throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable)ref).source() + " is not a function");
-								throw new net.nexustools.njs.Error.JavaException("TypeError", "is not a function");
+								Referenceable ref = reference.run(global, scope);
+								BaseFunction func;
+								try {
+									func = ((BaseFunction)ref.get());
+								} catch(Exception ex) {
+									if(ref instanceof KnownReferenceable)
+										throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable)ref).source() + " is not a function");
+									throw new net.nexustools.njs.Error.JavaException("TypeError", "is not a function");
+								}
+								BaseObject[] args = new BaseObject[argr.length];
+								for(int i=0; i<args.length; i++)
+									args[i] = argr[i].run(global, scope).get();
+								if(ref instanceof ParentedReferenceable)
+									return new ValueReferenceable(func.call(((ParentedReferenceable)ref).parent() instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)((ParentedReferenceable)ref).parent(), args));
+								else
+									return new ValueReferenceable(func.call(global, args));
+							} finally {
+								JSHelper.finishCall();
 							}
-							BaseObject[] args = new BaseObject[argr.length];
-							for(int i=0; i<args.length; i++)
-								args[i] = argr[i].run(global, scope).get();
-							if(ref instanceof ParentedReferenceable)
-								return new ValueReferenceable(func.call(((ParentedReferenceable)ref).parent() instanceof Scope ? net.nexustools.njs.Undefined.INSTANCE : (BaseObject)((ParentedReferenceable)ref).parent(), args));
-							else
-								return new ValueReferenceable(func.call(global, args));
 						}
 					};
 			}
@@ -461,7 +536,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new ValueReferenceable(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).multiply(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						return new ValueReferenceable(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).multiply(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof LessThan) {
@@ -470,7 +550,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new ValueReferenceable(global.wrap(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).number < global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get())).number));
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						return new ValueReferenceable(global.wrap(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).number < global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get())).number));
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof MoreThan) {
@@ -479,7 +564,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new ValueReferenceable(global.wrap(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).number > global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get())).number));
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						return new ValueReferenceable(global.wrap(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).number > global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get())).number));
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof MultiplyEq) {
@@ -488,11 +578,16 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					Referenceable ref = lhs.run(global, scope);
-					
-					net.nexustools.njs.Number.Instance number = global.Number.from(JSHelper.valueOf(ref.get())).multiply(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get())));
-					ref.set(number);
-					return new ValueReferenceable(number);
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						Referenceable ref = lhs.run(global, scope);
+
+						net.nexustools.njs.Number.Instance number = global.Number.from(JSHelper.valueOf(ref.get())).multiply(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get())));
+						ref.set(number);
+						return new ValueReferenceable(number);
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof Plus) {
@@ -501,14 +596,19 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					BaseObject l = JSHelper.valueOf(lhs.run(global, scope).get());
-					if(l instanceof net.nexustools.njs.Number.Instance)
-						return new ValueReferenceable(global.Number.from(l).plus(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
-					
-					StringBuilder builder = new StringBuilder();
-					builder.append(l.toString());
-					builder.append(JSHelper.valueOf(rhs.run(global, scope).get()).toString());
-					return new ValueReferenceable(global.wrap(builder.toString()));
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						BaseObject l = JSHelper.valueOf(lhs.run(global, scope).get());
+						if(l instanceof net.nexustools.njs.Number.Instance)
+							return new ValueReferenceable(global.Number.from(l).plus(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
+
+						StringBuilder builder = new StringBuilder();
+						builder.append(l.toString());
+						builder.append(JSHelper.valueOf(rhs.run(global, scope).get()).toString());
+						return new ValueReferenceable(global.wrap(builder.toString()));
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof OpenBracket) {
@@ -522,10 +622,15 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					BaseObject obj = contents.run(global, scope).get();
-					for(java.lang.String key : chain)
-						obj = obj.get(key);
-					return new StringKeyReferenceable(full, key, obj);
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						BaseObject obj = contents.run(global, scope).get();
+						for(java.lang.String key : chain)
+							obj = obj.get(key);
+						return new StringKeyReferenceable(full, key, obj);
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof Set) {
@@ -534,10 +639,15 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					Referenceable ref = lhs.run(global, scope);
-					BaseObject r = rhs.run(global, scope).get();
-					ref.set(r);
-					return new ValueReferenceable(r);
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						Referenceable ref = lhs.run(global, scope);
+						BaseObject r = rhs.run(global, scope).get();
+						ref.set(r);
+						return new ValueReferenceable(r);
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof AbstractCompiler.Return) {
@@ -545,7 +655,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new Return(ret.run(global, scope).get());
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						return new Return(ret.run(global, scope).get());
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof Var) {
@@ -565,20 +680,25 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					int i=0;
-					for(; i<len; i++) {
-						if(values[i] != null)
-							scope.var(keys[i], values[i].run(global, scope).get());
-						else
-							scope.var(keys[i]);
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						int i=0;
+						for(; i<len; i++) {
+							if(values[i] != null)
+								scope.var(keys[i], values[i].run(global, scope).get());
+							else
+								scope.var(keys[i]);
+						}
+						for(; i<keys.length; i++) {
+							if(values[i] != null)
+								scope.var(keys[i], values[i].run(global, scope).get());
+							else
+								scope.var(keys[i]);
+						}
+						return UNDEFINED_REFERENCE;
+					} finally {
+						JSHelper.finishCall();
 					}
-					for(; i<keys.length; i++) {
-						if(values[i] != null)
-							scope.var(keys[i], values[i].run(global, scope).get());
-						else
-							scope.var(keys[i]);
-					}
-					return UNDEFINED_REFERENCE;
 				}
 			};
 		} else if(object instanceof Function) {
@@ -650,11 +770,16 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					BaseObject lhs = ref.run(global, scope).get();
-					Iterator<java.lang.String> it = keys.iterator();
-					while(it.hasNext())
-						lhs = lhs.get(it.next());
-					return new StringKeyReferenceable(source, key, lhs);
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						BaseObject lhs = ref.run(global, scope).get();
+						Iterator<java.lang.String> it = keys.iterator();
+						while(it.hasNext())
+							lhs = lhs.get(it.next());
+						return new StringKeyReferenceable(source, key, lhs);
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof OpenArray) {
@@ -664,10 +789,15 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					GenericArray array = new GenericArray(global, entries.length);
-					for(int i=0; i<entries.length; i++)
-						array.set(i, entries[i].run(global, scope).get());
-					return new ValueReferenceable(array);
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						GenericArray array = new GenericArray(global, entries.length);
+						for(int i=0; i<entries.length; i++)
+							array.set(i, entries[i].run(global, scope).get());
+						return new ValueReferenceable(array);
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof Or) {
@@ -676,10 +806,15 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					BaseObject l = lhs.run(global, scope).get();
-					if(JSHelper.isTrue(l))
-						return new ValueReferenceable(l);
-					return rhs.run(global, scope);
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						BaseObject l = lhs.run(global, scope).get();
+						if(JSHelper.isTrue(l))
+							return new ValueReferenceable(l);
+						return rhs.run(global, scope);
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof PlusPlus) {
@@ -688,11 +823,16 @@ public class InterpreterCompiler extends AbstractCompiler {
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						Referenceable ref = lhs.run(global, scope);
-						net.nexustools.njs.Number.Instance val = global.toNumber(ref.get());
-						System.out.println("Currently: " + val);
-						ref.set(global.wrap(val.number + 1));
-						return new ValueReferenceable(val);
+						JSHelper.renameCall(data.methodName, data.fileName, 0);
+						try {
+							Referenceable ref = lhs.run(global, scope);
+							net.nexustools.njs.Number.Instance val = global.toNumber(ref.get());
+							System.out.println("Currently: " + val);
+							ref.set(global.wrap(val.number + 1));
+							return new ValueReferenceable(val);
+						} finally {
+							JSHelper.finishCall();
+						}
 					}
 				};
 			} else {
@@ -700,11 +840,16 @@ public class InterpreterCompiler extends AbstractCompiler {
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						Referenceable ref = rhs.run(global, scope);
-						net.nexustools.njs.Number.Instance val = global.toNumber(ref.get());
-						System.out.println("Currently: " + val);
-						ref.set(val = global.wrap(val.number+1));
-						return new ValueReferenceable(val);
+						JSHelper.renameCall(data.methodName, data.fileName, 0);
+						try {
+							Referenceable ref = rhs.run(global, scope);
+							net.nexustools.njs.Number.Instance val = global.toNumber(ref.get());
+							System.out.println("Currently: " + val);
+							ref.set(val = global.wrap(val.number+1));
+							return new ValueReferenceable(val);
+						} finally {
+							JSHelper.finishCall();
+						}
 					}
 				};
 			}
@@ -717,11 +862,16 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					GenericObject object = new GenericObject(global);
-					for(Map.Entry<java.lang.String, Runnable> entry : compiled.entrySet()) {
-						object.setStorage(entry.getKey(), entry.getValue().run(global, scope).get(), true);
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						GenericObject object = new GenericObject(global);
+						for(Map.Entry<java.lang.String, Runnable> entry : compiled.entrySet()) {
+							object.setStorage(entry.getKey(), entry.getValue().run(global, scope).get(), true);
+						}
+						return new ValueReferenceable(object);
+					} finally {
+						JSHelper.finishCall();
 					}
-					return new ValueReferenceable(object);
 				}
 			};
 		} else if(object instanceof If) {
@@ -738,16 +888,21 @@ public class InterpreterCompiler extends AbstractCompiler {
 							return new Runnable() {
 								@Override
 								public Referenceable run(Global global, Scope scope) {
-									if(JSHelper.isTrue(condition.run(global, scope).get())) {
-										Referenceable ref = impl.run(global, scope);
-										if(ref instanceof Return)
-											return ref;
-										ref.get();
-									} else {
-										Referenceable ref = elimpl.run(global, scope);
-										if(ref instanceof Return)
-											return ref;
-										ref.get();
+									JSHelper.renameCall(data.methodName, data.fileName, 0);
+									try {
+										if(JSHelper.isTrue(condition.run(global, scope).get())) {
+											Referenceable ref = impl.run(global, scope);
+											if(ref instanceof Return)
+												return ref;
+											ref.get();
+										} else {
+											Referenceable ref = elimpl.run(global, scope);
+											if(ref instanceof Return)
+												return ref;
+											ref.get();
+										}
+									} finally {
+										JSHelper.finishCall();
 									}
 
 									return UNDEFINED_REFERENCE;
@@ -759,11 +914,16 @@ public class InterpreterCompiler extends AbstractCompiler {
 					return new Runnable() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							if(JSHelper.isTrue(condition.run(global, scope).get())) {
-								Referenceable ref = impl.run(global, scope);
-								if(ref instanceof Return)
-									return ref;
-								ref.get();
+							JSHelper.renameCall(data.methodName, data.fileName, 0);
+							try {
+								if(JSHelper.isTrue(condition.run(global, scope).get())) {
+									Referenceable ref = impl.run(global, scope);
+									if(ref instanceof Return)
+										return ref;
+									ref.get();
+								}
+							} finally {
+								JSHelper.finishCall();
 							}
 
 							return UNDEFINED_REFERENCE;
@@ -775,7 +935,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new ValueReferenceable(global.wrap(value));
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						return new ValueReferenceable(global.wrap(value));
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof VariableReference) {
@@ -785,7 +950,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new ObjectKeyReferenceable(source, ref.run(global, scope).get(), lhs.run(global, scope).get());
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						return new ObjectKeyReferenceable(source, ref.run(global, scope).get(), lhs.run(global, scope).get());
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof Delete) {
@@ -793,7 +963,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new ValueReferenceable(global.wrap(ref.run(global, scope).delete()));
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						return new ValueReferenceable(global.wrap(ref.run(global, scope).delete()));
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof IntegerReference) {
@@ -803,7 +978,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new IntegerKeyReferenceable(source, integer, lhs.run(global, scope).get());
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						return new IntegerKeyReferenceable(source, integer, lhs.run(global, scope).get());
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof InstanceOf) {
@@ -812,7 +992,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new ValueReferenceable(global.wrap(lhs.run(global, scope).get().instanceOf((BaseFunction)rhs.run(global, scope).get())));
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						return new ValueReferenceable(global.wrap(lhs.run(global, scope).get().instanceOf((BaseFunction)rhs.run(global, scope).get())));
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof Try) {
@@ -825,23 +1010,28 @@ public class InterpreterCompiler extends AbstractCompiler {
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						Scope extended = scope.extend();
+						JSHelper.renameCall(data.methodName, data.fileName, 0);
 						try {
-							BaseObject ret = impl.exec(global, extended);
-							if(ret != null)
-								return new Return(ret);
-						} catch(Throwable t) {
-							if(t instanceof net.nexustools.njs.Error.InvisibleException)
-								throw (net.nexustools.njs.Error.InvisibleException)t;
+							Scope extended = scope.extend();
+							try {
+								BaseObject ret = impl.exec(global, extended);
+								if(ret != null)
+									return new Return(ret);
+							} catch(Throwable t) {
+								if(t instanceof net.nexustools.njs.Error.InvisibleException)
+									throw (net.nexustools.njs.Error.InvisibleException)t;
 
-							extended.set(key, global.wrap(t));
-							BaseObject ret = cimpl.exec(global, extended);
-							if(ret != null)
-								return new Return(ret);
+								extended.set(key, global.wrap(t));
+								BaseObject ret = cimpl.exec(global, extended);
+								if(ret != null)
+									return new Return(ret);
+							} finally {
+								BaseObject ret = fimpl.exec(global, extended);
+								if(ret != null)
+									return new Return(ret);
+							}
 						} finally {
-							BaseObject ret = fimpl.exec(global, extended);
-							if(ret != null)
-								return new Return(ret);
+							JSHelper.finishCall();
 						}
 						
 						return UNDEFINED_REFERENCE;
@@ -853,19 +1043,24 @@ public class InterpreterCompiler extends AbstractCompiler {
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						Scope extended = scope.extend();
+						JSHelper.renameCall(data.methodName, data.fileName, 0);
 						try {
-							BaseObject ret = impl.exec(global, extended);
-							if(ret != null)
-								return new Return(ret);
-						} catch(Throwable t) {
-							if(t instanceof net.nexustools.njs.Error.InvisibleException)
-								throw (net.nexustools.njs.Error.InvisibleException)t;
+							Scope extended = scope.extend();
+							try {
+								BaseObject ret = impl.exec(global, extended);
+								if(ret != null)
+									return new Return(ret);
+							} catch(Throwable t) {
+								if(t instanceof net.nexustools.njs.Error.InvisibleException)
+									throw (net.nexustools.njs.Error.InvisibleException)t;
 
-							extended.var(key, global.wrap(t));
-							BaseObject ret = cimpl.exec(global, extended);
-							if(ret != null)
-								return new Return(ret);
+								extended.var(key, global.wrap(t));
+								BaseObject ret = cimpl.exec(global, extended);
+								if(ret != null)
+									return new Return(ret);
+							}
+						} finally {
+							JSHelper.finishCall();
 						}
 						
 						return UNDEFINED_REFERENCE;
@@ -876,15 +1071,20 @@ public class InterpreterCompiler extends AbstractCompiler {
 				return new Runnable() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						Scope extended = scope.extend();
+						JSHelper.renameCall(data.methodName, data.fileName, 0);
 						try {
-							BaseObject ret = impl.exec(global, extended);
-							if(ret != null)
-								return new Return(ret);
+							Scope extended = scope.extend();
+							try {
+								BaseObject ret = impl.exec(global, extended);
+								if(ret != null)
+									return new Return(ret);
+							} finally {
+								BaseObject ret = fimpl.exec(global, extended);
+								if(ret != null)
+									return new Return(ret);
+							}
 						} finally {
-							BaseObject ret = fimpl.exec(global, extended);
-							if(ret != null)
-								return new Return(ret);
+							JSHelper.finishCall();
 						}
 						
 						return UNDEFINED_REFERENCE;
@@ -896,7 +1096,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					throw new net.nexustools.njs.Error.ThrowException(rhs.run(global, scope).get());
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
+					try {
+						throw new net.nexustools.njs.Error.ThrowException(rhs.run(global, scope).get());
+					} finally {
+						JSHelper.finishCall();
+					}
 				}
 			};
 		} else if(object instanceof While) {
@@ -905,18 +1110,23 @@ public class InterpreterCompiler extends AbstractCompiler {
 			return new Runnable() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					Scope extended = scope.extend();
-					extended.enter();
+					JSHelper.renameCall(data.methodName, data.fileName, 0);
 					try {
-						while(JSHelper.isTrue(condition.run(global, scope).get())) {
-							BaseObject ret = impl.exec(global, scope);
-							if(ret != null)
-								return new ValueReferenceable(ret);
-						}
+						Scope extended = scope.extend();
+						extended.enter();
+						try {
+							while(JSHelper.isTrue(condition.run(global, scope).get())) {
+								BaseObject ret = impl.exec(global, scope);
+								if(ret != null)
+									return new ValueReferenceable(ret);
+							}
 
-						return UNDEFINED_REFERENCE;
+							return UNDEFINED_REFERENCE;
+						} finally {
+							extended.exit();
+						}
 					} finally {
-						extended.exit();
+						JSHelper.finishCall();
 					}
 				}
 			};
@@ -971,7 +1181,9 @@ public class InterpreterCompiler extends AbstractCompiler {
 				public BaseObject exec(Global global, Scope scope) {
 					if(scope == null)
 						scope = new Scope.Extended(global);
+					
 					scope.enter();
+					JSHelper.renameCall(precompiled.methodName, precompiled.fileName, 0);
 					try {
 						precompiled.exec(global, scope);
 						for(int i=0; i<max; i++) {
@@ -982,6 +1194,7 @@ public class InterpreterCompiler extends AbstractCompiler {
 						}
 						return scriptType == ScriptType.Block ? null : net.nexustools.njs.Undefined.INSTANCE;
 					} finally {
+						JSHelper.finishCall();
 						scope.exit();
 					}
 				}
@@ -1001,10 +1214,12 @@ public class InterpreterCompiler extends AbstractCompiler {
 					if(scope == null)
 						scope = new Scope(global);
 					scope.enter();
+					JSHelper.renameCall(precompiled.methodName, precompiled.fileName, 0);
 					try {
 						precompiled.exec(global, scope);
 						return impl.run(global, scope).get();
 					} finally {
+						JSHelper.finishCall();
 						scope.exit();
 					}
 				}
@@ -1028,11 +1243,13 @@ public class InterpreterCompiler extends AbstractCompiler {
 							scope = new Scope(global);
 						
 						scope.enter();
+						JSHelper.renameCall(precompiled.methodName, precompiled.fileName, 0);
 						try {
 							precompiled.exec(global, scope);
 							parts[0].run(global, scope);
 							return parts[1].run(global, scope).get();
 						} finally {
+							JSHelper.finishCall();
 							scope.exit();
 						}
 					}
@@ -1050,12 +1267,14 @@ public class InterpreterCompiler extends AbstractCompiler {
 							scope = new Scope(global);
 						
 						scope.enter();
+						JSHelper.renameCall(precompiled.methodName, precompiled.fileName, 0);
 						try {
 							precompiled.exec(global, scope);
 							parts[0].run(global, scope);
 							parts[1].run(global, scope);
 							return parts[2].run(global, scope).get();
 						} finally {
+							JSHelper.finishCall();
 							scope.exit();
 						}
 					}
@@ -1075,12 +1294,14 @@ public class InterpreterCompiler extends AbstractCompiler {
 							scope = new Scope(global);
 						
 						scope.enter();
+						JSHelper.renameCall(precompiled.methodName, precompiled.fileName, 0);
 						try {
 							precompiled.exec(global, scope);
 							for(int i=0; i<max; i++)
 								lastValue = parts[i].run(global, scope).get();
 							return lastValue;
 						} finally {
+							JSHelper.finishCall();
 							scope.exit();
 						}
 					}

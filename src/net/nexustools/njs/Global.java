@@ -122,8 +122,8 @@ public class Global extends GenericObject {
 		if(t instanceof Error.ThrowException)
 			return ((Error.ThrowException)t).what;
 		if(t instanceof Error.JavaException)
-			return new Error.Instance(String, Error, ((Error.JavaException)t).type, ((Error.JavaException) t).getUnderlyingMessage(), JSHelper.convertStack(t));
-		return new Error.Instance(String, Error, "JavaError", t.toString(), JSHelper.convertStack(t));
+			return new Error.Instance(String, Error, ((Error.JavaException)t).type, ((Error.JavaException) t).getUnderlyingMessage(), JSHelper.convertStack(t.getMessage(), t));
+		return new Error.Instance(String, Error, "JavaError", t.toString(), JSHelper.convertStack("JavaError: " + t.toString(), t));
 	}
 
 	private static final List<WeakReference<JavaObjectWrapper>> WRAPS = new ArrayList();
