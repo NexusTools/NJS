@@ -5,6 +5,7 @@
  */
 package net.nexustools.njs;
 
+import net.nexustools.njs.JSHelper.ReplacementStackTraceElement;
 import net.nexustools.njs.compiler.Script;
 
 /**
@@ -22,7 +23,7 @@ public class Function extends AbstractFunction {
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				JSHelper.renameMethodCall("toString");
+				ReplacementStackTraceElement el = JSHelper.renameMethodCall("toString");
 				try {
 					if(_this instanceof BaseFunction) {
 						StringBuilder builder = new StringBuilder("function");
@@ -47,7 +48,7 @@ public class Function extends AbstractFunction {
 					}
 					throw new Error.JavaException("TypeError", "this is not instance of Function");
 				} finally {
-					JSHelper.finishCall();
+					el.finishCall();
 				}
 			}
 			@Override
@@ -68,27 +69,32 @@ public class Function extends AbstractFunction {
 		prototype.setStorage("call", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				switch(params.length) {
-					case 0:
-						return ((BaseFunction)_this).call(Undefined.INSTANCE);
+				ReplacementStackTraceElement el = JSHelper.renameMethodCall("Function.prototype.call");
+				try {
+					switch(params.length) {
+						case 0:
+							return ((BaseFunction)_this).call(Undefined.INSTANCE);
 
-					case 1:
-						return ((BaseFunction)_this).call(params[0]);
+						case 1:
+							return ((BaseFunction)_this).call(params[0]);
 
-					case 2:
-						return ((BaseFunction)_this).call(params[0], params[1]);
+						case 2:
+							return ((BaseFunction)_this).call(params[0], params[1]);
 
-					case 3:
-						return ((BaseFunction)_this).call(params[0], params[1], params[2]);
+						case 3:
+							return ((BaseFunction)_this).call(params[0], params[1], params[2]);
 
-					case 4:
-						return ((BaseFunction)_this).call(params[0], params[1], params[2], params[3]);
+						case 4:
+							return ((BaseFunction)_this).call(params[0], params[1], params[2], params[3]);
 
-					default:
-						final BaseObject target = params[0];
-						final BaseObject[] ps = new BaseObject[params.length-1];
-						System.arraycopy(params, 1, ps, 0, ps.length);
-						return ((BaseFunction)_this).call(target, ps);
+						default:
+							final BaseObject target = params[0];
+							final BaseObject[] ps = new BaseObject[params.length-1];
+							System.arraycopy(params, 1, ps, 0, ps.length);
+							return ((BaseFunction)_this).call(target, ps);
+					}
+				} finally {
+					el.finishCall();
 				}
 			}
 			@Override
@@ -118,11 +124,11 @@ public class Function extends AbstractFunction {
 					}
 				};
 				scope.enter();
-				JSHelper.renameCall(name(), "Function", 0, 0);
+				ReplacementStackTraceElement el = JSHelper.renameCall(name(), "Function", 0, 0);
 				try {
 					return compiled.exec(global, scope);
 				} finally {
-					JSHelper.finishCall();
+					el.finishCall();
 					scope.exit();
 				}
 			}

@@ -15,4 +15,5 @@ import net.nexustools.njs.Scope;
  */
 public interface Script {
 	public BaseObject exec(Global global, Scope scope);
+	public java.lang.String source();
 }

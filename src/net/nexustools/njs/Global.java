@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import net.nexustools.njs.compiler.Compiler;
+import net.nexustools.njs.compiler.JavaCompiler;
 import net.nexustools.njs.compiler.RuntimeCompiler;
 
 /**
@@ -17,6 +18,20 @@ import net.nexustools.njs.compiler.RuntimeCompiler;
  * @author kate
  */
 public class Global extends GenericObject {
+	private static boolean dumpJavaCompilerThrowable = true;
+	public static Compiler createCompiler() {
+		try {
+			return new JavaCompiler();
+		} catch(Throwable t) {
+			if(dumpJavaCompilerThrowable) {
+				dumpJavaCompilerThrowable = false;
+				System.out.println("Unable to use JavaCompiler, falling back to RuntimeCompiler");
+				t.printStackTrace(System.out);
+			}
+			return new RuntimeCompiler();
+		}
+	}
+	
 	public final Compiler compiler;
 	public final Function Function = new Function(this);
 	public final Object Object = new Object();
@@ -32,7 +47,7 @@ public class Global extends GenericObject {
 	public final Number.Instance NegativeInfinity;
 	
 	public Global() {
-		this(new RuntimeCompiler());
+		this(createCompiler());
 	}
 	
 	public Global(Compiler compiler) {
@@ -119,8 +134,8 @@ public class Global extends GenericObject {
 	}
 	
 	public BaseObject wrap(Throwable t) {
-		if(t instanceof Error.ThrowException)
-			return ((Error.ThrowException)t).what;
+		if(t instanceof Error.Thrown)
+			return ((Error.Thrown)t).what;
 		if(t instanceof Error.JavaException)
 			return new Error.Instance(String, Error, ((Error.JavaException)t).type, ((Error.JavaException) t).getUnderlyingMessage(), JSHelper.convertStack(t.getMessage(), t));
 		return new Error.Instance(String, Error, "JavaError", t.toString(), JSHelper.convertStack("JavaError: " + t.toString(), t));

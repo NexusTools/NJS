@@ -65,6 +65,10 @@ public class Number extends AbstractFunction {
 		public Instance clone() {
 			return new Instance(Number, number);
 		}
+		@Override
+		public java.lang.String toString() {
+			return net.nexustools.njs.Number.toString(number);
+		}
 	}
 	
 	private final List<WeakReference<Instance>> INSTANCES = new ArrayList();

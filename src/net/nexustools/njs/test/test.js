@@ -72,20 +72,6 @@
 		importClass("javax.swing.JOptionPane").showMessageDialog(null, e);
 	}
 	
-	if(true)
-		print("if true works!");
-	
-	if(false)
-		print("WRONG!");
-	else
-		print("If Else Right!");
-	
-	print(global.JSON.stringify({
-		"judas": (new tuna).horse(),
-		tuna: "fish",
-		farmer: 23
-	}));
-	
 	print(Throwable.prototype.constructor);
 	
 	/*if(throwable instanceof Throwable.prototype.constructor) {
@@ -104,36 +90,6 @@
 	})() * (function() {
 		return 2;
 	})());
-	
-	var key = "sausage";
-	print((function() {
-		return {
-			sausage: (function() {
-				return this.hamster;
-			}).call({
-				hamster: "Jesus"
-			})
-		};
-	})()[key]);
-	
-	var solid = {
-		horses: 23,
-		loops: 43
-	};
-	
-	var horses = "horses";
-	
-	print(JSON.stringify(solid));
-	print(delete solid[horses]);
-	print(JSON.stringify(solid));
-	
-	print((function() {
-		return {
-			further: function seasoned() {
-				return 2000;
-			}
-		}
-	})().further());
 	
 	var JOptionPane = importClass("javax.swing.JOptionPane");
 	try {

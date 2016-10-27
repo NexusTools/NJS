@@ -8,6 +8,8 @@ package net.nexustools.njs.test;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.StringReader;
 
 import net.nexustools.njs.Global;
 import net.nexustools.njs.JSHelper;
@@ -47,7 +49,23 @@ public class Test {
 			}
 		});
 		
-		global.compiler.eval(new InputStreamReader(Test.class.getResourceAsStream("/net/nexustools/njs/test/test.js")), "test.js", false).exec(global, null);
-		//global.compiler.eval(new FileReader("/home/kate/Projects/SnappFu/JNode12/node/node.js"), "node.js", false).exec(global, null);
+		eval("(15)", "test", global);
+		eval("toString()", "test", global);
+		eval("var i = 1;", "test", global);
+		eval("\"Abc\".charCodeAt(i)", "test", global);
+		//eval("var test = function(){}", "test", global);
+		//eval("function cheese(){(function(){throw new Error(\"Sausage Hamster\")})()}cheese();", "test", global);
+		
+		eval(new InputStreamReader(Test.class.getResourceAsStream("/net/nexustools/njs/test/test.js")), "test.js", global);
+		//eval(new InputStreamReader(Test.class.getResourceAsStream("/home/kate/Projects/SnappFu/JNode12/node/node.js")), "node.js", global);
 	}
+	
+	public static void eval(String source, String fileName, Global global) {
+		System.out.println(global.compiler.eval(source, fileName, false).exec(global, null));
+	}
+	
+	public static void eval(Reader reader, String fileName, Global global) {
+		System.out.println(global.compiler.eval(reader, fileName, false).exec(global, null));
+	}
+	
 }

@@ -66,11 +66,12 @@ public abstract class AbstractCompiler implements Compiler {
 		}
 	}
 	public static class ScriptData {
+		Function callee;
 		final Part[] impl;
 		final int rows, columns;
 		final Function[] functions;
-		java.lang.String methodName = null;
-		public ScriptData(Part[] impl, int rows, int columns) {
+		java.lang.String methodName = null, source;
+		public ScriptData(Part[] impl, java.lang.String source, int rows, int columns) {
 			List<Part> imp = new ArrayList();
 			List<Function> funcs = new ArrayList();
 			for(int i=0; i<impl.length; i++) {
@@ -83,6 +84,7 @@ public abstract class AbstractCompiler implements Compiler {
 			}
 			functions = funcs.toArray(new Function[funcs.size()]);
 			this.impl = imp.toArray(new Part[imp.size()]);
+			this.source = source;
 			this.columns = columns;
 			this.rows = rows;
 		}
@@ -556,7 +558,6 @@ public abstract class AbstractCompiler implements Compiler {
 		Part contents;
 		boolean closed;
 		List<java.lang.String> chain = new ArrayList();
-		Call call;
 		
 		public OpenBracket() {}
 		@Override
@@ -2041,6 +2042,9 @@ public abstract class AbstractCompiler implements Compiler {
 			java.lang.String buffer;
 			Matcher matcher;
 			
+			final int sRows = reader.rows;
+			final int sColumns = reader.columns;
+			
 			Part currentPart = null;
 			List<Part> parts = new ArrayList();
 			while(true) {
@@ -2074,7 +2078,7 @@ public abstract class AbstractCompiler implements Compiler {
 										}
 										if(DEBUG)
 											System.out.println("[" + this + "] End...");
-										end(reader, parts, builder.toString());
+										end(sRows, sColumns, parts, builder.toString());
 									}
 									
 									try {
@@ -2096,7 +2100,7 @@ public abstract class AbstractCompiler implements Compiler {
 											if(ex.part instanceof CloseGroup) {
 												if(DEBUG)
 													System.out.println("[" + this + "] End...");
-												end(reader, parts, builder.toString());
+												end(sRows, sColumns, parts, builder.toString());
 											}
 											if(!ex.part.isStandalone()) {
 												if(ex.part instanceof SemiColon) {
@@ -2114,6 +2118,7 @@ public abstract class AbstractCompiler implements Compiler {
 											functionParser.parse(reader);
 										} catch(ParseComplete ce) {
 											ex.function.impl = ce.impl;
+											ex.function.impl.callee = ex.function;
 											ex.function.source = ce.source;
 											ex.function.state = Function.State.Complete;
 											builder.append(ce.source);
@@ -2136,7 +2141,7 @@ public abstract class AbstractCompiler implements Compiler {
 									if(part.part instanceof CloseGroup) {
 										if(DEBUG)
 											System.out.println("[" + this + "] End...");
-										end(reader, parts, builder.toString());
+										end(sRows, sColumns, parts, builder.toString());
 									}
 									currentPart = part.part;
 								}
@@ -2147,7 +2152,7 @@ public abstract class AbstractCompiler implements Compiler {
 									if(currentPart instanceof CloseGroup) {
 										if(DEBUG)
 											System.out.println("[" + this + "] End...");
-										end(reader, parts, builder.toString());
+										end(sRows, sColumns, parts, builder.toString());
 									}
 									if(!currentPart.isStandalone())
 										throw new Error.JavaException("SyntaxError", "Unexpected " + currentPart);
@@ -2178,10 +2183,10 @@ public abstract class AbstractCompiler implements Compiler {
 					currentPart = null;
 				}
 			}
-			return new ScriptData(parts.toArray(new Part[parts.size()]), 0, 0);
+			return new ScriptData(parts.toArray(new Part[parts.size()]), builder.toString(), 1, 1);
 		}
 		
-		public void end(ParserReader reader, List<Part> parts, java.lang.String source) {
+		public void end(int rows, int columns, List<Part> parts, java.lang.String source) {
 			throw new Error.JavaException("SyntaxError", "Unexpected }");
 		}
 		
@@ -2352,8 +2357,9 @@ public abstract class AbstractCompiler implements Compiler {
 		public BlockParser(boolean inFunction) {
 			this.inFunction = inFunction;
 		}
-		public void end(ParserReader reader, List<Part> parts, java.lang.String source) {
-			throw new ParseComplete(new ScriptData(parts.toArray(new Part[parts.size()]), reader.rows, reader.columns), source);
+		@Override
+		public void end(int rows, int columns, List<Part> parts, java.lang.String source) {
+			throw new ParseComplete(new ScriptData(parts.toArray(new Part[parts.size()]), source, rows, columns), source);
 		}
 		@Override
 		public void ret(Matcher matcher) {
@@ -2367,8 +2373,9 @@ public abstract class AbstractCompiler implements Compiler {
 		public void ret(Matcher matcher) {
 			throw new PartExchange(new Return(), matcher.group().length());
 		}
-		public void end(ParserReader reader, List<Part> parts, java.lang.String source) {
-			throw new ParseComplete(new ScriptData(parts.toArray(new Part[parts.size()]), reader.rows, reader.columns), source);
+		@Override
+		public void end(int rows, int columns, List<Part> parts, java.lang.String source) {
+			throw new ParseComplete(new ScriptData(parts.toArray(new Part[parts.size()]), source, rows, columns), source);
 		}
 	}
 
@@ -2376,16 +2383,15 @@ public abstract class AbstractCompiler implements Compiler {
 	public final Script eval(java.lang.String source, java.lang.String fileName, boolean inFunction) {
 		return eval(new StringReader(source), fileName, inFunction);
 	}
-
-	@Override
-	public final Script eval(Reader source, java.lang.String fileName, boolean inFunction) {
+	
+	protected final ScriptData parse(Reader source, java.lang.String fileName, boolean inFunction) {
 		ParserReader reader = null;
 		RegexParser parser = inFunction ? new FunctionParser() : new ScriptParser();
 		try {
 			ScriptData script = parser.parse(reader = new ParserReader(source));
 			if(DEBUG)
 				System.out.println("Compiling " + join(Arrays.asList(script), ';'));
-			return compileScript(script, fileName, inFunction);
+			return script;
 		} catch(net.nexustools.njs.Error.JavaException ex) {
 			if(ex.type.equals("SyntaxError") && reader != null) {
 				StringBuilder builder = new StringBuilder(ex.getUnderlyingMessage());
@@ -2404,6 +2410,11 @@ public abstract class AbstractCompiler implements Compiler {
 		} catch(IOException ex) {
 			throw new Error.JavaException("EvalError", "IO Exception While Evaluating Script: " + ex.getMessage(), ex);
 		}
+	}
+
+	@Override
+	public final Script eval(Reader source, java.lang.String fileName, boolean inFunction) {
+		return compileScript(parse(source, fileName, inFunction), fileName, inFunction);
 	}
 	
 	protected abstract Script compileScript(ScriptData script, java.lang.String fileName, boolean inFunction);

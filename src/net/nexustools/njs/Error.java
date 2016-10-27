@@ -11,8 +11,6 @@ import java.io.PrintWriter;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  *
@@ -53,10 +51,40 @@ public class Error extends AbstractFunction implements BaseFunction {
 				// Print our stack trace
 				a.append(t.toString() + '\n');
 				for (int i = 0; i <= m; i++)
-					a.append("\tat " + trace[i] + '\n');
+					a.append("\tat " + toString(trace[i]) + '\n');
 				if (framesInCommon != 0)
 					a.append("\t... " + framesInCommon + " more\n");
 			}
+		}
+		
+		public static java.lang.String toString(StackTraceElement el) {
+			if(el.getClassName().equals("")) {
+				StringBuilder builder = new StringBuilder();
+				java.lang.String method = el.getMethodName();
+				boolean hasMethod = method != null && !method.isEmpty();
+				if(hasMethod) {
+					builder.append(method);
+					builder.append(" (");
+				}
+
+				java.lang.String fileName = el.getFileName();
+				if(fileName == null)
+					builder.append("<unknown source>");
+				else {
+					builder.append(fileName);
+					int lineNumber = el.getLineNumber();
+					if(lineNumber > 0) {
+						builder.append(':');
+						builder.append(lineNumber);
+					}
+				}
+
+				if(hasMethod)
+					builder.append(')');
+				
+				return builder.toString();
+			} else
+				return el.toString();
 		}
 		
 		public void printStackTrace(Appendable a) {
@@ -67,7 +95,7 @@ public class Error extends AbstractFunction implements BaseFunction {
 				StackTraceElement[] enclosing = JSHelper.convertStackTrace(getStackTrace());
 				a.append(toString());
 				for (int i = 0; i < enclosing.length; i++)
-					a.append("\n\tat " + enclosing[i]);
+					a.append("\n\tat " + toString(enclosing[i]));
 				for(Throwable supressed : getSuppressed()) {
 					a.append("\nSuppressed ");
 					printStackTrace(a, supressed, enclosing, dejaVu);
@@ -90,17 +118,17 @@ public class Error extends AbstractFunction implements BaseFunction {
 			super(message, cause);
 		}
 	}
-	public static class ThrowException extends ConvertedException {
+	public static class Thrown extends ConvertedException {
 		public final BaseObject what;
-		public ThrowException(BaseObject what) {
-			super(what.toString() + " thrown by NJS");
+		public Thrown(BaseObject what) {
+			super(what.toString());
 			this.what = what;
 		}
-		public ThrowException(java.lang.String message, BaseObject what) {
+		public Thrown(java.lang.String message, BaseObject what) {
 			super(message);
 			this.what = what;
 		}
-		public ThrowException(java.lang.String message, Throwable cause, BaseObject what) {
+		public Thrown(java.lang.String message, Throwable cause, BaseObject what) {
 			super(message, cause);
 			this.what = what;
 		}

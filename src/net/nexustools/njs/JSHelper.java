@@ -213,10 +213,8 @@ public class JSHelper {
 			if(stackRemaining < target) {
 				StackElementReplace el0 = list.get(stackRemaining);
 				if(el0 != null && el0.original.getClassName().equals(el.getClassName()) &&
-						el0.original.getFileName().equals(el.getFileName()) &&
-						el0.original.getMethodName().equals(el.getMethodName()) &&
-						el.getLineNumber() >= el0.original.getLineNumber() && 
-						el.getLineNumber() <= el0.maxLineNumber)
+						el0.original.getFileName().equals(el.getFileName()) && el0.original.getMethodName().equals(el.getMethodName()) &&
+						el.getLineNumber() >= el0.original.getLineNumber() && (el0.replacement == null || el.getLineNumber() <= el0.replacement.maxLineNumber))
 					el = el0.replacement.toStackTraceElement();
 			}
 			
@@ -228,9 +226,10 @@ public class JSHelper {
 
 	public static class ReplacementStackTraceElement {
 		
-		final int rows, columns;
-		final java.lang.String methodName, fileName;
-		public ReplacementStackTraceElement(java.lang.String methodName, java.lang.String fileName, int rows, int columns) {
+		public int rows, columns;
+		private int maxLineNumber = Integer.MAX_VALUE;
+		private final java.lang.String methodName, fileName;
+		private ReplacementStackTraceElement(java.lang.String methodName, java.lang.String fileName, int rows, int columns) {
 			this.methodName = methodName;
 			this.fileName = fileName;
 			this.rows = rows;
@@ -238,14 +237,17 @@ public class JSHelper {
 		}
 
 		private StackTraceElement toStackTraceElement() {
-			return new StackTraceElement("NJS", methodName, fileName, rows);
+			return new StackTraceElement("", methodName, fileName, rows);
+		}
+
+		public void finishCall() {
+			maxLineNumber = new Throwable().getStackTrace()[1].getLineNumber();
 		}
 		
 	}
 	private static class StackElementReplace {
 		ReplacementStackTraceElement replacement;
 		final StackTraceElement original;
-		int maxLineNumber = Integer.MAX_VALUE;
 		public StackElementReplace(StackTraceElement original, ReplacementStackTraceElement replacement) {
 			this.original = original;
 			this.replacement = replacement;
@@ -263,6 +265,12 @@ public class JSHelper {
 			return new ArrayList();
 		}
 	};
+
+	public static void updateCallPosition(int rows, int columns, int stackPos) {
+		ReplacementStackTraceElement el = STACK_REPLACEMENTS.get().get(stackPos).replacement;
+		el.columns = columns;
+		el.rows = rows;
+	}
 	public static java.lang.String convertStack(java.lang.String header, Throwable t) {
 		StringBuilder builder = new StringBuilder(header);
 		final StackTraceElement[] stack = t.getStackTrace();
@@ -274,11 +282,9 @@ public class JSHelper {
 			
 			if(stackRemaining < target) {
 				StackElementReplace el0 = list.get(stackRemaining);
-				if(el0 != null && el0.original.getClassName().equals(el.getClassName()) &&
-						el0.original.getFileName().equals(el.getFileName()) &&
-						el0.original.getMethodName().equals(el.getMethodName()) &&
-						el.getLineNumber() >= el0.original.getLineNumber() && 
-						el.getLineNumber() <= el0.maxLineNumber) {
+				if(el0 != null && el0.original.getClassName().equals(el.getClassName()) && el0.original.getFileName().equals(el.getFileName()) &&
+						el0.original.getMethodName().equals(el.getMethodName()) && el.getLineNumber() >= el0.original.getLineNumber() && 
+						(el0.replacement == null || el.getLineNumber() <= el0.replacement.maxLineNumber)) {
 					
 					ReplacementStackTraceElement rel = el0.replacement;
 					
@@ -342,36 +348,33 @@ public class JSHelper {
 		}
 		return builder.toString();
 	}
-	public static void renameMethodCall(java.lang.String methodName) {
+	public static ReplacementStackTraceElement renameMethodCall(java.lang.String methodName) {
+		ReplacementStackTraceElement replacement;
 		StackTraceElement[] stack = new Throwable().getStackTrace();
 		List<StackElementReplace> list = STACK_REPLACEMENTS.get();
 		int leftPad = stack.length-2;
 		if(list.size() <= leftPad) {
 			while(list.size() < leftPad)
 				list.add(null);
-			list.add(new StackElementReplace(stack[1], new ReplacementStackTraceElement(methodName, stack[1].getFileName(), stack[1].getLineNumber(), 0)));
+			list.add(new StackElementReplace(stack[1], replacement = new ReplacementStackTraceElement(methodName, stack[1].getFileName(), stack[1].getLineNumber(), 0)));
 		} else
-			list.set(leftPad, new StackElementReplace(stack[1], new ReplacementStackTraceElement(methodName, stack[1].getFileName(), stack[1].getLineNumber(), 0)));
+			list.set(leftPad, new StackElementReplace(stack[1], replacement = new ReplacementStackTraceElement(methodName, stack[1].getFileName(), stack[1].getLineNumber(), 0)));
 		STACK_POSITION.set(leftPad);
+		return replacement;
 	}
-	public static void renameCall(java.lang.String methodName, java.lang.String fileName, int rows, int columns) {
+	public static ReplacementStackTraceElement renameCall(java.lang.String methodName, java.lang.String fileName, int rows, int columns) {
+		ReplacementStackTraceElement replacement;
 		StackTraceElement[] stack = new Throwable().getStackTrace();
 		List<StackElementReplace> list = STACK_REPLACEMENTS.get();
 		int leftPad = stack.length-2;
 		if(list.size() <= leftPad) {
 			while(list.size() < leftPad)
 				list.add(null);
-			list.add(new StackElementReplace(stack[1], new ReplacementStackTraceElement(methodName, fileName, rows, columns)));
+			list.add(new StackElementReplace(stack[1], replacement = new ReplacementStackTraceElement(methodName, fileName, rows, columns)));
 		} else
-			list.set(leftPad, new StackElementReplace(stack[1], new ReplacementStackTraceElement(methodName, fileName, rows, columns)));
+			list.set(leftPad, new StackElementReplace(stack[1], replacement = new ReplacementStackTraceElement(methodName, fileName, rows, columns)));
 		STACK_POSITION.set(leftPad);
+		return replacement;
 	}
-
-	public static void finishCall() {
-		int pos = STACK_POSITION.get();
-		List<StackElementReplace> list = STACK_REPLACEMENTS.get();
-		list.get(pos).maxLineNumber = new Throwable().getStackTrace()[1].getLineNumber();
-		while(pos >= 1 && list.get(--pos) == null);
-		STACK_POSITION.set(pos);
-	}
+	
 }
