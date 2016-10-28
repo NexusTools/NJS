@@ -18,14 +18,14 @@ import net.nexustools.njs.compiler.RuntimeCompiler;
  * @author kate
  */
 public class Global extends GenericObject {
-	private static boolean dumpJavaCompilerThrowable = true;
+	private static boolean SHOW_UNAVAILABLE_MESSAGE = true;
 	public static Compiler createCompiler() {
 		try {
 			return new JavaCompiler();
 		} catch(Throwable t) {
-			if(dumpJavaCompilerThrowable) {
-				dumpJavaCompilerThrowable = false;
-				System.out.println("Unable to use JavaCompiler, falling back to RuntimeCompiler");
+			if(SHOW_UNAVAILABLE_MESSAGE) {
+				SHOW_UNAVAILABLE_MESSAGE = false;
+				System.out.println("JavaCompiler unavailable, falling back to RuntimeCompiler");
 				t.printStackTrace(System.out);
 			}
 			return new RuntimeCompiler();
@@ -113,21 +113,21 @@ public class Global extends GenericObject {
 		return String.wrap(string);
 	}
 
-	private static final List<WeakReference<JavaConstructor>> CONSTRUCTORS = new ArrayList();
-	public JavaConstructor wrap(Class<?> javaClass) {
+	private static final List<WeakReference<JavaClassWrapper>> CONSTRUCTORS = new ArrayList();
+	public JavaClassWrapper wrap(Class<?> javaClass) {
 		assert(javaClass != null);
 		synchronized(CONSTRUCTORS) {
-			Iterator<WeakReference<JavaConstructor>> it = CONSTRUCTORS.iterator();
+			Iterator<WeakReference<JavaClassWrapper>> it = CONSTRUCTORS.iterator();
 			while(it.hasNext()) {
-				WeakReference<JavaConstructor> ref = it.next();
-				JavaConstructor constructor = ref.get();
+				WeakReference<JavaClassWrapper> ref = it.next();
+				JavaClassWrapper constructor = ref.get();
 				if(constructor == null)
 					it.remove();
 				else if(constructor.javaClass == javaClass)
 					return constructor;
 			}
 		
-			JavaConstructor constructor = new JavaConstructor(this, javaClass);
+			JavaClassWrapper constructor = new JavaClassWrapper(this, javaClass);
 			CONSTRUCTORS.add(new WeakReference(constructor));
 			return constructor;
 		}

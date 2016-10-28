@@ -19,13 +19,13 @@ import java.util.Map;
  *
  * @author kate
  */
-public class JavaConstructor extends AbstractFunction {
+public class JavaClassWrapper extends AbstractFunction {
 	
 	public final Global global;
 	public final Class<?> javaClass;
 	public final java.lang.String javaClassString;
 	private final Map<Integer, List<Constructor>> constructors = new HashMap();
-	JavaConstructor(final Global global, final Class<?> javaClass) {
+	JavaClassWrapper(final Global global, final Class<?> javaClass) {
 		super(global);
 		assert(javaClass != null);
 		this.javaClass = javaClass;
@@ -49,7 +49,7 @@ public class JavaConstructor extends AbstractFunction {
 		
 		GenericObject prototype = prototype();
 		if(superClass != null) {
-			JavaConstructor superConstructor = global.wrap(superClass);
+			JavaClassWrapper superConstructor = global.wrap(superClass);
 			prototype.setHidden("__proto__", superConstructor.prototype());
 			prototype.setHidden("constructor", superConstructor);
 		}
@@ -79,14 +79,20 @@ public class JavaConstructor extends AbstractFunction {
 				@Override
 				public BaseObject call(BaseObject _this, BaseObject... params) {
 					if(params.length == 0) {
+						Method method;
 						try {
-							return global.javaToJS(byLength.get(0).get(0).invoke(((JavaObjectWrapper)_this).javaObject));
+							method = byLength.get(0).get(0);
+						} catch(NullPointerException ex) {
+							throw new Error.JavaException("JavaError", "Illegal arguments", ex);
+						}
+						try {
+							return global.javaToJS(method.invoke(((JavaObjectWrapper)_this).javaObject));
 						} catch (IllegalAccessException ex) {
-							throw new Error.JavaException("JavaError", ex.toString(), ex);
+							throw new Error.JavaException("JavaError", "Illegal arguments", ex);
 						} catch (IllegalArgumentException ex) {
-							throw new Error.JavaException("JavaError", ex.toString(), ex);
+							throw new Error.JavaException("JavaError", "Illegal arguments", ex);
 						} catch (InvocationTargetException ex) {
-							throw new Error.JavaException("JavaError", ex.toString(), ex);
+							throw new Error.JavaException("JavaError", "Illegal arguments", ex);
 						}
 					}
 					java.lang.Object[] converted = new java.lang.Object[params.length];
@@ -103,15 +109,15 @@ public class JavaConstructor extends AbstractFunction {
 							try {
 								return global.wrap(method.invoke(((JavaObjectWrapper)_this).javaObject, converted));
 							} catch (IllegalAccessException ex) {
-								throw new Error.JavaException("JavaError", ex.toString(), ex);
+								throw new Error.JavaException("JavaError", "Illegal arguments", ex);
 							} catch (IllegalArgumentException ex) {
-								throw new Error.JavaException("JavaError", ex.toString(), ex);
+								throw new Error.JavaException("JavaError", "Illegal arguments", ex);
 							} catch (InvocationTargetException ex) {
-								throw new Error.JavaException("JavaError", ex.toString(), ex);
+								throw new Error.JavaException("JavaError", "Illegal arguments", ex);
 							}
 						}
 					}
-					throw new UnsupportedOperationException();
+					throw new Error.JavaException("JavaError", "Illegal arguments");
 				}
 				@Override
 				public java.lang.String name() {
@@ -122,7 +128,7 @@ public class JavaConstructor extends AbstractFunction {
 		
 		methods.clear();
 		for(final Method method : javaClass.getDeclaredMethods()) {
-			if((method.getModifiers() & Modifier.STATIC) == 0)
+			if((method.getModifiers() & Modifier.STATIC) == 0) 
 				continue;
 			
 			List<Method> meths = methods.get(method.getName());
@@ -148,11 +154,11 @@ public class JavaConstructor extends AbstractFunction {
 						try {
 							return global.javaToJS(byLength.get(0).get(0).invoke(null));
 						} catch (IllegalAccessException ex) {
-							throw new Error.JavaException("JavaError", ex.toString(), ex);
+							throw new Error.JavaException("JavaError", "Illegal arguments", ex);
 						} catch (IllegalArgumentException ex) {
-							throw new Error.JavaException("JavaError", ex.toString(), ex);
+							throw new Error.JavaException("JavaError", "Illegal arguments", ex);
 						} catch (InvocationTargetException ex) {
-							throw new Error.JavaException("JavaError", ex.toString(), ex);
+							throw new Error.JavaException("JavaError", "Illegal arguments", ex);
 						}
 					java.lang.Object[] converted = new java.lang.Object[params.length];
 					List<Method> methods = byLength.get(params.length);
@@ -165,20 +171,21 @@ public class JavaConstructor extends AbstractFunction {
 									try {
 										converted[i] = JSHelper.jsToJava(params[i], types[i]);
 									} catch(ClassCastException ex) {
+										ex.printStackTrace();
 										break again;
 									}
 								try {
 									return global.wrap(method.invoke(null, converted));
 								} catch (IllegalAccessException ex) {
-									throw new Error.JavaException("JavaError", ex.toString(), ex);
+									throw new Error.JavaException("JavaError", "Illegal arguments", ex);
 								} catch (IllegalArgumentException ex) {
-									throw new Error.JavaException("JavaError", ex.toString(), ex);
+									throw new Error.JavaException("JavaError", "Illegal arguments", ex);
 								} catch (InvocationTargetException ex) {
-									throw new Error.JavaException("JavaError", ex.toString(), ex);
+									throw new Error.JavaException("JavaError", "Illegal arguments", ex);
 								}
 							}
 						}
-					throw new Error.JavaException("ArgumentError", "Invalid arguments");
+					throw new Error.JavaException("JavaError", "Illegal arguments");
 				}
 				@Override
 				public java.lang.String name() {

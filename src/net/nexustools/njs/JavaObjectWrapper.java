@@ -12,7 +12,7 @@ package net.nexustools.njs;
 public class JavaObjectWrapper extends GenericObject {
 
 	public final java.lang.Object javaObject;
-	JavaObjectWrapper(java.lang.Object javaObject, JavaConstructor constructor) {
+	JavaObjectWrapper(java.lang.Object javaObject, JavaClassWrapper constructor) {
 		super(constructor.prototype(), constructor);
 		this.javaObject = javaObject;
 	}

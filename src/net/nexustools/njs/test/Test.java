@@ -9,7 +9,6 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.io.StringReader;
 
 import net.nexustools.njs.Global;
 import net.nexustools.njs.JSHelper;
@@ -49,15 +48,12 @@ public class Test {
 			}
 		});
 		
-		eval("(15)", "test", global);
-		eval("toString()", "test", global);
-		eval("var i = 1;", "test", global);
-		eval("\"Abc\".charCodeAt(i)", "test", global);
-		//eval("var test = function(){}", "test", global);
-		//eval("function cheese(){(function(){throw new Error(\"Sausage Hamster\")})()}cheese();", "test", global);
-		
 		eval(new InputStreamReader(Test.class.getResourceAsStream("/net/nexustools/njs/test/test.js")), "test.js", global);
-		//eval(new InputStreamReader(Test.class.getResourceAsStream("/home/kate/Projects/SnappFu/JNode12/node/node.js")), "node.js", global);
+		//eval("/home/kate/Projects/SnappFu/JNode12/node/node.js", global);
+	}
+	
+	public static void eval(String fileName, Global global) throws FileNotFoundException {
+		eval(new FileReader(fileName), fileName, global);
 	}
 	
 	public static void eval(String source, String fileName, Global global) {

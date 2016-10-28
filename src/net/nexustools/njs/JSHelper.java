@@ -28,14 +28,23 @@ public class JSHelper {
 				}
 			};
 		
-		if(jsObject instanceof Number.Instance) {
-			if(jsObject instanceof Number.Instance)
-				return desiredClass.cast((Double)((Number.Instance)jsObject).number);
-			return desiredClass.cast(jsObject.toString());
-		}
+		if(desiredClass.isAssignableFrom(Number.class))
+			try {
+				return desiredClass.cast(Double.valueOf(jsObject.toString()));
+			} catch(NumberFormatException ex) {}
 		
-		if(Number.class.isAssignableFrom(desiredClass))
-			return desiredClass.cast(Double.valueOf(jsObject.toString()));
+		if(jsObject instanceof Number.Instance) {
+			double value = (Double)((Number.Instance)jsObject).number;
+			if(desiredClass == Long.class || desiredClass == Long.TYPE)
+				return (O)(Long)(long)value;
+			if(desiredClass == Integer.class || desiredClass == Integer.TYPE)
+				return (O)(Integer)(int)value;
+			if(desiredClass == Short.class || desiredClass == Short.TYPE)
+				return (O)(Short)(short)value;
+			if(desiredClass == Byte.class || desiredClass == Byte.TYPE)
+				return (O)(Byte)(byte)value;
+			return desiredClass.cast(value);
+		}
 		
 		if(jsObject instanceof JavaObjectWrapper)
 			return desiredClass.cast(((JavaObjectWrapper)jsObject).javaObject);
@@ -113,7 +122,7 @@ public class JSHelper {
 				global.setHidden("eval", new AbstractFunction(global) {
 					@Override
 					public BaseObject call(BaseObject _this, BaseObject... params) {
-						return global.compiler.eval(params[0].toString(), "eval", false).exec(global, Scope.getCurrent());
+						return global.compiler.eval(params[0].toString(), "<eval>", false).exec(global, Scope.current());
 					}
 					@Override
 					public java.lang.String name() {

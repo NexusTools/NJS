@@ -83,7 +83,16 @@
 	}*/
 	
 	var ExecutorService = importClass("java.util.concurrent.Executors").newCachedThreadPool();
+	var Thread = importClass("java.lang.Thread");
 	print(ExecutorService.execute);
+	
+	function setTimeout(cb, timeout) {
+		ExecutorService.execute(function() {
+			if(timeout)
+				Thread.sleep(timeout);
+			cb();
+		});
+	}
 	
 	print((function() {
 		return 52;
@@ -107,18 +116,25 @@
 		throw new Error("Farmers Dress");
 	}
 	
+	function JSHelper() {
+		var Thrown = importClass("net.nexustools.njs.Error$Thrown");
+		print(new Thrown(true).stack);
+		//new Thrown(true).printStackTrace();
+	}
+	
 	try {
 		require("mother.js")(muffin, JOptionPane);
 	} catch(e) {
-		print(e.stack);
+		print(eval("e.stack"));
+		print(eval("new Error().stack"));
 		JOptionPane.showMessageDialog(null, e);
 	}
 	
-	function 侷() {
-		throw new Error("Tuba Fish");
-	}
+	new JSHelper();
 	
-	侷();
+	setTimeout(function exit() {
+		importClass("java.lang.System").exit(0);
+	}, 5000);
 	
 	
 	
@@ -129,4 +145,4 @@
 			}
 		});
 	}*/
-}).call(this, this);
+})();

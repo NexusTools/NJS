@@ -108,7 +108,7 @@ public class Function extends AbstractFunction {
 	public BaseObject construct(BaseObject... params) {
 		final java.lang.String source = params[1].toString();
 		final java.lang.String arguments = params[0].toString();
-		final Script compiled = global.compiler.eval(source, "Function", true);
+		final Script compiled = global.compiler.eval(source, "<Function>", true);
 		final java.lang.String[] args = arguments.split("\\s*,\\s*");
 		
 		return new AbstractFunction(global, "<Function>") {
@@ -123,14 +123,7 @@ public class Function extends AbstractFunction {
 						var("arguments", new Arguments(global, self, params));
 					}
 				};
-				scope.enter();
-				ReplacementStackTraceElement el = JSHelper.renameCall(name(), "Function", 0, 0);
-				try {
-					return compiled.exec(global, scope);
-				} finally {
-					el.finishCall();
-					scope.exit();
-				}
+				return compiled.exec(global, scope);
 			}
 			@Override
 			public java.lang.String source() {

@@ -16,14 +16,80 @@ import java.util.Map;
  * @author kate
  */
 public class Scope implements Scopeable {
+	
+	private static class BlockScopeable implements Scopeable {
+		private final HashMap<java.lang.String, BaseObject> arguments = new HashMap();
+		
+		public void param(java.lang.String key, BaseObject val) {
+			arguments.put(key, val);
+		}
+		
+		@Override
+		public BaseObject get(java.lang.String key) {
+			throw new UnsupportedOperationException("Not supported");
+		}
+
+		@Override
+		public BaseObject get(java.lang.String key, Or<BaseObject> or) {
+			BaseObject arg = arguments.get(key);
+			if(arg != null)
+				return arg;
+			
+			return or.or(key);
+		}
+
+		@Override
+		public void set(java.lang.String key, BaseObject val) {
+			throw new UnsupportedOperationException("Not supported");
+		}
+
+		@Override
+		public void set(java.lang.String key, BaseObject val, Or<Void> or) {
+			Iterator<Map.Entry<java.lang.String, BaseObject>> it = arguments.entrySet().iterator();
+			while(it.hasNext()) {
+				Map.Entry<java.lang.String, BaseObject> entry = it.next();
+				if(entry.getKey().equals(key)) {
+					entry.setValue(val);
+					return;
+				}
+			}
+			
+			or.or(key);
+		}
+
+		@Override
+		public boolean delete(java.lang.String key) {
+			throw new UnsupportedOperationException("Not supported");
+		}
+
+		@Override
+		public boolean delete(java.lang.String key, Or<java.lang.Boolean> or) {
+			BaseObject arg = arguments.get(key);
+			if(arg != null)
+				return false;
+
+			return or.or(key);
+		}
+		
+	}
 
 	public static class Extended extends Scope {
-		private final HashMap<java.lang.String, BaseObject> storage = new HashMap();
+		private final HashMap<java.lang.String, BaseObject> storage;
+		private Extended(BaseObject _this, HashMap<java.lang.String, BaseObject> storage, Scopeable... scopeables) {
+			super(_this, scopeables);
+			this.storage = storage;
+		}
+		public Extended(Global global, Scopeable... scopeables) {
+			super(global, scopeables);
+			storage = new HashMap();
+		}
 		public Extended(BaseObject _this, Global global, Scopeable... scopeables) {
 			super(_this, global, scopeables);
+			storage = new HashMap();
 		}
-		public Extended(BaseObject _this, Scopeable... scopeables) {
+		private Extended(BaseObject _this, Scopeable... scopeables) {
 			super(_this, scopeables);
+			storage = new HashMap();
 		}
 	
 		@Override
@@ -99,6 +165,10 @@ public class Scope implements Scopeable {
 		this._this = _this;
 	}
 	
+	public final void param(java.lang.String key, BaseObject val) {
+		((BlockScopeable)scopeables[0]).param(key, val);
+	}
+	
 	public final void var(java.lang.String key) {
 		var(key, Undefined.INSTANCE);
 	}
@@ -157,15 +227,18 @@ public class Scope implements Scopeable {
 		return or.or(key);
 	}
 	
-	public final Scope extend() {
-		return extend(_this);
-	}
-	
 	public final Scope extend(BaseObject _this) {
 		Scopeable[] scopeables = new Scopeable[this.scopeables.length+1];
 		System.arraycopy(this.scopeables, 0, scopeables, 1, this.scopeables.length);
 		scopeables[0] = this;
 		return new Extended(_this, scopeables);
+	}
+
+	public Scope beginBlock() {
+		Scopeable[] scopeables = new Scopeable[this.scopeables.length+1];
+		System.arraycopy(this.scopeables, 0, scopeables, 1, this.scopeables.length);
+		scopeables[0] = new BlockScopeable();
+		return this instanceof Extended ? new Extended(_this, ((Extended)this).storage, scopeables) : new Scope(_this, scopeables);
 	}
 
 	public final BaseObject resolve(Iterable<java.lang.String> chain) {
@@ -195,10 +268,12 @@ public class Scope implements Scopeable {
 		List<Scope> stack = SCOPE_STACK.get();
 		assert(stack.remove(stack.size()-1) == this);
 	}
-	public static Scope getCurrent() {
+	public static Scope current() {
 		List<Scope> stack = SCOPE_STACK.get();
-		if(stack.isEmpty())
+		if(stack.isEmpty()) {
+			System.err.println("No current scope, eval will be executed in global scope...");
 			return null;
+		}
 		return stack.get(stack.size()-1);
 	}
 

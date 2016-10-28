@@ -19,6 +19,24 @@ import net.nexustools.njs.Scopeable;
  */
 public abstract class CompiledScript implements Script {
 	public static abstract class Debuggable extends CompiledScript {
+		public static BaseObject constructTop(String source, BaseObject _this, BaseObject... params) {
+			BaseFunction function;
+			try {
+				function = (BaseFunction)_this;
+			} catch(ClassCastException ex) {
+				throw new net.nexustools.njs.Error.JavaException("ReferenceError", source + " is not a function");
+			}
+			return function.construct(params);
+		}
+		public static BaseObject callNew(String source, BaseObject _this, BaseObject... params) {
+			BaseFunction function;
+			try {
+				function = (BaseFunction)_this;
+			} catch(ClassCastException ex) {
+				throw new net.nexustools.njs.Error.JavaException("ReferenceError", source + " is not a function");
+			}
+			return function.call(_this, params);
+		}
 		public static BaseObject callTopDynamic(String source, BaseObject key, BaseObject _this, BaseObject... params) {
 			BaseFunction function;
 			try {
@@ -59,6 +77,9 @@ public abstract class CompiledScript implements Script {
 	public static abstract class Optimized extends CompiledScript {
 		public static BaseObject callTopDynamic(BaseObject key, BaseObject _this, BaseObject... params) {
 			return ((BaseFunction)JSHelper.get(_this, key)).call(_this, params);
+		}
+		public static BaseObject callNew(String source, BaseObject _this, BaseObject... params) {
+			return ((BaseFunction)_this).call(_this, params);
 		}
 		public static BaseObject callTop(int key, BaseObject _this, BaseObject... params) {
 			return ((BaseFunction)_this.get(key)).call(_this, params);
