@@ -10,7 +10,7 @@ package net.nexustools.njs;
  * @author kate
  */
 public class Symbol extends AbstractFunction {
-	public static class Instance extends GenericObject {
+	public static class Instance extends UniqueObject {
 		public final java.lang.String name;
 		public Instance(Symbol Symbol, java.lang.String name) {
 			super(Symbol.prototype(), Symbol);

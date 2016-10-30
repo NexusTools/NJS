@@ -16,7 +16,7 @@ import java.util.List;
  */
 public class Number extends AbstractFunction {
 
-	public static class Instance extends GenericObject {
+	public static class Instance extends UniqueObject {
 		public final double number;
 		private final Number Number;
 		Instance(Number Number, double number) {
@@ -26,6 +26,15 @@ public class Number extends AbstractFunction {
 		}
 		Instance(Global global, double number) {
 			this(global.Number, number);
+		}
+		public Instance percent(Instance rhs) {
+			return Number.wrap(number % rhs.number);
+		}
+		public Instance and(Instance rhs) {
+			return Number.wrap((long)number & (long)rhs.number);
+		}
+		public Instance or(Instance rhs) {
+			return Number.wrap((long)number | (long)rhs.number);
 		}
 		public Instance plus(Instance rhs) {
 			return Number.wrap(number + rhs.number);
@@ -68,6 +77,33 @@ public class Number extends AbstractFunction {
 		@Override
 		public java.lang.String toString() {
 			return net.nexustools.njs.Number.toString(number);
+		}
+		@Override
+		public boolean equals(java.lang.Object obj) {
+			if(obj == this)
+				return true;
+			
+			if(obj instanceof Instance)
+				return ((Instance)obj).number == number;
+			
+			if(obj instanceof java.lang.Number)
+				return ((Number)obj).equals(number);
+			
+			if(obj instanceof java.lang.String)
+				try {
+					return number == Double.valueOf((java.lang.String)obj);
+				} catch(NumberFormatException ex) {
+					return false;
+				}
+			
+			if(obj instanceof String.Instance)
+				try {
+					return number == Double.valueOf(((String.Instance)obj).string);
+				} catch(NumberFormatException ex) {
+					return false;
+				}
+			
+			return false;
 		}
 	}
 	

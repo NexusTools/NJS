@@ -9,7 +9,7 @@ package net.nexustools.njs;
  *
  * @author kate
  */
-public abstract class AbstractFunction extends GenericObject implements BaseFunction {
+public abstract class AbstractFunction extends UniqueObject implements BaseFunction {
 	
 	public AbstractFunction(Global global) {
 		this(global.String, global.Object, global.Function);

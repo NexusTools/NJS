@@ -56,6 +56,16 @@ public class Function extends AbstractFunction {
 				return "Function_prototype_toString";
 			}
 		});
+		prototype.setStorage("bind", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return new BoundFunction(global, params[0], (BaseFunction)_this);
+			}
+			@Override
+			public java.lang.String name() {
+				return "Function_prototype_apply";
+			}
+		}, false);
 		prototype.setStorage("apply", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
@@ -108,7 +118,7 @@ public class Function extends AbstractFunction {
 	public BaseObject construct(BaseObject... params) {
 		final java.lang.String source = params[1].toString();
 		final java.lang.String arguments = params[0].toString();
-		final Script compiled = global.compiler.eval(source, "<Function>", true);
+		final Script compiled = global.compiler.compile(source, "<Function>", true);
 		final java.lang.String[] args = arguments.split("\\s*,\\s*");
 		
 		return new AbstractFunction(global, "<Function>") {

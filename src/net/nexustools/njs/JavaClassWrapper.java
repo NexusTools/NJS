@@ -11,6 +11,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,7 @@ import java.util.Map;
  * @author kate
  */
 public class JavaClassWrapper extends AbstractFunction {
+	public static final boolean DEBUG = System.getProperties().containsKey("NJSWRAPDEBUG");
 	
 	public final Global global;
 	public final Class<?> javaClass;
@@ -59,6 +61,7 @@ public class JavaClassWrapper extends AbstractFunction {
 			if((method.getModifiers() & Modifier.STATIC) != 0)
 				continue;
 			
+			method.setAccessible(true);
 			List<Method> meths = methods.get(method.getName());
 			if(meths == null)
 				methods.put(method.getName(), meths = new ArrayList());
@@ -88,36 +91,69 @@ public class JavaClassWrapper extends AbstractFunction {
 						try {
 							return global.javaToJS(method.invoke(((JavaObjectWrapper)_this).javaObject));
 						} catch (IllegalAccessException ex) {
-							throw new Error.JavaException("JavaError", "Illegal arguments", ex);
+							throw new Error.JavaException("JavaError", "Illegal access", ex);
 						} catch (IllegalArgumentException ex) {
 							throw new Error.JavaException("JavaError", "Illegal arguments", ex);
 						} catch (InvocationTargetException ex) {
-							throw new Error.JavaException("JavaError", "Illegal arguments", ex);
+							Throwable target = ex.getTargetException();
+							if(target instanceof RuntimeException)
+								throw (RuntimeException)target;
+							if(target instanceof java.lang.Error)
+								throw (java.lang.Error)target;
+							throw new RuntimeException(ex);
 						}
 					}
+					double bestAccuracy = 0;
+					Method bestMethod = null;
+					java.lang.Object[] bestConversion = null;
+					JSHelper.ConversionAccuracy convertAccuracy = new JSHelper.ConversionAccuracy();
 					java.lang.Object[] converted = new java.lang.Object[params.length];
 					for(Method method : byLength.get(params.length)) {
 						again:
 						while(true) {
+							float conversionAccuracy = 0;
+							if(DEBUG) System.out.println(method);
 							Class[] types = method.getParameterTypes();
 							for(int i=0; i<params.length; i++)
 								try {
-									converted[i] = JSHelper.jsToJava(params[i], types[i]);
-								} catch(ClassCastException ex) {
+									converted[i] = JSHelper.jsToJava(params[i], types[i], convertAccuracy);
+									conversionAccuracy += convertAccuracy.accuracy;
+								} catch(UnsupportedOperationException ex) {
+									if(DEBUG) System.out.println(ex);
+									break again;
+								} catch(NumberFormatException ex) {
 									break again;
 								}
-							try {
-								return global.wrap(method.invoke(((JavaObjectWrapper)_this).javaObject, converted));
-							} catch (IllegalAccessException ex) {
-								throw new Error.JavaException("JavaError", "Illegal arguments", ex);
-							} catch (IllegalArgumentException ex) {
-								throw new Error.JavaException("JavaError", "Illegal arguments", ex);
-							} catch (InvocationTargetException ex) {
-								throw new Error.JavaException("JavaError", "Illegal arguments", ex);
+							
+							if(conversionAccuracy > bestAccuracy) {
+								if(DEBUG) System.out.println(conversionAccuracy);
+							
+								bestMethod = method;
+								bestConversion = converted;
+								bestAccuracy = conversionAccuracy;
+								converted = new java.lang.Object[params.length];
 							}
+							break;
 						}
 					}
-					throw new Error.JavaException("JavaError", "Illegal arguments");
+					
+					if(bestMethod != null)
+						try {
+							return JSHelper.javaToJS(global, bestMethod.invoke(((JavaObjectWrapper)_this).javaObject, bestConversion));
+						} catch (IllegalAccessException ex) {
+							throw new Error.JavaException("JavaError", "Illegal access", ex);
+						} catch (IllegalArgumentException ex) {
+							throw new Error.JavaException("JavaError", "Illegal arguments", ex);
+						} catch (InvocationTargetException ex) {
+							Throwable target = ex.getTargetException();
+							if(target instanceof RuntimeException)
+								throw (RuntimeException)target;
+							if(target instanceof java.lang.Error)
+								throw (java.lang.Error)target;
+							throw new RuntimeException(ex);
+						}
+					
+					throw new Error.JavaException("JavaError", "Incompatible arguments");
 				}
 				@Override
 				public java.lang.String name() {
@@ -131,6 +167,7 @@ public class JavaClassWrapper extends AbstractFunction {
 			if((method.getModifiers() & Modifier.STATIC) == 0) 
 				continue;
 			
+			method.setAccessible(true);
 			List<Method> meths = methods.get(method.getName());
 			if(meths == null)
 				methods.put(method.getName(), meths = new ArrayList());
@@ -154,38 +191,69 @@ public class JavaClassWrapper extends AbstractFunction {
 						try {
 							return global.javaToJS(byLength.get(0).get(0).invoke(null));
 						} catch (IllegalAccessException ex) {
-							throw new Error.JavaException("JavaError", "Illegal arguments", ex);
+							throw new Error.JavaException("JavaError", "Illegal access", ex);
 						} catch (IllegalArgumentException ex) {
 							throw new Error.JavaException("JavaError", "Illegal arguments", ex);
 						} catch (InvocationTargetException ex) {
-							throw new Error.JavaException("JavaError", "Illegal arguments", ex);
+							Throwable target = ex.getTargetException();
+							if(target instanceof RuntimeException)
+								throw (RuntimeException)target;
+							if(target instanceof java.lang.Error)
+								throw (java.lang.Error)target;
+							throw new RuntimeException(ex);
 						}
+					double bestAccuracy = 0;
+					Method bestMethod = null;
+					java.lang.Object[] bestConversion = null;
+					JSHelper.ConversionAccuracy convertAccuracy = new JSHelper.ConversionAccuracy();
 					java.lang.Object[] converted = new java.lang.Object[params.length];
-					List<Method> methods = byLength.get(params.length);
-					if(methods != null)
-						for(Method method : methods) {
-							again:
-							while(true) {
-								Class[] types = method.getParameterTypes();
-								for(int i=0; i<params.length; i++)
-									try {
-										converted[i] = JSHelper.jsToJava(params[i], types[i]);
-									} catch(ClassCastException ex) {
-										ex.printStackTrace();
-										break again;
-									}
+					for(Method method : byLength.get(params.length)) {
+						again:
+						while(true) {
+							float conversionAccuracy = 0;
+							if(DEBUG) System.out.println(method);
+							Class[] types = method.getParameterTypes();
+							for(int i=0; i<params.length; i++)
 								try {
-									return global.wrap(method.invoke(null, converted));
-								} catch (IllegalAccessException ex) {
-									throw new Error.JavaException("JavaError", "Illegal arguments", ex);
-								} catch (IllegalArgumentException ex) {
-									throw new Error.JavaException("JavaError", "Illegal arguments", ex);
-								} catch (InvocationTargetException ex) {
-									throw new Error.JavaException("JavaError", "Illegal arguments", ex);
+									converted[i] = JSHelper.jsToJava(params[i], types[i], convertAccuracy);
+									conversionAccuracy += convertAccuracy.accuracy;
+								} catch(UnsupportedOperationException ex) {
+									if(DEBUG) System.out.println(ex);
+									break again;
+								} catch(NumberFormatException ex) {
+									break again;
 								}
+							
+							if(conversionAccuracy > bestAccuracy) {
+								if(DEBUG) System.out.println(conversionAccuracy);
+							
+								bestMethod = method;
+								bestConversion = converted;
+								bestAccuracy = conversionAccuracy;
+								converted = new java.lang.Object[params.length];
 							}
+							break;
 						}
-					throw new Error.JavaException("JavaError", "Illegal arguments");
+					}
+					
+					if(bestMethod != null)
+						try {
+							return JSHelper.javaToJS(global, bestMethod.invoke(null, bestConversion));
+						} catch (IllegalAccessException ex) {
+							throw new Error.JavaException("JavaError", "Illegal access", ex);
+						} catch (IllegalArgumentException ex) {
+							throw new Error.JavaException("JavaError", "Illegal arguments", ex);
+						} catch (InvocationTargetException ex) {
+							Throwable target = ex.getTargetException();
+							if(target instanceof RuntimeException)
+								throw (RuntimeException)target;
+							if(target instanceof java.lang.Error)
+								throw (java.lang.Error)target;
+							throw new RuntimeException(ex);
+						}
+					
+					
+					throw new Error.JavaException("JavaError", "Incompatible arguments");
 				}
 				@Override
 				public java.lang.String name() {
@@ -195,6 +263,7 @@ public class JavaClassWrapper extends AbstractFunction {
 		}
 		
 		for(Constructor constructor : javaClass.getDeclaredConstructors()) {
+			constructor.setAccessible(true);
 			List<Constructor> cons = constructors.get(constructor.getParameterCount());
 			if(cons == null)
 				constructors.put(constructor.getParameterCount(), cons = new ArrayList());
@@ -205,6 +274,7 @@ public class JavaClassWrapper extends AbstractFunction {
 			if((field.getModifiers() & Modifier.STATIC) == 0)
 				continue;
 			
+			field.setAccessible(true);
 			defineProperty(field.getName(), new AbstractFunction(global) {
 				@Override
 				public BaseObject call(BaseObject _this, BaseObject... params) {
@@ -234,9 +304,9 @@ public class JavaClassWrapper extends AbstractFunction {
 
 	@Override
 	public BaseObject construct(BaseObject... params) {
-		java.lang.Object[] converted = new java.lang.Object[params.length];
 		List<Constructor> cons = constructors.get(params.length);
-		if(cons != null)
+		if(cons != null) {
+			java.lang.Object[] converted = new java.lang.Object[params.length];
 			for(Constructor constructor : cons) {
 				next:
 				while(true) {
@@ -244,23 +314,37 @@ public class JavaClassWrapper extends AbstractFunction {
 					for(int i=0; i<params.length; i++)
 						try {
 							converted[i] = JSHelper.jsToJava(params[i], types[i]);
-						} catch(ClassCastException ex) {
+						} catch(UnsupportedOperationException ex) {
+							if(DEBUG) System.out.println(ex);
+							break next;
+						} catch(NumberFormatException ex) {
 							break next;
 						}
 					try {
 						return global.wrap(constructor.newInstance(converted));
 					} catch (InstantiationException ex) {
-						throw new Error.JavaException("JavaError", ex.toString(), ex);
+						Throwable target = ex.getCause();
+						if(target instanceof RuntimeException)
+							throw (RuntimeException)target;
+						if(target instanceof java.lang.Error)
+							throw (java.lang.Error)target;
+						throw new RuntimeException(ex);
 					} catch (IllegalAccessException ex) {
-						throw new Error.JavaException("JavaError", ex.toString(), ex);
+						throw new Error.JavaException("JavaError", "Illegal access", ex);
 					} catch (IllegalArgumentException ex) {
-						throw new Error.JavaException("JavaError", ex.toString(), ex);
+						throw new Error.JavaException("JavaError", "Illegal arguments", ex);
 					} catch (InvocationTargetException ex) {
-						throw new Error.JavaException("JavaError", ex.toString(), ex);
+						Throwable target = ex.getTargetException();
+						if(target instanceof RuntimeException)
+							throw (RuntimeException)target;
+						if(target instanceof java.lang.Error)
+							throw (java.lang.Error)target;
+						throw new RuntimeException(ex);
 					}
 				}
 			}
-		throw new Error.JavaException("ArgumentError", "Invalid arguments");
+		}
+		throw new Error.JavaException("ArgumentError", "Incompatible arguments");
 	}
 
 	@Override

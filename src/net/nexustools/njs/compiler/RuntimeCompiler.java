@@ -5,9 +5,6 @@
  */
 package net.nexustools.njs.compiler;
 
-import java.lang.ref.WeakReference;
-import java.util.ArrayList;
-import net.nexustools.njs.AbstractFunction;
 import net.nexustools.njs.BaseFunction;
 import net.nexustools.njs.BaseObject;
 import net.nexustools.njs.Global;
@@ -18,6 +15,8 @@ import net.nexustools.njs.GenericArray;
 import net.nexustools.njs.GenericObject;
 import net.nexustools.njs.Scopeable;
 
+import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -30,6 +29,10 @@ import java.util.regex.Pattern;
  * @author kate
  */
 public class RuntimeCompiler extends AbstractCompiler {
+	static {
+		if(System.getProperties().containsKey("NJSNOCOMPILING"))
+			throw new RuntimeException("NJSNOCOMPILING");
+	}
 	private static class ScriptCompilerData {
 		final java.lang.String fileName;
 		final java.lang.String methodName;
@@ -267,7 +270,21 @@ public class RuntimeCompiler extends AbstractCompiler {
 		final int rows = object.rows;
 		final int columns = object.columns;
 		if(object instanceof Integer) {
-			final double number = ((Integer)object).value;
+			final int number = ((Integer)object).value;
+			if(number == 0)
+				return new Impl() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						return new ValueReferenceable(global.Zero);
+					}
+				};
+			if(number == 1)
+				return new Impl() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						return new ValueReferenceable(global.PositiveOne);
+					}
+				};
 			return new Impl() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -570,6 +587,126 @@ public class RuntimeCompiler extends AbstractCompiler {
 					}
 				}
 			};
+		} else if(object instanceof Minus) {
+			final Impl lhs = compile(data, ((Minus)object).lhs);
+			final Impl rhs = compile(data, ((Minus)object).rhs);
+			return new Impl() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
+					try {
+						return new ValueReferenceable(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).minus(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
+					} finally {
+						el.finishCall();
+					}
+				}
+			};
+		} else if(object instanceof Percent) {
+			final Impl lhs = compile(data, ((Percent)object).lhs);
+			final Impl rhs = compile(data, ((Percent)object).rhs);
+			return new Impl() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
+					try {
+						return new ValueReferenceable(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).percent(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
+					} finally {
+						el.finishCall();
+					}
+				}
+			};
+		} else if(object instanceof And) {
+			final Impl lhs = compile(data, ((And)object).lhs);
+			final Impl rhs = compile(data, ((And)object).rhs);
+			return new Impl() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
+					try {
+						return new ValueReferenceable(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).and(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
+					} finally {
+						el.finishCall();
+					}
+				}
+			};
+		} else if(object instanceof Not) {
+			final Impl rhs = compile(data, ((Not)object).rhs);
+			return new Impl() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					return new ValueReferenceable(global.wrap(!JSHelper.isTrue(rhs.run(global, scope).get())));
+				}
+			};
+		} else if(object instanceof Or) {
+			final Impl lhs = compile(data, ((Or)object).lhs);
+			final Impl rhs = compile(data, ((Or)object).rhs);
+			return new Impl() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
+					try {
+						return new ValueReferenceable(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).or(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
+					} finally {
+						el.finishCall();
+					}
+				}
+			};
+		} else if(object instanceof Equals) {
+			final Impl lhs = compile(data, ((Equals)object).lhs);
+			final Impl rhs = compile(data, ((Equals)object).rhs);
+			return new Impl() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
+					try {
+						return new ValueReferenceable(global.wrap(lhs.run(global, scope).get().equals(rhs.run(global, scope).get())));
+					} finally {
+						el.finishCall();
+					}
+				}
+			};
+		} else if(object instanceof NotEquals) {
+			final Impl lhs = compile(data, ((NotEquals)object).lhs);
+			final Impl rhs = compile(data, ((NotEquals)object).rhs);
+			return new Impl() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
+					try {
+						return new ValueReferenceable(global.wrap(!lhs.run(global, scope).get().equals(rhs.run(global, scope).get())));
+					} finally {
+						el.finishCall();
+					}
+				}
+			};
+		} else if(object instanceof StrictEquals) {
+			final Impl lhs = compile(data, ((StrictEquals)object).lhs);
+			final Impl rhs = compile(data, ((StrictEquals)object).rhs);
+			return new Impl() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
+					try {
+						return new ValueReferenceable(global.wrap(lhs.run(global, scope).get() == rhs.run(global, scope).get()));
+					} finally {
+						el.finishCall();
+					}
+				}
+			};
+		} else if(object instanceof StrictNotEquals) {
+			final Impl lhs = compile(data, ((StrictNotEquals)object).lhs);
+			final Impl rhs = compile(data, ((StrictNotEquals)object).rhs);
+			return new Impl() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
+					try {
+						return new ValueReferenceable(global.wrap(lhs.run(global, scope).get() != rhs.run(global, scope).get()));
+					} finally {
+						el.finishCall();
+					}
+				}
+			};
 		} else if(object instanceof LessThan) {
 			final Impl lhs = compile(data, ((LessThan)object).lhs);
 			final Impl rhs = compile(data, ((LessThan)object).rhs);
@@ -584,6 +721,20 @@ public class RuntimeCompiler extends AbstractCompiler {
 					}
 				}
 			};
+		} else if(object instanceof LessEqual) {
+			final Impl lhs = compile(data, ((LessEqual)object).lhs);
+			final Impl rhs = compile(data, ((LessEqual)object).rhs);
+			return new Impl() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
+					try {
+						return new ValueReferenceable(global.wrap(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).number <= global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get())).number));
+					} finally {
+						el.finishCall();
+					}
+				}
+			};
 		} else if(object instanceof MoreThan) {
 			final Impl lhs = compile(data, ((MoreThan)object).lhs);
 			final Impl rhs = compile(data, ((MoreThan)object).rhs);
@@ -593,6 +744,20 @@ public class RuntimeCompiler extends AbstractCompiler {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						return new ValueReferenceable(global.wrap(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).number > global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get())).number));
+					} finally {
+						el.finishCall();
+					}
+				}
+			};
+		} else if(object instanceof MoreEqual) {
+			final Impl lhs = compile(data, ((MoreEqual)object).lhs);
+			final Impl rhs = compile(data, ((MoreEqual)object).rhs);
+			return new Impl() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
+					try {
+						return new ValueReferenceable(global.wrap(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).number >= global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get())).number));
 					} finally {
 						el.finishCall();
 					}
@@ -755,7 +920,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Impl() {
 				@Override
 				public Referenceable run(final Global global, final Scope scope) {
-					AbstractFunction func = new ConstructableFunction(global) {
+					ConstructableFunction func = new ConstructableFunction(global) {
 						@Override
 						public BaseObject call(BaseObject _this, BaseObject... params) {
 							JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(stackName, data.fileName, subRows, subColumns);
@@ -769,12 +934,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 								for(; i<args.length; i++)
 									s.var(args[i]);
 								s.var("callee", this);
-								s.enter();
-								try {
-									return impl.exec(global, s);
-								} finally {
-									s.exit();
-								}
+								return impl.exec(global, s);
 							} finally {
 								el.finishCall();
 							}
@@ -833,9 +993,9 @@ public class RuntimeCompiler extends AbstractCompiler {
 					}
 				}
 			};
-		} else if(object instanceof Or) {
-			final Impl lhs = compile(data, ((Or)object).lhs);
-			final Impl rhs = compile(data, ((Or)object).rhs);
+		} else if(object instanceof OrOr) {
+			final Impl lhs = compile(data, ((OrOr)object).lhs);
+			final Impl rhs = compile(data, ((OrOr)object).rhs);
 			return new Impl() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -851,16 +1011,15 @@ public class RuntimeCompiler extends AbstractCompiler {
 				}
 			};
 		} else if(object instanceof PlusPlus) {
-			if(((PlusPlus)object).lhs != null) {
-				final Impl lhs = compile(data, ((PlusPlus)object).lhs);
+			final Impl _ref = compile(data, ((PlusPlus)object).ref);
+			if(((PlusPlus)object).right) {
 				return new Impl() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
 						JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 						try {
-							Referenceable ref = lhs.run(global, scope);
+							Referenceable ref = _ref.run(global, scope);
 							net.nexustools.njs.Number.Instance val = global.toNumber(ref.get());
-							System.out.println("Currently: " + val);
 							ref.set(global.wrap(val.number + 1));
 							return new ValueReferenceable(val);
 						} finally {
@@ -869,15 +1028,13 @@ public class RuntimeCompiler extends AbstractCompiler {
 					}
 				};
 			} else {
-				final Impl rhs = compile(data, ((PlusPlus)object).rhs);
 				return new Impl() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
 						JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 						try {
-							Referenceable ref = rhs.run(global, scope);
+							Referenceable ref = _ref.run(global, scope);
 							net.nexustools.njs.Number.Instance val = global.toNumber(ref.get());
-							System.out.println("Currently: " + val);
 							ref.set(val = global.wrap(val.number+1));
 							return new ValueReferenceable(val);
 						} finally {

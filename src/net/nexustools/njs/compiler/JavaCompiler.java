@@ -7,8 +7,13 @@ package net.nexustools.njs.compiler;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.FilterOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.Writer;
@@ -24,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.FileObject;
@@ -43,9 +50,6 @@ import net.nexustools.njs.Global;
 public class JavaCompiler extends AbstractCompiler {
 	private static final List<java.lang.String> RESTRICTED_NAMES = Arrays.asList(new java.lang.String[]{"Arguments", "CompiledScript", "Debuggable", "Optimized", "String", "Number", "RegEx", "Global", "Scope", "exec", "call", "multiply", "plus", "divide", "or", "BaseObject", "BaseFunction", "AbstractFunction", "GenericObject", "GenericArray", "ConstructableFunction", "JSHelper"});
 
-	private static java.lang.String toSource(java.lang.String string) {
-		return string.replace("\\", "\\\\").replace("\n", "\\n").replace("\t", "\\t").replace("\"", "\\\"");
-	}
 
 	private static final Map<java.lang.String, AtomicInteger> USED_NAMES = new HashMap();
 	private java.lang.String toClassName(java.lang.String name, boolean topLevel) {
@@ -95,6 +99,44 @@ public class JavaCompiler extends AbstractCompiler {
 			return "<anonymous>";
 	}
 
+	private void generateMath(SourceBuilder sourceBuilder, Parsed lhs, Parsed rhs, java.lang.String op, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName) {
+		if(lhs instanceof NumberReferency) {
+			generateParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(".");
+			sourceBuilder.append(op);
+			sourceBuilder.append("(");
+
+			if(rhs instanceof NumberReferency)
+				generateParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
+			else {
+				sourceBuilder.append("global.Number.from(JSHelper.valueOf(");
+				generateParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
+				sourceBuilder.append("))");
+			}
+
+			sourceBuilder.append(")");
+			return;
+		} else if(lhs instanceof StringReferency && op.equals("plus")) {
+			if(lhs instanceof String) {
+				sourceBuilder.append("global.wrap(\"");
+				sourceBuilder.append(convertStringSource(((String)lhs).string));
+				sourceBuilder.append("\" + ");
+				generateParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
+				sourceBuilder.append(")");
+				return;
+			}
+			
+			throw new RuntimeException("Cannot compile math: " + describe(lhs));
+		}
+		
+		sourceBuilder.append(op);
+		sourceBuilder.append("(global, ");
+		generateParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
+		sourceBuilder.append(", ");
+		generateParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
+		sourceBuilder.append(")");
+	}
+
 	private static class SourceBuilder {
 
 		java.lang.String indent = "";
@@ -136,11 +178,13 @@ public class JavaCompiler extends AbstractCompiler {
 	private static final StandardJavaFileManager STANDARD_FILE_MANAGER;
 
 	static {
+		if(System.getProperties().containsKey("NJSNOCOMPILING"))
+			throw new RuntimeException("NJSNOCOMPILING");
 		JAVA_COMPILER = ToolProvider.getSystemJavaCompiler();
 		if (JAVA_COMPILER == null)
 			throw new RuntimeException("Could not get Java compiler. Please, ensure that JDK is used instead of JRE.");
 		STANDARD_FILE_MANAGER = JAVA_COMPILER.getStandardFileManager(null, null, null);
-		assert ((new JavaCompiler().eval("(function munchkin(){\n\tfunction yellow(){\n\t\treturn 55;\n\t}\n\treturn yellow()\n\t})()", "JavaCompilerStaticTest", false)).exec(new Global(), null).toString().equals("55"));
+		assert ((new JavaCompiler().compile("(function munchkin(){\n\tfunction yellow(){\n\t\treturn 55;\n\t}\n\treturn yellow()\n\t})()", "JavaCompilerStaticTest", false)).exec(new Global(), null).toString().equals("55"));
 	}
 
 	private static enum SourceState {
@@ -156,7 +200,7 @@ public class JavaCompiler extends AbstractCompiler {
 		this.addDebugging = addDebugging;
 	}
 	
-	protected void generateBlockSource(SourceBuilder sourceBuilder, ScriptData blockDat, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, boolean addDebugging) {
+	protected void generateBlockSource(SourceBuilder sourceBuilder, ScriptData blockDat, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName) {
 		for(Parsed part : blockDat.impl) {
 			if (addDebugging && (part.rows > 1 || part.columns > 1)) {
 				sourceBuilder.append("stackElement.rows = ");
@@ -166,15 +210,15 @@ public class JavaCompiler extends AbstractCompiler {
 				sourceBuilder.append(java.lang.String.valueOf(part.columns));
 				sourceBuilder.appendln(";");
 			}
-			generateParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, addDebugging);
+			generateParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName);
 			sourceBuilder.appendln(";");
 		}
 	}
 		
-	protected void generateParsedSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, boolean addDebugging) {
+	protected void generateParsedSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName) {
 		if (part instanceof Return) {
 			sourceBuilder.append("return ");
-			generateParsedSource(sourceBuilder, ((Return) part).rhs, methodPrefix, baseScope, fileName, addDebugging);
+			generateParsedSource(sourceBuilder, ((Return) part).rhs, methodPrefix, baseScope, fileName);
 			return;
 		} else if (part instanceof Call) {
 			Parsed reference = ((Call)part).reference;
@@ -182,22 +226,22 @@ public class JavaCompiler extends AbstractCompiler {
 				reference = ((OpenBracket)reference).contents;
 			
 			if(reference instanceof Referency && !(reference instanceof Reference || reference instanceof Call)) {
-				final java.lang.String source = reference.toString();
+				final java.lang.String source = reference.toSimpleSource();
 				if(reference instanceof RightReference) {
 					final java.lang.String key = ((RightReference)reference).chain.remove(((RightReference)reference).chain.size()-1);
 					sourceBuilder.append("callTop(");
 					if (addDebugging) {
 						sourceBuilder.append("\"");
-						sourceBuilder.append(toSource(source));
+						sourceBuilder.append(convertStringSource(source));
 						sourceBuilder.append("\", ");
 					}
 					sourceBuilder.append("\"");
-					sourceBuilder.append(toSource(key));
+					sourceBuilder.append(convertStringSource(key));
 					sourceBuilder.append("\", ");
-					generateParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, addDebugging);
+					generateParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName);
 					for (Parsed arg : ((Call) part).arguments) {
 						sourceBuilder.append(", ");
-						generateParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, addDebugging);
+						generateParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName);
 					}
 					sourceBuilder.append(")");
 					return;
@@ -206,15 +250,15 @@ public class JavaCompiler extends AbstractCompiler {
 					sourceBuilder.append("callTop(");
 					if (addDebugging) {
 						sourceBuilder.append("\"");
-						sourceBuilder.append(toSource(source));
+						sourceBuilder.append(convertStringSource(source));
 						sourceBuilder.append("\", ");
 					}
 					sourceBuilder.append(java.lang.String.valueOf(key));
 					sourceBuilder.append(", ");
-					generateParsedSource(sourceBuilder, ((IntegerReference)reference).lhs, methodPrefix, baseScope, fileName, addDebugging);
+					generateParsedSource(sourceBuilder, ((IntegerReference)reference).lhs, methodPrefix, baseScope, fileName);
 					for (Parsed arg : ((Call) part).arguments) {
 						sourceBuilder.append(", ");
-						generateParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, addDebugging);
+						generateParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName);
 					}
 					sourceBuilder.append(")");
 					return;
@@ -223,16 +267,16 @@ public class JavaCompiler extends AbstractCompiler {
 					sourceBuilder.append("callTop(");
 					if (addDebugging) {
 						sourceBuilder.append("\"");
-						sourceBuilder.append(toSource(source));
+						sourceBuilder.append(convertStringSource(source));
 						sourceBuilder.append("\", ");
 					}
 					sourceBuilder.append("\"");
-					sourceBuilder.append(toSource(key));
+					sourceBuilder.append(convertStringSource(key));
 					sourceBuilder.append("\", ");
-					generateParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, addDebugging);
+					generateParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName);
 					for (Parsed arg : ((Call) part).arguments) {
 						sourceBuilder.append(", ");
-						generateParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, addDebugging);
+						generateParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName);
 					}
 					sourceBuilder.append(")");
 					return;
@@ -240,13 +284,13 @@ public class JavaCompiler extends AbstractCompiler {
 					sourceBuilder.append("callNew(");
 					if (addDebugging) {
 						sourceBuilder.append("\"");
-						sourceBuilder.append(toSource(source));
+						sourceBuilder.append(convertStringSource(source));
 						sourceBuilder.append("\", ");
 					}
-					generateParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, addDebugging);
+					generateParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName);
 					for (Parsed arg : ((Call) part).arguments) {
 						sourceBuilder.append(", ");
-						generateParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, addDebugging);
+						generateParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName);
 					}
 					sourceBuilder.append(")");
 					return;
@@ -258,24 +302,24 @@ public class JavaCompiler extends AbstractCompiler {
 			if(addDebugging) {
 				sourceBuilder.append("callTop(");
 				sourceBuilder.append("\"");
-				sourceBuilder.append(toSource(reference.toString()));
+				sourceBuilder.append(convertStringSource(reference.toSimpleSource()));
 				sourceBuilder.append("\", ");
-				generateParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, addDebugging);
+				generateParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName);
 				sourceBuilder.append(", ");
 				sourceBuilder.append("Undefined.INSTANCE");
 				for (Parsed arg : ((Call) part).arguments) {
 					sourceBuilder.append(", ");
-					generateParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, addDebugging);
+					generateParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName);
 				}
 				sourceBuilder.append(")");
 			} else {
 				sourceBuilder.append("((BaseFunction)");
-				generateParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, addDebugging);
+				generateParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName);
 				sourceBuilder.append(").call(");
 				sourceBuilder.append("Undefined.INSTANCE");
 				for (Parsed arg : ((Call) part).arguments) {
 					sourceBuilder.append(", ");
-					generateParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, addDebugging);
+					generateParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName);
 				}
 				sourceBuilder.append(")");
 			}
@@ -287,47 +331,81 @@ public class JavaCompiler extends AbstractCompiler {
 			sourceBuilder.append(")");
 			return;
 		} else if (part instanceof Integer) {
-			sourceBuilder.append("global.wrap(");
-			sourceBuilder.append(java.lang.String.valueOf(((Integer) part).value));
-			sourceBuilder.append(")");
+			int value = ((Integer) part).value;
+			switch(value) {
+				case 0:
+					sourceBuilder.append("global.Zero");
+					break;
+				case 1:
+					sourceBuilder.append("global.PositiveOne");
+					break;
+				case -1:
+					sourceBuilder.append("global.NegativeOne");
+					break;
+				default:
+					sourceBuilder.append("global.wrap(");
+					sourceBuilder.append(java.lang.String.valueOf(value));
+					sourceBuilder.append(")");
+			}
 			return;
 		} else if (part instanceof String) {
 			sourceBuilder.append("global.wrap(\"");
-			sourceBuilder.append(toSource(java.lang.String.valueOf(((String) part).string)));
+			sourceBuilder.append(convertStringSource(java.lang.String.valueOf(((String) part).string)));
 			sourceBuilder.append("\")");
 			return;
 		} else if (part instanceof Reference) {
 			sourceBuilder.append(baseScope);
 			sourceBuilder.append(".get(\"");
-			sourceBuilder.append(toSource(((Reference) part).ref));
+			sourceBuilder.append(convertStringSource(((Reference) part).ref));
 			sourceBuilder.append("\")");
 			return;
+		} else if (part instanceof LessEqual) {
+			Parsed lhs = ((LessEqual)part).lhs;
+			Parsed rhs = ((LessEqual)part).rhs;
+			generateMath(sourceBuilder, lhs, rhs, "lessEqual", methodPrefix, baseScope, fileName);
+			return;
 		} else if (part instanceof Plus) {
-			sourceBuilder.append("plus(global, ");
-			generateParsedSource(sourceBuilder, ((Plus) part).lhs, methodPrefix, baseScope, fileName, addDebugging);
-			sourceBuilder.append(", ");
-			generateParsedSource(sourceBuilder, ((Plus) part).rhs, methodPrefix, baseScope, fileName, addDebugging);
-			sourceBuilder.append(")");
+			Parsed lhs = ((Plus)part).lhs;
+			Parsed rhs = ((Plus)part).rhs;
+			generateMath(sourceBuilder, lhs, rhs, "plus", methodPrefix, baseScope, fileName);
 			return;
 		} else if (part instanceof Multiply) {
-			sourceBuilder.append("multiply(global, ");
-			generateParsedSource(sourceBuilder, ((Multiply) part).lhs, methodPrefix, baseScope, fileName, addDebugging);
-			sourceBuilder.append(", ");
-			generateParsedSource(sourceBuilder, ((Multiply) part).rhs, methodPrefix, baseScope, fileName, addDebugging);
-			sourceBuilder.append(")");
+			Parsed lhs = ((Multiply)part).lhs;
+			Parsed rhs = ((Multiply)part).rhs;
+			generateMath(sourceBuilder, lhs, rhs, "multiply", methodPrefix, baseScope, fileName);
+			return;
+		} else if (part instanceof And) {
+			Parsed lhs = ((And)part).lhs;
+			Parsed rhs = ((And)part).rhs;
+			generateMath(sourceBuilder, lhs, rhs, "and", methodPrefix, baseScope, fileName);
+			return;
+		} else if (part instanceof Or) {
+			Parsed lhs = ((Or)part).lhs;
+			Parsed rhs = ((Or)part).rhs;
+			generateMath(sourceBuilder, lhs, rhs, "or", methodPrefix, baseScope, fileName);
+			return;
+		} else if (part instanceof Percent) {
+			Parsed lhs = ((Percent)part).lhs;
+			Parsed rhs = ((Percent)part).rhs;
+			generateMath(sourceBuilder, lhs, rhs, "percent", methodPrefix, baseScope, fileName);
+			return;
+		} else if (part instanceof Minus) {
+			Parsed lhs = ((Minus)part).lhs;
+			Parsed rhs = ((Minus)part).rhs;
+			generateMath(sourceBuilder, lhs, rhs, "percent", methodPrefix, baseScope, fileName);
 			return;
 		} else if (part instanceof New) {
 			boolean addComma;
 			if(addDebugging) {
 				addComma = true;
 				sourceBuilder.append("constructTop(\"");
-				sourceBuilder.append(toSource(((New)part).reference.toString()));
+				sourceBuilder.append(convertStringSource(((New)part).reference.toSimpleSource()));
 				sourceBuilder.append("\", ");
-				generateParsedSource(sourceBuilder, ((New) part).reference, methodPrefix, baseScope, fileName, addDebugging);
+				generateParsedSource(sourceBuilder, ((New) part).reference, methodPrefix, baseScope, fileName);
 			} else {
 				addComma = false;
 				sourceBuilder.append("((BaseFunction)");
-				generateParsedSource(sourceBuilder, ((New) part).reference, methodPrefix, baseScope, fileName, addDebugging);
+				generateParsedSource(sourceBuilder, ((New) part).reference, methodPrefix, baseScope, fileName);
 				sourceBuilder.append(").construct(");
 			}
 			if (((New) part).arguments != null) {
@@ -336,27 +414,27 @@ public class JavaCompiler extends AbstractCompiler {
 						sourceBuilder.append(", ");
 					else
 						addComma = true;
-					generateParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, addDebugging);
+					generateParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName);
 				}
 			}
 			sourceBuilder.append(")");
 			return;
 		} else if(part instanceof RightReference) {
-			generateParsedSource(sourceBuilder, ((RightReference) part).ref, methodPrefix, baseScope, fileName, addDebugging);
+			generateParsedSource(sourceBuilder, ((RightReference) part).ref, methodPrefix, baseScope, fileName);
 			for(java.lang.String key : ((RightReference)part).chain) {
 				sourceBuilder.append(".get(\"");
-				sourceBuilder.append(toSource(key));
+				sourceBuilder.append(convertStringSource(key));
 				sourceBuilder.append("\")");
 			}
 			return;
 		} else if(part instanceof OpenBracket) {
 			sourceBuilder.append("(");
-			generateParsedSource(sourceBuilder, ((OpenBracket) part).contents, methodPrefix, baseScope, fileName, addDebugging);
+			generateParsedSource(sourceBuilder, ((OpenBracket) part).contents, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(")");
 			return;
 		} else if(part instanceof Throw) {
 			sourceBuilder.append("throw new net.nexustools.njs.Error.Thrown(");
-			generateParsedSource(sourceBuilder, ((Throw) part).rhs, methodPrefix, baseScope, fileName, addDebugging);
+			generateParsedSource(sourceBuilder, ((Throw) part).rhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(")");
 			return;
 		} else if(part instanceof Function) {
@@ -368,50 +446,100 @@ public class JavaCompiler extends AbstractCompiler {
 			sourceBuilder.appendln(".extend(_this);");
 			sourceBuilder.appendln("}");
 			((Function)part).impl.callee = ((Function)part);
-			generateScriptSource(sourceBuilder, ((Function)part).impl, methodPrefix, fileName, SourceScope.Function, addDebugging);
+			generateScriptSource(sourceBuilder, ((Function)part).impl, methodPrefix, fileName, SourceScope.Function);
 			sourceBuilder.unindent();
 			sourceBuilder.append("}");
 			return;
 		} else if(part instanceof Var) {
 			List<Var.Set> sets = ((Var)part).sets;
 			if(sets.size() > 1) {
-			} else {
-				Var.Set set = sets.get(0);
-				sourceBuilder.append(baseScope);
-				sourceBuilder.append(".var(\"");
-				sourceBuilder.append(toSource(set.lhs));
-				sourceBuilder.append("\", ");
-				generateParsedSource(sourceBuilder, set.rhs, methodPrefix, baseScope, fileName, addDebugging);
-				sourceBuilder.append(")");
+				java.lang.Boolean first = true;
+				for(Var.Set set : sets) {
+					if(first)
+						first = false;
+					else
+						sourceBuilder.appendln(";");
+					sourceBuilder.append(baseScope);
+					sourceBuilder.append(".var(\"");
+					sourceBuilder.append(convertStringSource(set.lhs));
+					sourceBuilder.append("\", ");
+					if(set.rhs == null)
+						sourceBuilder.append("Undefined.INSTANCE");
+					else
+						generateParsedSource(sourceBuilder, set.rhs, methodPrefix, baseScope, fileName);
+					sourceBuilder.append(")");
+				}
 				return;
 			}
-
-			throw new UnsupportedOperationException("Cannot compile var: " + describe(part));
-		} else if(part instanceof Or) {
-			sourceBuilder.append("or(");
-			generateParsedSource(sourceBuilder, ((Or) part).lhs, methodPrefix, baseScope, fileName, addDebugging);
-			sourceBuilder.append(", ");
-			generateParsedSource(sourceBuilder, ((Or) part).rhs, methodPrefix, baseScope, fileName, addDebugging);
+			Var.Set set = sets.get(0);
+			sourceBuilder.append(baseScope);
+			sourceBuilder.append(".var(\"");
+			sourceBuilder.append(convertStringSource(set.lhs));
+			sourceBuilder.append("\", ");
+			if(set.rhs == null)
+				sourceBuilder.append("Undefined.INSTANCE");
+			else
+				generateParsedSource(sourceBuilder, set.rhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(")");
+			return;
+		} else if(part instanceof OrOr) {
+			sourceBuilder.append("orOr(");
+			generateParsedSource(sourceBuilder, ((OrOr) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(", ");
+			generateParsedSource(sourceBuilder, ((OrOr) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(")");
+			return;
+		} else if(part instanceof Equals) {
+			sourceBuilder.append("(");
+			generateParsedSource(sourceBuilder, ((Equals) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(".equals(");
+			generateParsedSource(sourceBuilder, ((Equals) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
+			return;
+		} else if(part instanceof NotEquals) {
+			sourceBuilder.append("(");
+			generateParsedSource(sourceBuilder, ((NotEquals) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(".equals(");
+			generateParsedSource(sourceBuilder, ((NotEquals) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(") ? global.Boolean.FALSE : global.Boolean.TRUE)");
+			return;
+		} else if(part instanceof StrictEquals) {
+			sourceBuilder.append("(((BaseObject)");
+			generateParsedSource(sourceBuilder, ((StrictEquals) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(" == (BaseObject)");
+			generateParsedSource(sourceBuilder, ((StrictEquals) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
+			return;
+		} else if(part instanceof StrictNotEquals) {
+			sourceBuilder.append("(((BaseObject)");
+			generateParsedSource(sourceBuilder, ((StrictNotEquals) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(" != (BaseObject)");
+			generateParsedSource(sourceBuilder, ((StrictNotEquals) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
 			return;
 		} else if(part instanceof ReferenceChain) {
 			java.lang.String first = ((ReferenceChain)part).chain.remove(0);
 			sourceBuilder.append(baseScope);
 			sourceBuilder.append(".get(\"");
-			sourceBuilder.append(toSource(first));
+			sourceBuilder.append(convertStringSource(first));
 			sourceBuilder.append("\")");
 			for(java.lang.String ref : ((ReferenceChain)part).chain) {
 				sourceBuilder.append(".get(\"");
-				sourceBuilder.append(toSource(ref));
+				sourceBuilder.append(convertStringSource(ref));
 				sourceBuilder.append("\")");
 			}
 			return;
 		} else if(part instanceof IntegerReference) {
 			int key = ((IntegerReference)part).ref;
-			generateParsedSource(sourceBuilder, ((IntegerReference) part).lhs, methodPrefix, baseScope, fileName, addDebugging);
+			generateParsedSource(sourceBuilder, ((IntegerReference) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(".get(");
 			sourceBuilder.append(java.lang.String.valueOf(key));
 			sourceBuilder.append(")");
+			return;
+		} else if(part instanceof Not) {
+			sourceBuilder.append("global.wrap(!JSHelper.isTrue(");
+			generateParsedSource(sourceBuilder, ((Not) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append("))");
 			return;
 		} else if(part instanceof OpenArray) {
 			boolean first = true;
@@ -421,7 +549,7 @@ public class JavaCompiler extends AbstractCompiler {
 					first = false;
 				else
 					sourceBuilder.append(", ");
-				generateParsedSource(sourceBuilder, subpart, methodPrefix, baseScope, fileName, addDebugging);
+				generateParsedSource(sourceBuilder, subpart, methodPrefix, baseScope, fileName);
 			}
 			sourceBuilder.append("})");
 			return;
@@ -430,11 +558,29 @@ public class JavaCompiler extends AbstractCompiler {
 			Parsed rhs = ((Set)part).rhs;
 			if(lhs instanceof IntegerReference) {
 				sourceBuilder.append("callSet(");
-				generateParsedSource(sourceBuilder, ((IntegerReference)lhs).lhs, methodPrefix, baseScope, fileName, addDebugging);
+				generateParsedSource(sourceBuilder, ((IntegerReference)lhs).lhs, methodPrefix, baseScope, fileName);
 				sourceBuilder.append(", ");
 				sourceBuilder.append(java.lang.String.valueOf(((IntegerReference)lhs).ref));
 				sourceBuilder.append(", ");
-				generateParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, addDebugging);
+				generateParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
+				sourceBuilder.append(")");
+				return;
+			} else if(lhs instanceof VariableReference) {
+				sourceBuilder.append("JSHelper.set(");
+				generateParsedSource(sourceBuilder, ((VariableReference)lhs).lhs, methodPrefix, baseScope, fileName);
+				sourceBuilder.append(", ");
+				generateParsedSource(sourceBuilder, ((VariableReference)lhs).ref, methodPrefix, baseScope, fileName);
+				sourceBuilder.append(", ");
+				generateParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
+				sourceBuilder.append(")");
+				return;
+			} else if(lhs instanceof Reference) {
+				sourceBuilder.append("callSet(");
+				sourceBuilder.append(baseScope);
+				sourceBuilder.append(", \"");
+				sourceBuilder.append(convertStringSource(((Reference)lhs).ref));
+				sourceBuilder.append("\", ");
+				generateParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
 				sourceBuilder.append(")");
 				return;
 			} else if(lhs instanceof ReferenceChain) {
@@ -445,17 +591,17 @@ public class JavaCompiler extends AbstractCompiler {
 					sourceBuilder.append("callSet(");
 					sourceBuilder.append(baseScope);
 					sourceBuilder.append(".get(\"");
-					sourceBuilder.append(toSource(first));
+					sourceBuilder.append(convertStringSource(first));
 					sourceBuilder.append("\")");
 					for(java.lang.String k : chain) {
 						sourceBuilder.append(".get(\"");
-						sourceBuilder.append(toSource(k));
+						sourceBuilder.append(convertStringSource(k));
 						sourceBuilder.append("\")");
 					}
 					sourceBuilder.append(", \"");
-					sourceBuilder.append(toSource(key));
+					sourceBuilder.append(convertStringSource(key));
 					sourceBuilder.append("\", ");
-					generateParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, addDebugging);
+					generateParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
 					sourceBuilder.append(")");
 					return;
 				} else {
@@ -472,7 +618,7 @@ public class JavaCompiler extends AbstractCompiler {
 			} else if(c != null) {
 				sourceBuilder.appendln("try {");
 				sourceBuilder.indent();
-				generateBlockSource(sourceBuilder, ((Try)part).impl, methodPrefix, baseScope, fileName, addDebugging);
+				generateBlockSource(sourceBuilder, ((Try)part).impl, methodPrefix, baseScope, fileName);
 				sourceBuilder.unindent();
 				sourceBuilder.appendln("} catch(net.nexustools.njs.Error.InvisibleException ex) {");
 				sourceBuilder.appendln("\tthrow ex;");
@@ -499,9 +645,9 @@ public class JavaCompiler extends AbstractCompiler {
 				sourceBuilder.indent();
 				sourceBuilder.append(newScope);
 				sourceBuilder.append(".param(\"");
-				sourceBuilder.append(toSource(((Reference)c.condition).ref));
+				sourceBuilder.append(convertStringSource(((Reference)c.condition).ref));
 				sourceBuilder.appendln("\", global.wrap(t));");
-				generateBlockSource(sourceBuilder, c.impl, methodPrefix, newScope, fileName, addDebugging);
+				generateBlockSource(sourceBuilder, c.impl, methodPrefix, newScope, fileName);
 				sourceBuilder.unindent();
 				sourceBuilder.appendln("} finally {");
 				sourceBuilder.append("\t");
@@ -516,15 +662,116 @@ public class JavaCompiler extends AbstractCompiler {
 			throw new UnsupportedOperationException("Cannot compile try: " + describe(c) + describe(f));
 		} else if(part instanceof If) {
 			if(((If)part).simpleimpl != null) {
-				sourceBuilder.appendln("if(JSHelper.isTrue(");
-				generateParsedSource(sourceBuilder, ((If)part).condition, methodPrefix, baseScope, fileName, addDebugging);
+				sourceBuilder.append("if(JSHelper.isTrue(");
+				generateParsedSource(sourceBuilder, ((If)part).condition, methodPrefix, baseScope, fileName);
 				sourceBuilder.appendln("))");
 				sourceBuilder.append("\t");
-				generateParsedSource(sourceBuilder, ((If)part).simpleimpl, methodPrefix, baseScope, fileName, addDebugging);
+				generateParsedSource(sourceBuilder, ((If)part).simpleimpl, methodPrefix, baseScope, fileName);
+				
+				Else els = ((If)part).el;
+				while(els != null) {
+					sourceBuilder.appendln(";");
+					if(els.simpleimpl != null) {
+						if(els instanceof ElseIf) {
+							sourceBuilder.append("else if(JSHelper.isTrue(");
+							generateParsedSource(sourceBuilder, els.condition, methodPrefix, baseScope, fileName);
+							sourceBuilder.appendln("))");
+						} else
+							sourceBuilder.appendln("else");
+						sourceBuilder.append("\t");
+						generateParsedSource(sourceBuilder, els.simpleimpl, methodPrefix, baseScope, fileName);
+					} else
+						throw new UnsupportedOperationException("Cannot compile if: " + describe(els));
+					
+					if(els instanceof ElseIf)
+						els = ((ElseIf)els).el;
+					else
+						break;
+				}
 				return;
 			}
 
 			throw new UnsupportedOperationException("Cannot compile if: " + describe(part));
+		} else if(part instanceof While) {
+			if(((While)part).simpleimpl != null) {
+				sourceBuilder.append("while(JSHelper.isTrue(");
+				generateParsedSource(sourceBuilder, ((While)part).condition, methodPrefix, baseScope, fileName);
+				sourceBuilder.appendln("))");
+				sourceBuilder.append("\t");
+				generateParsedSource(sourceBuilder, ((While)part).simpleimpl, methodPrefix, baseScope, fileName);
+				return;
+			}
+
+			
+			sourceBuilder.append("while(JSHelper.isTrue(");
+			generateParsedSource(sourceBuilder, ((While)part).condition, methodPrefix, baseScope, fileName);
+			sourceBuilder.appendln(")) {");
+			sourceBuilder.indent();
+			generateBlockSource(sourceBuilder, ((While)part).impl, methodPrefix, baseScope, fileName);
+			sourceBuilder.unindent();
+			sourceBuilder.appendln("}");
+			return;
+		} else if(part instanceof PlusPlus) {
+			Parsed ref = ((PlusPlus)part).ref;
+			if(((PlusPlus)part).right) {
+				sourceBuilder.append("plusPlusRight(global, ");
+				if(ref instanceof Reference) {
+					sourceBuilder.append("\"");
+					sourceBuilder.append(convertStringSource(((Reference) ref).ref));
+					sourceBuilder.append("\", ");
+					sourceBuilder.append(baseScope);
+				} else
+					throw new UnsupportedOperationException("Cannot compile x++: " + describe(ref));
+				sourceBuilder.append(")");
+				return;
+			}
+			
+			sourceBuilder.append("plusPlusLeft(global, ");
+			if(ref instanceof Reference) {
+				sourceBuilder.append("\"");
+				sourceBuilder.append(convertStringSource(((Reference) ref).ref));
+				sourceBuilder.append("\", ");
+				sourceBuilder.append(baseScope);
+			} else
+				throw new UnsupportedOperationException("Cannot compile ++x: " + describe(ref));
+			sourceBuilder.append(")");
+			return;
+		} else if(part instanceof OpenGroup) {
+			sourceBuilder.appendln("new GenericObject(global) {");
+			sourceBuilder.indent();
+			sourceBuilder.appendln("{");
+			sourceBuilder.indent();
+			for(Map.Entry<java.lang.String, Parsed> entry : ((OpenGroup)part).entries.entrySet()) {
+				sourceBuilder.append("set(\"");
+				sourceBuilder.append(convertStringSource(entry.getKey()));
+				sourceBuilder.append("\", ");
+				generateParsedSource(sourceBuilder, entry.getValue(), methodPrefix, baseScope, fileName);
+				sourceBuilder.appendln(");");
+			}
+			sourceBuilder.unindent();
+			sourceBuilder.appendln("}");
+			sourceBuilder.unindent();
+			sourceBuilder.appendln("}");
+			return;
+		} else if(part instanceof Delete) {
+			Parsed rhs = ((Delete)part).rhs;
+			if(rhs instanceof Reference) {
+				sourceBuilder.append("global.wrap(");
+				sourceBuilder.append(baseScope);
+				sourceBuilder.append(".delete(\"");
+				sourceBuilder.append(convertStringSource(((Reference)rhs).ref));
+				sourceBuilder.append("\"))");
+				return;
+			}
+
+			throw new UnsupportedOperationException("Cannot compile ++: " + describe(part));
+		} else if(part instanceof VariableReference) {
+			sourceBuilder.append("JSHelper.get(");
+			generateParsedSource(sourceBuilder, ((VariableReference)part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(", ");
+			generateParsedSource(sourceBuilder, ((VariableReference)part).ref, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(")");
+			return;
 		} else if(part instanceof Boolean) {
 			sourceBuilder.append("global.Boolean.");
 			if(((Boolean)part).value)
@@ -552,24 +799,26 @@ public class JavaCompiler extends AbstractCompiler {
 			return this == GlobalFunction || this == Function;
 		}
 	}
-	protected void generateScriptSource(SourceBuilder sourceBuilder, ScriptData script, java.lang.String methodPrefix, java.lang.String fileName, SourceScope scope, boolean addDebugging) {
-		sourceBuilder.appendln("@Override");
-		sourceBuilder.appendln("public String source() {");
-		sourceBuilder.append("\treturn \"");
-		if (addDebugging)
-			sourceBuilder.append(toSource(script.source));
-		else
-			sourceBuilder.append("[java_code]");
-		sourceBuilder.appendln("\";");
-		sourceBuilder.appendln("}");
+	protected void generateScriptSource(SourceBuilder sourceBuilder, ScriptData script, java.lang.String methodPrefix, java.lang.String fileName, SourceScope scope) {
+		if(addDebugging || !scope.isFunction()) {
+			sourceBuilder.appendln("@Override");
+			sourceBuilder.appendln("public String source() {");
+			sourceBuilder.append("\treturn \"");
+			if (addDebugging)
+				sourceBuilder.append(convertStringSource(script.source));
+			else
+				sourceBuilder.append("[java_code]");
+			sourceBuilder.appendln("\";");
+			sourceBuilder.appendln("}");
+		}
 		if (scope.isFunction()) {
 			sourceBuilder.appendln("@Override");
 			sourceBuilder.appendln("public String name() {");
 			sourceBuilder.append("\treturn \"");
 			if(script.callee != null)
-				sourceBuilder.append(script.callee.name != null ? toSource(script.callee.name) : "<anonymous>");
+				sourceBuilder.append(script.callee.name != null ? convertStringSource(script.callee.name) : "<anonymous>");
 			else
-				sourceBuilder.append(script.methodName != null ? toSource(script.methodName) : "<anonymous>");
+				sourceBuilder.append(script.methodName != null ? convertStringSource(script.methodName) : "<anonymous>");
 			sourceBuilder.appendln("\";");
 			sourceBuilder.appendln("}");
 			
@@ -589,14 +838,14 @@ public class JavaCompiler extends AbstractCompiler {
 						sourceBuilder.appendln(":");
 						for(; a < i; a++) {
 							sourceBuilder.append("\t\t\tbaseScope.var(\"");
-							sourceBuilder.append(toSource(arguments.get(a)));
+							sourceBuilder.append(convertStringSource(arguments.get(a)));
 							sourceBuilder.append("\", params[");
 							sourceBuilder.append(java.lang.String.valueOf(a));
 							sourceBuilder.appendln("]);");
 						}
 						for(; a < arguments.size(); a++) {
 							sourceBuilder.append("\t\t\tbaseScope.var(\"");
-							sourceBuilder.append(toSource(arguments.get(a)));
+							sourceBuilder.append(convertStringSource(arguments.get(a)));
 							sourceBuilder.appendln("\", Undefined.INSTANCE);");
 						}
 						sourceBuilder.appendln("\t\t\tbreak;");
@@ -615,7 +864,7 @@ public class JavaCompiler extends AbstractCompiler {
 		sourceBuilder.indent();
 		for (Function function : script.functions) {
 			sourceBuilder.append("baseScope.var(\"");
-			sourceBuilder.append(toSource(function.name));
+			sourceBuilder.append(convertStringSource(function.name));
 			sourceBuilder.append("\", new ");
 			sourceBuilder.append(function.uname = toClassName(function.name, false));
 			sourceBuilder.appendln("(global, baseScope));");
@@ -655,7 +904,7 @@ public class JavaCompiler extends AbstractCompiler {
 					sourceBuilder.appendln(";");
 				}
 				hasReturn = hasReturn || part instanceof Return || part instanceof Throw;
-				generateParsedSource(sourceBuilder, part, methodPrefix, "baseScope", fileName, addDebugging);
+				generateParsedSource(sourceBuilder, part, methodPrefix, "baseScope", fileName);
 				sourceBuilder.appendln(";");
 			}
 
@@ -680,7 +929,7 @@ public class JavaCompiler extends AbstractCompiler {
 					else
 						needReturn = true;
 				}
-				generateParsedSource(sourceBuilder, part, methodPrefix, "baseScope", fileName, addDebugging);
+				generateParsedSource(sourceBuilder, part, methodPrefix, "baseScope", fileName);
 				sourceBuilder.appendln(";");
 			}
 			if(needReturn)
@@ -722,17 +971,19 @@ public class JavaCompiler extends AbstractCompiler {
 			sourceBuilder.appendln("\tbaseScope = scope;");
 			sourceBuilder.appendln("}");
 
-			generateScriptSource(sourceBuilder, function.impl, methodPrefix, fileName, scope == SourceScope.Function ? SourceScope.Function : SourceScope.GlobalFunction, addDebugging);
+			generateScriptSource(sourceBuilder, function.impl, methodPrefix, fileName, scope == SourceScope.Function ? SourceScope.Function : SourceScope.GlobalFunction);
 
 			sourceBuilder.unindent();
 			sourceBuilder.appendln("}");
 		}
 	}
 
-	protected java.lang.String generateClassSource(ScriptData script, java.lang.String className, java.lang.String fileName, java.lang.String pkg, boolean inFunction, boolean addDebugging) {
+	protected java.lang.String generateJavaClassSource(ScriptData script, java.lang.String className, java.lang.String fileName, java.lang.String pkg, boolean inFunction, boolean generateMain) {
 		SourceBuilder sourceBuilder = new SourceBuilder();
-		sourceBuilder.appendln("package " + pkg + ";");
-		sourceBuilder.appendln();
+		if(pkg != null && !pkg.isEmpty()) {
+			sourceBuilder.appendln("package " + pkg + ";");
+			sourceBuilder.appendln();
+		}
 		sourceBuilder.appendln("import net.nexustools.njs.compiler.CompiledScript;");
 		sourceBuilder.appendln("import net.nexustools.njs.BaseObject;");
 		sourceBuilder.appendln("import net.nexustools.njs.GenericObject;");
@@ -754,10 +1005,21 @@ public class JavaCompiler extends AbstractCompiler {
 		sourceBuilder.indent();
 
 		try {
-			generateScriptSource(sourceBuilder, script, script.methodName, fileName, SourceScope.GlobalScript, addDebugging);
+			generateScriptSource(sourceBuilder, script, script.methodName, fileName, SourceScope.GlobalScript);
 		} catch(RuntimeException t) {
 			System.err.println(sourceBuilder.toString());
 			throw t;
+		}
+		
+		if(generateMain) {
+			sourceBuilder.appendln("public static void main(String[] args) {");
+			sourceBuilder.appendln("\tGlobal global = JSHelper.createExtendedGlobal();");
+			sourceBuilder.appendln("\tScope scope = new Scope(global);");
+			sourceBuilder.appendln("\tscope.var(\"arguments\", JSHelper.convertArguments(global, args));");
+			sourceBuilder.append("\tnew ");
+			sourceBuilder.append(className);
+			sourceBuilder.appendln("().exec(global, scope);");
+			sourceBuilder.appendln("}");
 		}
 
 		sourceBuilder.unindent();
@@ -773,7 +1035,7 @@ public class JavaCompiler extends AbstractCompiler {
 			className = toClassName(fileName.substring(0, fileName.length()-3), true);
 		else
 			className = toClassName(fileName, true);
-		final java.lang.String source = generateClassSource(script, className, fileName, "net.nexustools.njs.gen", inFunction, addDebugging);
+		final java.lang.String source = generateJavaClassSource(script, className, fileName, "net.nexustools.njs.gen", inFunction, false);
 		final java.lang.String classPath = "net.nexustools.njs.gen." + className;
 
 		if(DEBUG)
@@ -869,10 +1131,6 @@ public class JavaCompiler extends AbstractCompiler {
 		}
 
 		return classBytes;
-	}
-
-	public static void main(String... args) {
-		throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
 	}
 
 	private static class MemoryJavaFileManager extends ForwardingJavaFileManager {
@@ -1043,4 +1301,130 @@ public class JavaCompiler extends AbstractCompiler {
 			return res;
 		}
 	}
+	
+	public java.lang.String transpile(java.lang.String input, java.lang.String className, java.lang.String pkg, boolean generateMain) throws FileNotFoundException {
+		if(input.equals("-"))
+			return transpile(new InputStreamReader(System.in), "System.in", className, pkg, generateMain);
+		return transpile(new FileReader(input), input, className, pkg, generateMain);
+	}
+	
+	public java.lang.String transpile(InputStreamReader reader, java.lang.String input, java.lang.String className, java.lang.String pkg, boolean generateMain) {
+		return generateJavaClassSource(parse(reader, className, false), className, input, pkg, false, generateMain);
+	}
+	
+	public static void main(java.lang.String... args) {
+		boolean addDebugging = true, generateMain = true;
+		java.lang.String input = null, output = null, pkg = null;
+		for(int i=0; i<args.length; i++) {
+			java.lang.String arg = args[i];
+			if(arg.startsWith("-")) {
+				if(arg.equals("-s") || arg.equals("-strip") || arg.equals("--strip"))
+					addDebugging = false;
+				else if(arg.equals("-m") || arg.equals("-nomain") || arg.equals("--nomain") || arg.equals("--no-main"))
+					generateMain = false;
+				else if(arg.equals("-p") || arg.equals("-package") || arg.equals("--package")) {
+					
+				} else if(arg.equals("-h") || arg.equals("-help") || arg.equals("--help"))
+					throw new UnsupportedOperationException();
+				else {
+					System.err.println("No such commandline argument " + arg);
+					System.exit(1);
+					return;
+				}
+			} else if(input == null)
+				input = arg;
+			else if(output == null)
+				output = arg;
+			else {
+				System.err.println("Too many arguments");
+				System.exit(1);
+				return;
+			}
+		}
+		if(input == null) {
+			System.err.println("No input specified");
+			System.exit(1);
+			return;
+		}
+		
+		JavaCompiler compiler = new JavaCompiler(addDebugging);
+		
+		final java.lang.String className;
+		final java.lang.String baseName;
+		if(output == null) {
+			int pos = input.lastIndexOf(".");
+			if(pos > -1)
+				output = input.substring(0, pos) + ".java";
+			else
+				output = input + ".java";
+		}
+		int pos = output.lastIndexOf(File.separatorChar);
+		if(pos > -1)
+			baseName = output.substring(pos+1);
+		else
+			baseName = output;
+		if(baseName.endsWith(".java"))
+			className = compiler.toClassName(baseName.substring(0, baseName.length()-5), true);
+		else
+			className = compiler.toClassName(baseName, true);
+		if(pkg == null) {
+			if(pos > -1) {
+				pkg = output.substring(0, pos).replaceAll(File.separator, ".");
+				if(pkg.startsWith("src."))
+					pkg = pkg.substring(4);
+				else if(pkg.startsWith("source."))
+					pkg = pkg.substring(7);
+			}
+		}
+		
+		java.lang.String source;
+		try {
+			source = compiler.transpile(input, className, pkg, generateMain);
+		} catch (FileNotFoundException ex) {
+			System.err.println("Input does not exist...");
+			ex.printStackTrace();
+			System.exit(1);
+			return;
+		}
+		
+		OutputStream out;
+		if(output.equals("-"))
+			out = System.out;
+		else {
+			File dir;
+			if(pos > -1) {
+				dir = new File(output.substring(0, pos));
+				if(!dir.exists() && !dir.mkdirs()) {
+					System.err.println("Output directory could not be created...");
+					System.err.println(output.substring(0, pos));
+					System.exit(1);
+				}
+			} else
+				dir = new File(".");
+			if(!dir.isDirectory()) {
+				System.err.println("Output parent is not a directory...");
+				System.err.println(dir.toString());
+				System.exit(1);
+			}
+			try {
+				File outputFile = new File(dir, className + ".java");
+				out = new FileOutputStream(outputFile);
+				System.out.println("Writing to " + outputFile);
+			} catch (FileNotFoundException ex) {
+				System.err.println("Output could not be created...");
+				ex.printStackTrace();
+				System.exit(1);
+				return;
+			}
+		}
+		
+		try {
+			out.write(source.getBytes());
+		} catch (IOException ex) {
+			System.err.println("Output could not be written...");
+			ex.printStackTrace();
+			System.exit(1);
+		}
+	}
+	
 }

@@ -7,7 +7,6 @@ package net.nexustools.njs;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
@@ -16,7 +15,7 @@ import java.util.List;
  * @author kate
  */
 public class String extends AbstractFunction {
-	public static class Instance extends GenericObject {
+	public static class Instance extends UniqueObject {
 		public final java.lang.String string;
 		public final String String;
 		Instance(Number Number, final String String, final java.lang.String string) {

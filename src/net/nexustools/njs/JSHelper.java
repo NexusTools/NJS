@@ -13,47 +13,184 @@ import java.util.List;
  * @author kate
  */
 public class JSHelper {
-	public static <O> O jsToJava(final BaseObject jsObject, Class<O> desiredClass) {
+	public static class ConversionAccuracy {
+		double accuracy;
+	}
+	private static final ConversionAccuracy DONT_CARE_ABOUT_ACCURACY = new ConversionAccuracy();
+	public static java.lang.Object jsToJava(final BaseObject jsObject, Class<?> desiredClass) {
+		return jsToJava(jsObject, desiredClass, DONT_CARE_ABOUT_ACCURACY);
+	}
+	public static java.lang.Object jsToJava(final BaseObject jsObject, Class<?> desiredClass, ConversionAccuracy accuracy) {
 		if(jsObject instanceof Undefined || jsObject instanceof Null)
 			return null;
 		
-		if(desiredClass == String.class)
-			return (O)jsObject.toString();
+		if(desiredClass == java.lang.Object.class)
+			return jsObject;
 		
-		if(desiredClass == Runnable.class && jsObject instanceof BaseFunction)
-			return (O)new Runnable() {
+		if(desiredClass.isArray()) {
+			Class<?> desiredArrayType = desiredClass.getComponentType();
+			
+			if(desiredArrayType == Character.TYPE) {
+				if(jsObject instanceof String.Instance)
+					accuracy.accuracy = 1;
+				else if(jsObject instanceof Number.Instance)
+					accuracy.accuracy = 0.75;
+				else
+					accuracy.accuracy = 0.5;
+				return jsObject.toString();
+			}
+			
+			throw new UnsupportedOperationException("Cannot convert array with component type " + desiredArrayType);
+		}
+		
+		if(desiredClass == java.lang.String.class) {
+			if(jsObject instanceof String.Instance)
+				accuracy.accuracy = 1;
+			else if(jsObject instanceof Number.Instance)
+				accuracy.accuracy = 0.75;
+			else
+				accuracy.accuracy = 0.5;
+			return jsObject.toString();
+		}
+		
+		if(desiredClass == Runnable.class && jsObject instanceof BaseFunction) {
+			accuracy.accuracy = 1;
+			return new Runnable() {
 				@Override
 				public void run() {
 					((BaseFunction)jsObject).call(Undefined.INSTANCE);
 				}
 			};
-		
-		if(desiredClass.isAssignableFrom(Number.class))
-			try {
-				return desiredClass.cast(Double.valueOf(jsObject.toString()));
-			} catch(NumberFormatException ex) {}
-		
-		if(jsObject instanceof Number.Instance) {
-			double value = (Double)((Number.Instance)jsObject).number;
-			if(desiredClass == Long.class || desiredClass == Long.TYPE)
-				return (O)(Long)(long)value;
-			if(desiredClass == Integer.class || desiredClass == Integer.TYPE)
-				return (O)(Integer)(int)value;
-			if(desiredClass == Short.class || desiredClass == Short.TYPE)
-				return (O)(Short)(short)value;
-			if(desiredClass == Byte.class || desiredClass == Byte.TYPE)
-				return (O)(Byte)(byte)value;
-			return desiredClass.cast(value);
 		}
 		
-		if(jsObject instanceof JavaObjectWrapper)
-			return desiredClass.cast(((JavaObjectWrapper)jsObject).javaObject);
-		if(jsObject instanceof String.Instance)
-			return desiredClass.cast(((String.Instance)jsObject).string);
-		if(jsObject instanceof AbstractArray)
-			return desiredClass.cast(((AbstractArray)jsObject).arrayStorage);
+		if(desiredClass == java.lang.Boolean.class) {
+			if(jsObject instanceof Boolean.Instance)
+				accuracy.accuracy = 1;
+			else if(jsObject instanceof Number.Instance)
+				accuracy.accuracy = 0.75;
+			else
+				accuracy.accuracy = 0.5;
+			return (java.lang.Boolean)isTrue(jsObject);
+		}
+		if(desiredClass == java.lang.Boolean.TYPE) {
+			if(jsObject instanceof Boolean.Instance)
+				accuracy.accuracy = 1;
+			else if(jsObject instanceof Number.Instance)
+				accuracy.accuracy = 0.75;
+			else
+				accuracy.accuracy = 0.5;
+			return isTrue(jsObject);
+		}
 		
-		return desiredClass.cast(jsObject);
+		if(jsObject instanceof Number.Instance) {
+			accuracy.accuracy = 1;
+			double value = (Double)((Number.Instance)jsObject).number;
+			if(desiredClass == Long.class)
+				return (Long)(long)value;
+			if(desiredClass == Integer.class)
+				return (Integer)(int)value;;
+			if(desiredClass == Float.class)
+				return (Float)(float)value;;
+			if(desiredClass == Double.class)
+				return (Double)value;
+			if(desiredClass == Short.class)
+				return (Short)(short)value;
+			if(desiredClass == Byte.class)
+				return (Byte)(byte)value;
+			if(desiredClass == Integer.TYPE)
+				return (int)value;
+			if(desiredClass == Float.TYPE)
+				return (float)value;
+			if(desiredClass == Double.TYPE)
+				return value;
+			if(desiredClass == Short.TYPE)
+				return (short)value;
+			if(desiredClass == Byte.TYPE)
+				return (byte)value;
+		}
+		
+		if(java.lang.Number.class.isAssignableFrom(desiredClass)) {
+			if(jsObject instanceof String.Instance)
+				accuracy.accuracy = 0.75;
+			else
+				accuracy.accuracy = 0.5;
+			
+			java.lang.String string  = jsObject.toString();
+			if(desiredClass == Long.class)
+				return Long.valueOf(string);
+			if(desiredClass == Integer.class)
+				return Integer.valueOf(string);
+			if(desiredClass == Float.class)
+				return Float.valueOf(string);
+			if(desiredClass == Double.class)
+				return Double.valueOf(string);
+			if(desiredClass == Short.class)
+				return Short.valueOf(string);
+			if(desiredClass == Byte.class)
+				return Byte.valueOf(string);
+		}
+		
+		if(desiredClass == Integer.TYPE) {
+			if(jsObject instanceof String.Instance)
+				accuracy.accuracy = 0.75;
+			else
+				accuracy.accuracy = 0.5;
+			
+			java.lang.String string  = jsObject.toString();
+			return (int)Integer.valueOf(string);
+		}
+		if(desiredClass == Float.TYPE) {
+			if(jsObject instanceof String.Instance)
+				accuracy.accuracy = 0.75;
+			else
+				accuracy.accuracy = 0.5;
+			
+			java.lang.String string  = jsObject.toString();
+			return (float)Float.valueOf(string);
+		}
+		if(desiredClass == Double.TYPE) {
+			if(jsObject instanceof String.Instance)
+				accuracy.accuracy = 0.75;
+			else
+				accuracy.accuracy = 0.5;
+			
+			java.lang.String string  = jsObject.toString();
+			return (double)Double.valueOf(string);
+		}
+		if(desiredClass == Short.TYPE) {
+			if(jsObject instanceof String.Instance)
+				accuracy.accuracy = 0.75;
+			else
+				accuracy.accuracy = 0.5;
+			
+			java.lang.String string  = jsObject.toString();
+			return (short)Short.valueOf(string);
+		}
+		if(desiredClass == Byte.TYPE) {
+			if(jsObject instanceof String.Instance)
+				accuracy.accuracy = 0.75;
+			else
+				accuracy.accuracy = 0.5;
+			
+			java.lang.String string  = jsObject.toString();
+			return (byte)Byte.valueOf(string);
+		}
+		if(desiredClass == Long.TYPE) {
+			if(jsObject instanceof String.Instance)
+				accuracy.accuracy = 0.75;
+			else
+				accuracy.accuracy = 0.5;
+			
+			java.lang.String string  = jsObject.toString();
+			return (long)Long.valueOf(string);
+		}
+		
+		if(jsObject instanceof JavaObjectWrapper && desiredClass.isInstance(((JavaObjectWrapper)jsObject).javaObject)) {
+			accuracy.accuracy = 1;
+			return ((JavaObjectWrapper)jsObject).javaObject;
+		}
+		
+		throw new UnsupportedOperationException(desiredClass.getName() + " from " + jsObject.getClass().getName());
 	}
 	public static BaseObject javaToJS(Global global, java.lang.Object javaObject) {
 		if(javaObject == null)
@@ -67,6 +204,8 @@ public class JSHelper {
 		
 		if(javaObject instanceof java.lang.Number)
 			return global.wrap(((java.lang.Number)javaObject).doubleValue());
+		if(java.lang.Integer.TYPE.isInstance(javaObject))
+			return global.wrap((int)(Integer)javaObject);
 
 		if(javaObject instanceof Class)
 			return global.wrap((Class)javaObject);
@@ -122,7 +261,8 @@ public class JSHelper {
 				global.setHidden("eval", new AbstractFunction(global) {
 					@Override
 					public BaseObject call(BaseObject _this, BaseObject... params) {
-						return global.compiler.eval(params[0].toString(), "<eval>", false).exec(global, Scope.current());
+						renameMethodCall("eval");
+						return global.compiler.compile(params[0].toString(), "<eval>", false).exec(global, Scope.current());
 					}
 					@Override
 					public java.lang.String name() {
@@ -164,7 +304,7 @@ public class JSHelper {
 			return _this.get(key.toString());
 	}
 	
-	public static void set(BaseObject _this, BaseObject key, BaseObject val) {
+	public static BaseObject set(BaseObject _this, BaseObject key, BaseObject val) {
 		if(key instanceof String.Instance)
 			_this.set(((String.Instance) key).string, val);
 		else if(key instanceof Number.Instance && ((Number.Instance)key).number >= 0
@@ -172,6 +312,7 @@ public class JSHelper {
 			_this.set((int)((Number.Instance)key).number, val);
 		else
 			_this.set(key.toString(), val);
+		return val;
 	}
 	
 	public static boolean delete(BaseObject _this, BaseObject key) {
@@ -280,7 +421,7 @@ public class JSHelper {
 		el.columns = columns;
 		el.rows = rows;
 	}
-	public static java.lang.String convertStack(java.lang.String header, Throwable t) {
+	public static java.lang.String extractStack(java.lang.String header, Throwable t) {
 		StringBuilder builder = new StringBuilder(header);
 		final StackTraceElement[] stack = t.getStackTrace();
 		final List<StackElementReplace> list = STACK_REPLACEMENTS.get();
@@ -327,31 +468,27 @@ public class JSHelper {
 				}
 			}
 			
-			if(el.getClassName().startsWith("net.nexustools.njs.compiler.RuntimeCompiler")) {
-				builder.append("<unknown source>");
-			} else {
-				java.lang.String method = el.getMethodName();
-				boolean hasMethod = method != null && !method.isEmpty();
-				if(hasMethod) {
-					builder.append(method);
-					builder.append(" (");
-				}
-
-				java.lang.String fileName = el.getFileName();
-				if(fileName == null)
-					builder.append("<unknown source>");
-				else {
-					builder.append(fileName);
-					int lineNumber = el.getLineNumber();
-					if(lineNumber > 0) {
-						builder.append(':');
-						builder.append(lineNumber);
-					}
-				}
-
-				if(hasMethod)
-					builder.append(')');
+			java.lang.String method = el.getMethodName();
+			boolean hasMethod = method != null && !method.isEmpty();
+			if(hasMethod) {
+				builder.append(method);
+				builder.append(" (");
 			}
+
+			java.lang.String fileName = el.getFileName();
+			if(fileName == null)
+				builder.append("<unknown source>");
+			else {
+				builder.append(fileName);
+				int lineNumber = el.getLineNumber();
+				if(lineNumber > 0) {
+					builder.append(':');
+					builder.append(lineNumber);
+				}
+			}
+
+			if(hasMethod)
+				builder.append(')');
 			
 			stackRemaining--;
 		}
@@ -386,4 +523,21 @@ public class JSHelper {
 		return replacement;
 	}
 	
+	public static Arguments convertArguments(Global global, java.lang.String... arguments) {
+		return new Arguments(global, null, convertArray(global, arguments));
+	}
+	
+	public static BaseObject[] convertArray(Global global, java.lang.String[] array) {
+		BaseObject[] converted = new BaseObject[array.length];
+		for(int i=0; i<converted.length; i++)
+			converted[i] = global.wrap(array[i]);
+		return converted;
+	}
+	
+	public static BaseObject[] convertArray(Global global, java.lang.Object[] array) {
+		BaseObject[] converted = new BaseObject[array.length];
+		for(int i=0; i<converted.length; i++)
+			converted[i] = JSHelper.javaToJS(global, array[i]);
+		return converted;
+	}
 }

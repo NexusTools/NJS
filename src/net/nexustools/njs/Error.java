@@ -188,8 +188,8 @@ public class Error extends AbstractFunction implements BaseFunction {
 	@Override
 	public BaseObject construct(BaseObject... params) {
 		if(params.length > 0)
-			return new Instance(String, this, "Error", params[0].toString(), JSHelper.convertStack("Error: " + params[0].toString(), new Throwable()));
-		return new Instance(String, this, "Error", null, JSHelper.convertStack("Error", new Throwable()));
+			return new Instance(String, this, "Error", params[0].toString(), JSHelper.extractStack("Error: " + params[0].toString(), new Throwable()));
+		return new Instance(String, this, "Error", null, JSHelper.extractStack("Error", new Throwable()));
 	}
 	
 	@Override

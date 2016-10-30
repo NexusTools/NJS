@@ -17,8 +17,14 @@ public class Boolean extends AbstractFunction {
 			this.value = value;
 		}
 		@Override
-		public java.lang.String toString() {
-			return value ? "true" : "false";
+		public boolean equals(java.lang.Object obj) {
+			if(obj == this)
+				return true;
+			
+			if(obj instanceof Instance)
+				return ((Instance)obj).value == value;
+			
+			return ((Number.Instance)obj).number == 1;
 		}
 	}
 
@@ -29,6 +35,17 @@ public class Boolean extends AbstractFunction {
 		TRUE = new Instance(this, true);
 		FALSE.seal();
 		TRUE.seal();
+		
+		final String.Instance _true = global.wrap("true");
+		final String.Instance _false = global.wrap("false");
+		
+		GenericObject prototype = prototype();
+		prototype.setHidden("toString", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return JSHelper.isTrue(_this) ? _true : _false;
+			}
+		});
 	}
 
 	@Override

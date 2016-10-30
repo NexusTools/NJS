@@ -58,6 +58,9 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 					put0(i, val);
 					actualLength = java.lang.Math.max(actualLength, i+1);
 				} catch(ArrayIndexOutOfBoundsException ex) {
+					if(!autoResize())
+						return;
+					
 					int newLength = java.lang.Math.max(actualLength, i+1);
 					O newArray = createStorage(nextPowerOf2(newLength));
 					copy(arrayStorage, newArray, actualLength);
@@ -72,7 +75,12 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 				if(i > actualLength)
 					return true;
 				
+				if(!autoResize())
+					return false;
+				
 				put0(i, null);
+				if(i == actualLength)
+					actualLength --;
 				return or.or(java.lang.String.valueOf(i));
 			}
 			@Override
@@ -88,7 +96,17 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 					return false;
 				}
 			}
+
+			@Override
+			public int hashCode() {
+				return arrayStorage.hashCode();
+			}
+			
 		});
+	}
+	
+	protected boolean autoResize() {
+		return false;
 	}
 	
 	@Override

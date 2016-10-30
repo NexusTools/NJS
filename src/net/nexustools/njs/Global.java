@@ -11,24 +11,35 @@ import java.util.Iterator;
 import java.util.List;
 import net.nexustools.njs.compiler.Compiler;
 import net.nexustools.njs.compiler.JavaCompiler;
+import net.nexustools.njs.compiler.NullCompiler;
 import net.nexustools.njs.compiler.RuntimeCompiler;
 
 /**
  *
  * @author kate
  */
-public class Global extends GenericObject {
+public class Global extends UniqueObject {
 	private static boolean SHOW_UNAVAILABLE_MESSAGE = true;
 	public static Compiler createCompiler() {
 		try {
 			return new JavaCompiler();
 		} catch(Throwable t) {
-			if(SHOW_UNAVAILABLE_MESSAGE) {
-				SHOW_UNAVAILABLE_MESSAGE = false;
-				System.out.println("JavaCompiler unavailable, falling back to RuntimeCompiler");
-				t.printStackTrace(System.out);
+			try {
+				RuntimeCompiler compiler = new RuntimeCompiler();
+				if(SHOW_UNAVAILABLE_MESSAGE) {
+					SHOW_UNAVAILABLE_MESSAGE = false;
+					System.out.println("JavaCompiler unavailable, falling back to RuntimeCompiler");
+					t.printStackTrace(System.out);
+				}
+				return compiler;
+			} catch(Throwable tt) {
+				if(SHOW_UNAVAILABLE_MESSAGE) {
+					SHOW_UNAVAILABLE_MESSAGE = false;
+					System.out.println("JavaCompiler and RuntimeCompiler unavailable, compilation at runtime disabled");
+					tt.printStackTrace(System.out);
+				}
+				return new NullCompiler();
 			}
-			return new RuntimeCompiler();
 		}
 	}
 	
@@ -45,6 +56,9 @@ public class Global extends GenericObject {
 	public final Number.Instance NaN;
 	public final Number.Instance PositiveInfinity;
 	public final Number.Instance NegativeInfinity;
+	public final Number.Instance NegativeOne;
+	public final Number.Instance PositiveOne;
+	public final Number.Instance Zero;
 	
 	public Global() {
 		this(createCompiler());
@@ -73,32 +87,39 @@ public class Global extends GenericObject {
 		Error = new Error(this);
 		Array = new Array(this);
 		
+		Zero = Number.wrap(0);
+		PositiveOne = Number.wrap(1);
+		NegativeOne = Number.wrap(-1);
 		NaN = Number.wrap(Double.NaN);
 		PositiveInfinity = Number.wrap(Double.POSITIVE_INFINITY);
 		NegativeInfinity = Number.wrap(Double.NEGATIVE_INFINITY);
 		PositiveInfinity.seal();
 		NegativeInfinity.seal();
+		PositiveOne.seal();
+		NegativeOne.seal();
+		Zero.seal();
 		NaN.seal();
 	}
 	
 	public void initStandards() {
-		setStorage("constructor", Object, false);
-		setStorage("__proto__", Object.prototype(), false);
+		setHidden("constructor", Object);
+		setHidden("__proto__", Object.prototype());
 		
-		setStorage("NaN", NaN, false);
-		setStorage("isNaN", new AbstractFunction(this) {
+		setHidden("NaN", NaN);
+		setHidden("Infinity", PositiveInfinity);
+		setHidden("isNaN", new AbstractFunction(this) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				return Double.isNaN(Number.from(params[0]).number) ? Boolean.TRUE : Boolean.FALSE;
 			}
-		}, false);
-		setStorage("Function", Function, false);
-		setStorage("Object", Object, false);
-		setStorage("String", String, false);
-		setStorage("Number", Number, false);
-		setStorage("Symbol", Symbol, false);
-		setStorage("Error", Error, false);
-		setStorage("Array", Array, false);
+		});
+		setHidden("Function", Function);
+		setHidden("Object", Object);
+		setHidden("String", String);
+		setHidden("Number", Number);
+		setHidden("Symbol", Symbol);
+		setHidden("Error", Error);
+		setHidden("Array", Array);
 	}
 	
 	public Number.Instance wrap(double number) {
@@ -137,8 +158,8 @@ public class Global extends GenericObject {
 		if(t instanceof Error.Thrown)
 			return ((Error.Thrown)t).what;
 		if(t instanceof Error.JavaException)
-			return new Error.Instance(String, Error, ((Error.JavaException)t).type, ((Error.JavaException) t).getUnderlyingMessage(), JSHelper.convertStack(t.getMessage(), t));
-		return new Error.Instance(String, Error, "JavaError", t.toString(), JSHelper.convertStack("JavaError: " + t.toString(), t));
+			return new Error.Instance(String, Error, ((Error.JavaException)t).type, ((Error.JavaException) t).getUnderlyingMessage(), JSHelper.extractStack(t.getMessage(), t));
+		return new Error.Instance(String, Error, "JavaError", t.toString(), JSHelper.extractStack("JavaError: " + t.toString(), t));
 	}
 
 	private static final List<WeakReference<JavaObjectWrapper>> WRAPS = new ArrayList();

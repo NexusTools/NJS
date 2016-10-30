@@ -10,18 +10,11 @@ package net.nexustools.njs;
  * @author kate
  */
 public class GenericArray extends AbstractArray<BaseObject[]> {
-	public static BaseObject[] convert(Global global, java.lang.Object[] array) {
-		BaseObject[] converted = new BaseObject[array.length];
-		for(int i=0; i<converted.length; i++)
-			converted[i] = global.javaToJS(array[i]);
-		return converted;
-	}
-
 	public GenericArray(Global global) {
 		this(global, global.Array, 0);
 	}
 	public GenericArray(Global global, java.lang.Object[] array) {
-		this(global, global.Array, convert(global, array));
+		this(global, global.Array, JSHelper.convertArray(global, array));
 	}
 	public GenericArray(Global global, int len) {
 		this(global, global.Array, new BaseObject[len]);
@@ -34,6 +27,11 @@ public class GenericArray extends AbstractArray<BaseObject[]> {
 	}
 	public GenericArray(Global global, Array Array, BaseObject[] storage) {
 		super(global, Array.prototype(), Array, storage);
+	}
+
+	@Override
+	protected boolean autoResize() {
+		return true;
 	}
 
 	@Override

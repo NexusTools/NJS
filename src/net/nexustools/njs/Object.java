@@ -5,6 +5,8 @@
  */
 package net.nexustools.njs;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,26 +51,43 @@ public class Object extends AbstractFunction {
 			}
 		});
 		
+		final String.Instance _objectNull = global.wrap("[object Null]");
+		final String.Instance _objectUndefined = global.wrap("[object Undefined]");
+		final String.Instance _objectArguments = global.wrap("[object Arguments]");
+		final String.Instance _objectGlobal = global.wrap("[object Global]");
+		final String.Instance _objectObject = global.wrap("[object Object]");
+		final Map<BaseFunction, String.Instance> constructorNameMap = new HashMap();
+		
 		GenericObject prototype = prototype();
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(_this == null || _this instanceof Null)
-					return global.wrap("[object Null]");
+					return _objectNull;
 				if(_this instanceof Undefined)
-					return global.wrap("[object Undefined]");
+					return _objectUndefined;
+				if(_this instanceof Arguments)
+					return _objectArguments;
+				if(_this instanceof Global)
+					return _objectGlobal;
 				
 				try {
 					BaseFunction constructor = _this.constructor();
-					if(constructor instanceof BaseFunction) {
+					synchronized(constructorNameMap) {
+						String.Instance string = constructorNameMap.get(constructor);
+						if(string != null)
+							return string;
 						Class<?> clazz = constructor.getClass();
 						Matcher matcher = BUILT_IN.matcher(clazz.getName());
-						if(matcher.matches())
-							return global.wrap("[object " + matcher.group(1) + "]");
+						if(matcher.matches()) {
+							constructorNameMap.put(constructor, string = global.wrap("[object " + matcher.group(1) + "]"));
+							return string;
+						}
 					}
-				} catch(Error.JavaException ex) {}
+				} catch(Error.JavaException ex) {
+				} catch(ClassCastException ex) {}
 				
-				return global.wrap("[object Object]");
+				return _objectObject;
 			}
 			@Override
 			public java.lang.String name() {
