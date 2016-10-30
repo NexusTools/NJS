@@ -42,6 +42,11 @@ public class Comparisons {
 	public void equals() {
 		test("equals");
 	}
+	
+	@Test
+	public void greaterLess() {
+		test("greaterLess");
+	}
 
 	public void test(String name) {
 		for(Compiler compiler : compilers) {

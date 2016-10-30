@@ -28,6 +28,25 @@ public class String extends AbstractFunction {
 			
 			setReadOnly("length", length);
 		}
+
+		@Override
+		public boolean equals(java.lang.Object obj) {
+			if(obj == this)
+				return true;
+			
+			if(obj instanceof String.Instance)
+				return string.equals(((String.Instance)obj).string);
+			
+			if(obj instanceof java.lang.String)
+				return string.equals((java.lang.String)obj);
+			
+			if(obj instanceof Number.Instance)
+				try {
+					return Double.valueOf(string) == ((Number.Instance)obj).number;
+				} catch(NumberFormatException ex) {}
+			
+			return false;
+		}
 		@Override
 		public Instance clone() {
 			return new Instance(getDirectly("length"), String, string);
@@ -86,6 +105,26 @@ public class String extends AbstractFunction {
 			@Override
 			public java.lang.String name() {
 				return "String_prototype_toString";
+			}
+		});
+		prototype.setHidden("toUpperCase", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return String.this.wrap(_this.toString().toUpperCase());
+			}
+			@Override
+			public java.lang.String name() {
+				return "String_prototype_toUpperCase"; //To change body of generated methods, choose Tools | Templates.
+			}
+		});
+		prototype.setHidden("toLowerCase", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return String.this.wrap(_this.toString().toLowerCase());
+			}
+			@Override
+			public java.lang.String name() {
+				return "String_prototype_toLowerCase"; //To change body of generated methods, choose Tools | Templates.
 			}
 		});
 		prototype.setHidden("charCodeAt", new AbstractFunction(global) {
@@ -150,7 +189,7 @@ public class String extends AbstractFunction {
 				Instance um = ref.get();
 				if(um == null)
 					it.remove();
-				else if(string == um.string)
+				else if(string.equals(um.string))
 					return um;
 			}
 			

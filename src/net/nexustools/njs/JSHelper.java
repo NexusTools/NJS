@@ -13,6 +13,199 @@ import java.util.List;
  * @author kate
  */
 public class JSHelper {
+
+	public static boolean stringMoreThan(java.lang.String s1, java.lang.String s2) {
+		int l1 = s1.length();
+		int l2 = s2.length();
+		if(l1 > l2) {
+			for(int i=0; i<l1; i++) {
+				char c1 = s1.charAt(i);
+				char c2;
+				try {
+					c2 = s2.charAt(i);
+				} catch(IndexOutOfBoundsException ex) {
+					c2 = 0;
+				}
+				if(c1 == c2)
+					continue;
+
+				return c1 > c2;
+			}
+
+			return false;
+		} else if(l1 < l2) {
+			for(int i=0; i<l1; i++) {
+				char c1;
+				try {
+					c1 = s1.charAt(i);
+				} catch(IndexOutOfBoundsException ex) {
+					c1 = 0;
+				}
+				char c2 = s2.charAt(i);
+				if(c1 == c2)
+					continue;
+
+				return c1 > c2;
+			}
+
+			return false;
+		} else {
+			for(int i=0; i<l1; i++) {
+				char c1 = s1.charAt(i);
+				char c2 = s2.charAt(i);
+				if(c1 == c2)
+					continue;
+
+				return c1 > c2;
+			}
+			return false;
+		}
+	}
+
+	public static boolean stringLessThan(java.lang.String s1, java.lang.String s2) {
+		int l1 = s1.length();
+		int l2 = s2.length();
+		if(l1 > l2) {
+			for(int i=0; i<l1; i++) {
+				char c1 = s1.charAt(i);
+				char c2;
+				try {
+					c2 = s2.charAt(i);
+				} catch(IndexOutOfBoundsException ex) {
+					c2 = 0;
+				}
+				if(c1 == c2)
+					continue;
+
+				return c1 < c2;
+			}
+
+			return false;
+		} else if(l1 < l2) {
+			for(int i=0; i<l1; i++) {
+				char c1;
+				try {
+					c1 = s1.charAt(i);
+				} catch(IndexOutOfBoundsException ex) {
+					c1 = 0;
+				}
+				char c2 = s2.charAt(i);
+				if(c1 == c2)
+					continue;
+
+				return c1 < c2;
+			}
+
+			return false;
+		} else {
+			for(int i=0; i<l1; i++) {
+				char c1 = s1.charAt(i);
+				char c2 = s2.charAt(i);
+				if(c1 == c2)
+					continue;
+
+				return c1 < c2;
+			}
+			return false;
+		}
+	}
+	
+	public static boolean stringMoreEqual(java.lang.String s1, java.lang.String s2) {
+		int l1 = s1.length();
+		int l2 = s2.length();
+		if(l1 > l2) {
+			for(int i=0; i<l1; i++) {
+				char c1 = s1.charAt(i);
+				char c2;
+				try {
+					c2 = s2.charAt(i);
+				} catch(IndexOutOfBoundsException ex) {
+					c2 = 0;
+				}
+				if(c1 == c2)
+					continue;
+
+				return c1 >= c2;
+			}
+
+			return true;
+		} else if(l1 < l2) {
+			for(int i=0; i<l1; i++) {
+				char c1;
+				try {
+					c1 = s1.charAt(i);
+				} catch(IndexOutOfBoundsException ex) {
+					c1 = 0;
+				}
+				char c2 = s2.charAt(i);
+				if(c1 == c2)
+					continue;
+
+				return c1 >= c2;
+			}
+
+			return true;
+		} else {
+			for(int i=0; i<l1; i++) {
+				char c1 = s1.charAt(i);
+				char c2 = s2.charAt(i);
+				if(c1 == c2)
+					continue;
+
+				return c1 >= c2;
+			}
+			return true;
+		}
+	}
+
+	public static boolean stringLessEqual(java.lang.String s1, java.lang.String s2) {
+		int l1 = s1.length();
+		int l2 = s2.length();
+		if(l1 > l2) {
+			for(int i=0; i<l1; i++) {
+				char c1 = s1.charAt(i);
+				char c2;
+				try {
+					c2 = s2.charAt(i);
+				} catch(IndexOutOfBoundsException ex) {
+					c2 = 0;
+				}
+				if(c1 == c2)
+					continue;
+
+				return c1 <= c2;
+			}
+
+			return true;
+		} else if(l1 < l2) {
+			for(int i=0; i<l1; i++) {
+				char c1;
+				try {
+					c1 = s1.charAt(i);
+				} catch(IndexOutOfBoundsException ex) {
+					c1 = 0;
+				}
+				char c2 = s2.charAt(i);
+				if(c1 == c2)
+					continue;
+
+				return c1 <= c2;
+			}
+
+			return true;
+		} else {
+			for(int i=0; i<l1; i++) {
+				char c1 = s1.charAt(i);
+				char c2 = s2.charAt(i);
+				if(c1 == c2)
+					continue;
+
+				return c1 <= c2;
+			}
+			return true;
+		}
+	}
+
 	public static class ConversionAccuracy {
 		double accuracy;
 	}
@@ -540,4 +733,5 @@ public class JSHelper {
 			converted[i] = JSHelper.javaToJS(global, array[i]);
 		return converted;
 	}
+	
 }

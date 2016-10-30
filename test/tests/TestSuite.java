@@ -14,10 +14,12 @@ import org.junit.runners.Suite;
  */
 @RunWith(Suite.class)
 @Suite.SuiteClasses({
-	tests.MathOperations.class,
+	MathOperations.class,
+	Comparisons.class,
+	Blocks.class,
 	
-	tests.Array.class,
+	Array.class,
 	
-	tests.Comparisons.class})
+	RedefineGlobal.class})
 public class TestSuite {
 }

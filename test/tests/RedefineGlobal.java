@@ -6,8 +6,7 @@
 package tests;
 
 import java.io.InputStreamReader;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
 import net.nexustools.njs.JSHelper;
 import net.nexustools.njs.compiler.Compiler;
 import net.nexustools.njs.compiler.JavaCompiler;
@@ -21,7 +20,7 @@ import org.junit.Test;
  *
  * @author kate
  */
-public class Array {
+public class RedefineGlobal {
 	
 	Compiler[] compilers;
 	
@@ -39,54 +38,10 @@ public class Array {
 	}
 	
 	@Test
-	public void construct() {
-		test("construct");
-	}
-	
-	@Test
-	public void from() {
-		test("from");
-	}
-	
-	@Test
-	public void of() {
-		test("of");
-	}
-	
-	@Test
-	public void fill() {
-		test("fill");
-	}
-	
-	@Test
-	public void reverse() {
-		test("reverse");
-	}
-	
-	@Test
-	public void sort() {
-		test("sort");
-	}
-	
-	@Test
-	public void push() {
-		test("push");
-	}
-	
-	@Test
-	public void pop() {
-		test("pop");
-	}
-	
-	@Test
-	public void shift() {
-		test("shift");
-	}
-
-	public void test(String name) {
+	public void test() {
 		for(Compiler compiler : compilers) {
 			try {
-				compiler.compile(new InputStreamReader(Array.class.getResourceAsStream("/tests/array/" + name + ".js")), name, false).exec(JSHelper.createExtendedGlobal(), null);
+				compiler.compile(new InputStreamReader(RedefineGlobal.class.getResourceAsStream("/tests/evaltests.js")), "evaltests.js", false).exec(JSHelper.createExtendedGlobal(), null);
 			} catch(java.lang.RuntimeException re) {
 				System.err.println(JSHelper.extractStack(re.toString(), re));
 				throw re;

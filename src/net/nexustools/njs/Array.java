@@ -6,7 +6,10 @@
 package net.nexustools.njs;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import org.apache.commons.math3.util.FastMath;
 
 /**
  *
@@ -18,7 +21,68 @@ public class Array extends AbstractFunction {
 	public Array(final Global global) {
 		super(global);
 		this.global = global;
+		setHidden("from", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				BaseObject target = params[0];
+				int length = global.toNumber(target.get("length")).toInt();
+				if(length < 1)
+					return new GenericArray(global);
+				
+				// TODO: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/from
+				
+				BaseObject[] copy = new BaseObject[length];
+				for(int i=0; i<length; i++)
+					copy[i] = target.get(i);
+				return new GenericArray(global, copy);
+			}
+		});
+		setHidden("isArray", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return params[0] instanceof GenericArray ? global.Boolean.TRUE : global.Boolean.FALSE;
+			}
+		});
+		setHidden("of", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return new GenericArray(global, params);
+			}
+		});
 		GenericObject prototype = prototype();
+		prototype.setHidden("fill", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				int start, end;
+				BaseObject value;
+				switch(params.length) {
+					case 0:
+						start = 0;
+						value = Undefined.INSTANCE;
+						end = global.toNumber(_this.get("length")).toInt();
+						break;
+					case 1:
+						start = 0;
+						value = params[0];
+						end = global.toNumber(_this.get("length")).toInt();
+						break;
+					case 2:
+						value = params[0];
+						start = global.toNumber(params[1]).toInt();
+						end = global.toNumber(_this.get("length")).toInt();
+						break;
+					default:
+						value = params[0];
+						start = global.toNumber(params[1]).toInt();
+						end = global.toNumber(params[2]).toInt();
+						break;
+				}
+				for(; start < end; start++) {
+					_this.set(start, value);
+				}
+				return _this;
+			}
+		});
 		prototype.setHidden("shift", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
@@ -32,6 +96,102 @@ public class Array extends AbstractFunction {
 				}
 				_this.set("length", global.wrap(length-1));
 				return first;
+			}
+		});
+		prototype.setHidden("reverse", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				int length = (int)global.toNumber(_this.get("length")).number;
+				if(length < 2)
+					return _this;
+				
+				int index = length-1;
+				int mid = (int)FastMath.ceil((double)length/2.0);
+				BaseObject[] buffer = new BaseObject[mid];
+				for(int i=0; i<length; i++) {
+					if(i >= mid) {
+						_this.set(i, buffer[index-i]);
+					} else {
+						buffer[i] = _this.get(i);
+						_this.set(i, _this.get(index-i));
+					}
+				}
+				return _this;
+			}
+		});
+		prototype.setHidden("sort", new AbstractFunction(global) {
+			final Comparator<BaseObject> BUILT_IN_COMPARE_FUNCTION = new Comparator<BaseObject>() {
+				
+				public char charAt(java.lang.String str, int pos) {
+					try {
+						return str.charAt(pos);
+					} catch(IndexOutOfBoundsException ex) {
+						return 0;
+					}
+				}
+				
+				@Override
+				public int compare(BaseObject o1, BaseObject o2) {
+					java.lang.String s1 = o1.toString();
+					java.lang.String s2 = o2.toString();
+					
+					int l1 = s1.length();
+					int l2 = s2.length();
+					if(l1 == l2) {
+						for(int i=0; i<l1; i++) {
+							char c1 = s1.charAt(i);
+							char c2 = s2.charAt(i);
+							if(c1 == c2)
+								continue;
+							
+							return c1 > c2 ? 1 : -1;
+						}
+						return 0;
+					} else {
+						int len = java.lang.Math.max(l1, l2);
+						
+						for(int i=0; i<len; i++) {
+							char c1 = charAt(s1, i);
+							char c2 = charAt(s2, i);
+							if(c1 == c2)
+								continue;
+							
+							return c1 > c2 ? 1 : -1;
+						}
+						
+						return 0;
+					}
+				}
+			};
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				final Comparator<BaseObject> comparator;
+				if(params.length > 0) {
+					final BaseFunction compareFunction = (BaseFunction)params[0];
+					comparator = new Comparator<BaseObject>() {
+						@Override
+						public int compare(BaseObject o1, BaseObject o2) {
+							return global.toNumber(compareFunction.call(Undefined.INSTANCE, o1, o2)).toInt();
+						}
+					};
+				} else
+					comparator = BUILT_IN_COMPARE_FUNCTION;
+				
+				if(_this instanceof GenericArray) {
+					GenericArray ga = (GenericArray)_this;
+					Arrays.sort(ga.arrayStorage, 0, ga.length(), comparator);
+				} else {
+					int length = global.toNumber(_this.get("length")).toInt();
+					if(length > 0) {
+						BaseObject[] objects = new BaseObject[length];
+						for(int i=0; i<length; i++)
+							objects[i] = _this.get(i);
+						Arrays.sort(objects, comparator);
+						for(int i=0; i<length; i++)
+							_this.set(i, objects[i]);
+					}
+				}
+				return _this;
 			}
 		});
 		prototype.setHidden("pop", new AbstractFunction(global) {

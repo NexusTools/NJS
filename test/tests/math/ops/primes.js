@@ -16,5 +16,6 @@ while(numbers.length) {
 	});
 }
 
+
 Assert.assertTrue(numbers.length === 0);
 Assert.assertTrue(primes.length === 25);

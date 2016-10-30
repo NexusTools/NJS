@@ -21,7 +21,7 @@ import org.junit.Test;
  *
  * @author kate
  */
-public class Array {
+public class Blocks {
 	
 	Compiler[] compilers;
 	
@@ -39,54 +39,22 @@ public class Array {
 	}
 	
 	@Test
-	public void construct() {
-		test("construct");
+	public void _if() {
+		test("if");
 	}
 	
 	@Test
-	public void from() {
-		test("from");
-	}
-	
-	@Test
-	public void of() {
-		test("of");
-	}
-	
-	@Test
-	public void fill() {
-		test("fill");
-	}
-	
-	@Test
-	public void reverse() {
-		test("reverse");
-	}
-	
-	@Test
-	public void sort() {
-		test("sort");
-	}
-	
-	@Test
-	public void push() {
-		test("push");
-	}
-	
-	@Test
-	public void pop() {
-		test("pop");
-	}
-	
-	@Test
-	public void shift() {
-		test("shift");
+	public void _while() {
+		test("while");
 	}
 
 	public void test(String name) {
 		for(Compiler compiler : compilers) {
 			try {
-				compiler.compile(new InputStreamReader(Array.class.getResourceAsStream("/tests/array/" + name + ".js")), name, false).exec(JSHelper.createExtendedGlobal(), null);
+				compiler.compile(new InputStreamReader(Blocks.class.getResourceAsStream("/tests/blocks/" + name + ".js")), name + ".js", false).exec(JSHelper.createExtendedGlobal(), null);
+			} catch(net.nexustools.njs.Error.ConvertedException re) {
+				re.printStackTrace();
+				throw re;
 			} catch(java.lang.RuntimeException re) {
 				System.err.println(JSHelper.extractStack(re.toString(), re));
 				throw re;

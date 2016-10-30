@@ -7,7 +7,6 @@ package net.nexustools.njs.compiler;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
@@ -48,7 +47,7 @@ import net.nexustools.njs.Global;
  * @author kate
  */
 public class JavaCompiler extends AbstractCompiler {
-	private static final List<java.lang.String> RESTRICTED_NAMES = Arrays.asList(new java.lang.String[]{"Arguments", "CompiledScript", "Debuggable", "Optimized", "String", "Number", "RegEx", "Global", "Scope", "exec", "call", "multiply", "plus", "divide", "or", "BaseObject", "BaseFunction", "AbstractFunction", "GenericObject", "GenericArray", "ConstructableFunction", "JSHelper"});
+	private static final List<java.lang.String> RESTRICTED_NAMES = Arrays.asList(new java.lang.String[]{"if", "do", "while", "for", "switch", "case", "default", "enum", "Arguments", "CompiledScript", "Debuggable", "Optimized", "String", "Number", "RegEx", "Global", "Scope", "exec", "call", "multiply", "plus", "divide", "or", "BaseObject", "BaseFunction", "AbstractFunction", "GenericObject", "GenericArray", "ConstructableFunction", "JSHelper"});
 
 
 	private static final Map<java.lang.String, AtomicInteger> USED_NAMES = new HashMap();
@@ -137,6 +136,94 @@ public class JavaCompiler extends AbstractCompiler {
 		sourceBuilder.append(")");
 	}
 
+	private void generateIfBlockSource(SourceBuilder sourceBuilder, Else els, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName) {
+		while(els != null) {
+			if(els.simpleimpl != null) {
+				if(els instanceof ElseIf) {
+					sourceBuilder.append("else if(");
+					generateBooleanSource(sourceBuilder, els.condition, methodPrefix, baseScope, fileName);
+					sourceBuilder.appendln(")");
+				} else
+					sourceBuilder.appendln("else");
+				sourceBuilder.indent();
+				generateParsedSource(sourceBuilder, els.simpleimpl, methodPrefix, baseScope, fileName);
+				sourceBuilder.unindent();
+			} else{
+				if(els instanceof ElseIf) {
+					sourceBuilder.append("else if(");
+					generateBooleanSource(sourceBuilder, els.condition, methodPrefix, baseScope, fileName);
+					sourceBuilder.appendln(") {");
+				} else
+					sourceBuilder.appendln("else {");
+				sourceBuilder.indent();
+				generateBlockSource(sourceBuilder, els.impl, methodPrefix, baseScope, fileName);
+				sourceBuilder.unindent();
+				sourceBuilder.appendln("}");
+			}
+
+			if(els instanceof ElseIf)
+				els = ((ElseIf)els).el;
+			else
+				break;
+		}
+	}
+
+	private void generateBooleanSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName) {
+		if(part instanceof Boolean) {
+			if(((Boolean)part).value)
+				sourceBuilder.append("true");
+			else
+				sourceBuilder.append("false");
+		} else if(part instanceof Equals) {
+			generateParsedSource(sourceBuilder, ((Equals) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(".equals(");
+			generateParsedSource(sourceBuilder, ((Equals) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(")");
+		} else if(part instanceof NotEquals) {
+			sourceBuilder.append("(!");
+			generateParsedSource(sourceBuilder, ((NotEquals) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(".equals(");
+			generateParsedSource(sourceBuilder, ((NotEquals) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append("))");
+		} else if(part instanceof StrictEquals) {
+			generateParsedSource(sourceBuilder, ((StrictEquals) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(" == ");
+			generateParsedSource(sourceBuilder, ((StrictEquals) part).rhs, methodPrefix, baseScope, fileName);
+		} else if(part instanceof StrictNotEquals) {
+			generateParsedSource(sourceBuilder, ((StrictNotEquals) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(" != ");
+			generateParsedSource(sourceBuilder, ((StrictNotEquals) part).rhs, methodPrefix, baseScope, fileName);
+		} else if(part instanceof MoreThan) {
+			sourceBuilder.append("moreThan(global, ");
+			generateParsedSource(sourceBuilder, ((MoreThan) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(", ");
+			generateParsedSource(sourceBuilder, ((MoreThan) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(")");
+		} else if(part instanceof LessThan) {
+			sourceBuilder.append("lessThan(global, ");
+			generateParsedSource(sourceBuilder, ((LessThan) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(", ");
+			generateParsedSource(sourceBuilder, ((LessThan) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(")");
+		} else if(part instanceof MoreEqual) {
+			sourceBuilder.append("moreEqual(global, ");
+			generateParsedSource(sourceBuilder, ((MoreEqual) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(", ");
+			generateParsedSource(sourceBuilder, ((MoreEqual) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(")");
+		} else if(part instanceof LessEqual) {
+			sourceBuilder.append("lessEqual(global, ");
+			generateParsedSource(sourceBuilder, ((LessEqual) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(", ");
+			generateParsedSource(sourceBuilder, ((LessEqual) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(")");
+		} else {
+			sourceBuilder.append("JSHelper.isTrue(");
+			generateParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(")");
+		}
+	}
+
 	private static class SourceBuilder {
 
 		java.lang.String indent = "";
@@ -160,12 +247,15 @@ public class JavaCompiler extends AbstractCompiler {
 
 		public void indent() {
 			indent += '\t';
-			builder.append('\t');
+			if(Character.isWhitespace(builder.charAt(builder.length() - 1)))
+				builder.append('\t');
 		}
 
 		public void unindent() {
+			int pos = builder.length() - 1;
 			indent = indent.substring(0, indent.length() - 1);
-			builder.deleteCharAt(builder.length() - 1);
+			if(Character.isWhitespace(builder.charAt(pos)))
+				builder.deleteCharAt(pos);
 		}
 
 		@Override
@@ -392,7 +482,7 @@ public class JavaCompiler extends AbstractCompiler {
 		} else if (part instanceof Minus) {
 			Parsed lhs = ((Minus)part).lhs;
 			Parsed rhs = ((Minus)part).rhs;
-			generateMath(sourceBuilder, lhs, rhs, "percent", methodPrefix, baseScope, fileName);
+			generateMath(sourceBuilder, lhs, rhs, "minus", methodPrefix, baseScope, fileName);
 			return;
 		} else if (part instanceof New) {
 			boolean addComma;
@@ -504,18 +594,18 @@ public class JavaCompiler extends AbstractCompiler {
 			sourceBuilder.append(") ? global.Boolean.FALSE : global.Boolean.TRUE)");
 			return;
 		} else if(part instanceof StrictEquals) {
-			sourceBuilder.append("(((BaseObject)");
+			sourceBuilder.append("((");
 			generateParsedSource(sourceBuilder, ((StrictEquals) part).lhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(" == (BaseObject)");
+			sourceBuilder.append(" == ");
 			generateParsedSource(sourceBuilder, ((StrictEquals) part).rhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
 			return;
 		} else if(part instanceof StrictNotEquals) {
-			sourceBuilder.append("(((BaseObject)");
+			sourceBuilder.append("((");
 			generateParsedSource(sourceBuilder, ((StrictNotEquals) part).lhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(" != (BaseObject)");
+			sourceBuilder.append(" == ");
 			generateParsedSource(sourceBuilder, ((StrictNotEquals) part).rhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
+			sourceBuilder.append(") ? global.Boolean.FALSE : global.Boolean.TRUE)");
 			return;
 		} else if(part instanceof ReferenceChain) {
 			java.lang.String first = ((ReferenceChain)part).chain.remove(0);
@@ -531,15 +621,33 @@ public class JavaCompiler extends AbstractCompiler {
 			return;
 		} else if(part instanceof IntegerReference) {
 			int key = ((IntegerReference)part).ref;
+			if(((IntegerReference) part).lhs == null) {
+				sourceBuilder.append("new GenericArray(global, new BaseObject[]{");
+				switch(key){
+					case 0:
+						sourceBuilder.append("global.Zero");
+						break;
+					case 1:
+						sourceBuilder.append("global.One");
+						break;
+					default:
+						sourceBuilder.append("global.wrap(");
+						sourceBuilder.append(java.lang.String.valueOf(key));
+						sourceBuilder.append(")");
+				}
+				sourceBuilder.append("})");
+				return;
+			}
+			
 			generateParsedSource(sourceBuilder, ((IntegerReference) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(".get(");
 			sourceBuilder.append(java.lang.String.valueOf(key));
 			sourceBuilder.append(")");
 			return;
 		} else if(part instanceof Not) {
-			sourceBuilder.append("global.wrap(!JSHelper.isTrue(");
-			generateParsedSource(sourceBuilder, ((Not) part).rhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append("))");
+			sourceBuilder.append("global.wrap(!");
+			generateBooleanSource(sourceBuilder, ((Not) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(")");
 			return;
 		} else if(part instanceof OpenArray) {
 			boolean first = true;
@@ -662,50 +770,45 @@ public class JavaCompiler extends AbstractCompiler {
 			throw new UnsupportedOperationException("Cannot compile try: " + describe(c) + describe(f));
 		} else if(part instanceof If) {
 			if(((If)part).simpleimpl != null) {
-				sourceBuilder.append("if(JSHelper.isTrue(");
-				generateParsedSource(sourceBuilder, ((If)part).condition, methodPrefix, baseScope, fileName);
-				sourceBuilder.appendln("))");
-				sourceBuilder.append("\t");
+				sourceBuilder.append("if(");
+				generateBooleanSource(sourceBuilder, ((If)part).condition, methodPrefix, baseScope, fileName);
+				sourceBuilder.appendln(")");
+				sourceBuilder.indent();
 				generateParsedSource(sourceBuilder, ((If)part).simpleimpl, methodPrefix, baseScope, fileName);
-				
-				Else els = ((If)part).el;
-				while(els != null) {
+				if(((If)part).el != null)
 					sourceBuilder.appendln(";");
-					if(els.simpleimpl != null) {
-						if(els instanceof ElseIf) {
-							sourceBuilder.append("else if(JSHelper.isTrue(");
-							generateParsedSource(sourceBuilder, els.condition, methodPrefix, baseScope, fileName);
-							sourceBuilder.appendln("))");
-						} else
-							sourceBuilder.appendln("else");
-						sourceBuilder.append("\t");
-						generateParsedSource(sourceBuilder, els.simpleimpl, methodPrefix, baseScope, fileName);
-					} else
-						throw new UnsupportedOperationException("Cannot compile if: " + describe(els));
-					
-					if(els instanceof ElseIf)
-						els = ((ElseIf)els).el;
-					else
-						break;
-				}
+				else
+					sourceBuilder.appendln();
+				sourceBuilder.unindent();
+				
+				generateIfBlockSource(sourceBuilder, ((If)part).el, methodPrefix, baseScope, fileName);
 				return;
 			}
 
-			throw new UnsupportedOperationException("Cannot compile if: " + describe(part));
+			sourceBuilder.append("if(");
+			generateBooleanSource(sourceBuilder, ((If)part).condition, methodPrefix, baseScope, fileName);
+			sourceBuilder.appendln(") {");
+			sourceBuilder.indent();
+			generateBlockSource(sourceBuilder, ((If)part).impl, methodPrefix, baseScope, fileName);
+			sourceBuilder.unindent();
+			sourceBuilder.appendln("}");
+
+			generateIfBlockSource(sourceBuilder, ((If)part).el, methodPrefix, baseScope, fileName);
+			return;
 		} else if(part instanceof While) {
 			if(((While)part).simpleimpl != null) {
-				sourceBuilder.append("while(JSHelper.isTrue(");
-				generateParsedSource(sourceBuilder, ((While)part).condition, methodPrefix, baseScope, fileName);
-				sourceBuilder.appendln("))");
+				sourceBuilder.append("while(");
+				generateBooleanSource(sourceBuilder, ((While)part).condition, methodPrefix, baseScope, fileName);
+				sourceBuilder.appendln(")");
 				sourceBuilder.append("\t");
 				generateParsedSource(sourceBuilder, ((While)part).simpleimpl, methodPrefix, baseScope, fileName);
 				return;
 			}
 
 			
-			sourceBuilder.append("while(JSHelper.isTrue(");
-			generateParsedSource(sourceBuilder, ((While)part).condition, methodPrefix, baseScope, fileName);
-			sourceBuilder.appendln(")) {");
+			sourceBuilder.append("while(");
+			generateBooleanSource(sourceBuilder, ((While)part).condition, methodPrefix, baseScope, fileName);
+			sourceBuilder.appendln(") {");
 			sourceBuilder.indent();
 			generateBlockSource(sourceBuilder, ((While)part).impl, methodPrefix, baseScope, fileName);
 			sourceBuilder.unindent();
@@ -727,6 +830,31 @@ public class JavaCompiler extends AbstractCompiler {
 			}
 			
 			sourceBuilder.append("plusPlusLeft(global, ");
+			if(ref instanceof Reference) {
+				sourceBuilder.append("\"");
+				sourceBuilder.append(convertStringSource(((Reference) ref).ref));
+				sourceBuilder.append("\", ");
+				sourceBuilder.append(baseScope);
+			} else
+				throw new UnsupportedOperationException("Cannot compile ++x: " + describe(ref));
+			sourceBuilder.append(")");
+			return;
+		} else if(part instanceof MinusMinus) {
+			Parsed ref = ((MinusMinus)part).ref;
+			if(((MinusMinus)part).right) {
+				sourceBuilder.append("minusMinusRight(global, ");
+				if(ref instanceof Reference) {
+					sourceBuilder.append("\"");
+					sourceBuilder.append(convertStringSource(((Reference) ref).ref));
+					sourceBuilder.append("\", ");
+					sourceBuilder.append(baseScope);
+				} else
+					throw new UnsupportedOperationException("Cannot compile x++: " + describe(ref));
+				sourceBuilder.append(")");
+				return;
+			}
+			
+			sourceBuilder.append("minusMinusLeft(global, ");
 			if(ref instanceof Reference) {
 				sourceBuilder.append("\"");
 				sourceBuilder.append(convertStringSource(((Reference) ref).ref));
@@ -765,6 +893,34 @@ public class JavaCompiler extends AbstractCompiler {
 			}
 
 			throw new UnsupportedOperationException("Cannot compile ++: " + describe(part));
+		} else if(part instanceof MoreThan) {
+			sourceBuilder.append("(moreThan(global, ");
+			generateParsedSource(sourceBuilder, ((MoreThan) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(", ");
+			generateParsedSource(sourceBuilder, ((MoreThan) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
+			return;
+		} else if(part instanceof LessThan) {
+			sourceBuilder.append("(lessThan(global, ");
+			generateParsedSource(sourceBuilder, ((LessThan) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(", ");
+			generateParsedSource(sourceBuilder, ((LessThan) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
+			return;
+		} else if(part instanceof MoreEqual) {
+			sourceBuilder.append("(moreEqual(global, ");
+			generateParsedSource(sourceBuilder, ((MoreEqual) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(", ");
+			generateParsedSource(sourceBuilder, ((MoreEqual) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
+			return;
+		} else if(part instanceof LessEqual) {
+			sourceBuilder.append("(lessEqual(global, ");
+			generateParsedSource(sourceBuilder, ((LessEqual) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(", ");
+			generateParsedSource(sourceBuilder, ((LessEqual) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
+			return;
 		} else if(part instanceof VariableReference) {
 			sourceBuilder.append("JSHelper.get(");
 			generateParsedSource(sourceBuilder, ((VariableReference)part).lhs, methodPrefix, baseScope, fileName);
@@ -823,6 +979,7 @@ public class JavaCompiler extends AbstractCompiler {
 			sourceBuilder.appendln("}");
 			
 			sourceBuilder.appendln("@Override");
+			sourceBuilder.appendln("@SuppressWarnings(\"all\")");
 			sourceBuilder.appendln("public BaseObject call(BaseObject _this, BaseObject... params) {");
 			sourceBuilder.appendln("\tfinal Scope baseScope = extendScope(_this);");
 			if(script.callee != null) {
@@ -856,6 +1013,7 @@ public class JavaCompiler extends AbstractCompiler {
 				methodPrefix = extendMethodChain(methodPrefix, script.methodName);
 		} else {
 			sourceBuilder.appendln("@Override");
+			sourceBuilder.appendln("@SuppressWarnings(\"all\")");
 			sourceBuilder.appendln("public BaseObject exec(Global global, Scope scope) {");
 			sourceBuilder.appendln("\tif(scope == null)");
 			sourceBuilder.appendln("\t\tscope = new Scope(global);");
@@ -924,7 +1082,7 @@ public class JavaCompiler extends AbstractCompiler {
 					sourceBuilder.appendln(";");
 				}
 				if (i == script.impl.length - 1 && !(part instanceof Throw)) {
-					if(!(part instanceof Var))
+					if(!(part instanceof Var) && !(part instanceof If) && !(part instanceof While))
 						sourceBuilder.append("return ");
 					else
 						needReturn = true;
@@ -997,6 +1155,7 @@ public class JavaCompiler extends AbstractCompiler {
 		sourceBuilder.appendln("import net.nexustools.njs.Scope;");
 		sourceBuilder.appendln("import net.nexustools.njs.Null;");
 		sourceBuilder.appendln();
+		sourceBuilder.appendln("@SuppressWarnings(\"all\")");
 		sourceBuilder.append("public final class ");
 		sourceBuilder.append(className);
 		sourceBuilder.append(" extends CompiledScript.");

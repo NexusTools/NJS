@@ -20,6 +20,27 @@ public class Object extends AbstractFunction {
 	public Object() {}
 
 	public void initPrototypeFunctions(final Global global) {
+		setHidden("defineProperty", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				GenericObject target = (GenericObject)params[0];
+				java.lang.String key = params[1].toString();
+				BaseObject config = params[2];
+				
+				ExtendedProperty property = new ExtendedProperty(JSHelper.isTrue(config.get("enumerable")));
+				property.configurable = JSHelper.isTrue(config.get("configurable"));
+				property.getter = (BaseFunction)config.get("get", OR_NULL);
+				property.setter = (BaseFunction)config.get("set", OR_NULL);
+				property.value = config.get("value");
+				target.setProperty(key, property);
+				
+				return Undefined.INSTANCE;
+			}
+			@Override
+			public java.lang.String name() {
+				return "Object_defineProperty";
+			}
+		});
 		setHidden("keys", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {

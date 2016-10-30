@@ -363,6 +363,8 @@ public class Math extends GenericObject {
 				double number = global.toNumber(params[0]).number;
 				if(Double.isNaN(number))
 					return global.NaN;
+				if(number == 0)
+					return global.Zero;
 				if(number < 0)
 					return global.NegativeOne;
 				return global.PositiveOne;

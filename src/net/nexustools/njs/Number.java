@@ -123,7 +123,7 @@ public class Number extends AbstractFunction {
 	@Override
 	public BaseObject construct(BaseObject... params) {
 		if(params.length == 0)
-			return wrap(0);
+			return wrap(0).clone();
 		
 		return from(params[0]).clone();
 	}
@@ -155,6 +155,11 @@ public class Number extends AbstractFunction {
 	}
 	
 	public Instance from(BaseObject param) {
+		if(param == Undefined.INSTANCE)
+			return wrap(Double.NaN);
+		if(param == Null.INSTANCE)
+			return wrap(0);
+		
 		BaseObject valueOf = param.get("valueOf");
 		if(valueOf != null && valueOf instanceof BaseFunction)
 			param = ((BaseFunction)valueOf).call(param);

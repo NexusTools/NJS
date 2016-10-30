@@ -179,12 +179,6 @@ public abstract class AbstractCompiler implements Compiler {
 				return new Call(part, this);
 			else if(part instanceof InstanceOf)
 				return new InstanceOf(this);
-			else if(part instanceof MultiplyEq)
-				return new MultiplyEq(this);
-			else if(part instanceof PlusEq)
-				return new PlusEq(this);
-			else if(part instanceof PlusPlus)
-				return new PlusPlus(this);
 			else if(part instanceof MoreThan)
 				return new MoreThan(this);
 			else if(part instanceof LessThan)
@@ -205,6 +199,8 @@ public abstract class AbstractCompiler implements Compiler {
 				return new Multiply(this);
 			else if(part instanceof Plus)
 				return new Plus(this);
+			else if(part instanceof Minus)
+				return new Minus(this);
 			else if(part instanceof Set)
 				return new Set(this);
 			else if(part instanceof Percent)
@@ -252,7 +248,15 @@ public abstract class AbstractCompiler implements Compiler {
 		public Parsed transformFallback(Parsed part) {
 			if(part instanceof OpenArray)
 				return new VariableReference(this);
-			return super.transformFallback(part); //To change body of generated methods, choose Tools | Templates.
+			else if(part instanceof MultiplyEq)
+				return new MultiplyEq(this);
+			else if(part instanceof PlusEq)
+				return new PlusEq(this);
+			else if(part instanceof PlusPlus)
+				return new PlusPlus(this);
+			else if(part instanceof MinusMinus)
+				return new MinusMinus(this);
+			return super.transformFallback(part);
 		}
 		
 	}
@@ -1460,7 +1464,7 @@ public abstract class AbstractCompiler implements Compiler {
 		public Parsed transform(Parsed part) {
 			if(rhs == null) {
 				if(!part.isStandalone())
-					throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part.toSource());
+					throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + describe(this));
 				rhs = part;
 				return this;
 			}
@@ -1740,6 +1744,68 @@ public abstract class AbstractCompiler implements Compiler {
 			if(right)
 				builder.append(unparsed(ref));
 			builder.append("++");
+			if(!right)
+				builder.append(unparsed(ref));
+			return builder.toString();
+		}
+		
+	}
+	public static class MinusMinus extends Referency implements NumberReferency {
+		Parsed ref;
+		boolean right;
+		public MinusMinus() {}
+		public MinusMinus(Parsed ref) {
+			this.ref = ref;
+			rows = ref.rows;
+			columns = ref.columns;
+			right = true;
+		}
+
+		@Override
+		public Parsed transform(Parsed part) {
+			if(right)
+				return super.transform(part);
+			
+			if(ref == null) {
+				ref = part;
+				return this;
+			} else if(ref.isIncomplete()) {
+				ref = ref.transform(part);
+				return this;
+			}
+			
+			return super.transform(part);
+		}
+
+		@Override
+		public Parsed transformFallback(Parsed part) {
+			if(right)
+				throw new CompleteException(part);
+			if(ref == null)
+				ref = part;
+			else
+				ref = ref.transform(part);
+			return this;
+		}
+
+		@Override
+		public boolean isIncomplete() {
+			return ref == null || ref.isIncomplete();
+		}
+
+		@Override
+		public Parsed finish() {
+			if(!right)
+				ref = ref.finish();
+			return this;
+		}
+		
+		@Override
+		public java.lang.String toSource() {
+			StringBuilder builder = new StringBuilder();
+			if(right)
+				builder.append(unparsed(ref));
+			builder.append("--");
 			if(!right)
 				builder.append(unparsed(ref));
 			return builder.toString();
@@ -2028,7 +2094,9 @@ public abstract class AbstractCompiler implements Compiler {
 	public static final Pattern STRICTEQUALS = Pattern.compile("^===");
 	public static final Pattern NOTSTRICTEQUALS = Pattern.compile("^!==");
 	public static final Pattern PLUSPLUS = Pattern.compile("^\\+\\+");
+	public static final Pattern MINUSMINUS = Pattern.compile("^\\-\\-");
 	public static final Pattern MULTIPLY = Pattern.compile("^\\*");
+	public static final Pattern MINUS = Pattern.compile("^\\-");
 	public static final Pattern MORETHAN = Pattern.compile("^\\>");
 	public static final Pattern LESSTHAN = Pattern.compile("^\\<");
 	public static final Pattern MOREEQUAL = Pattern.compile("^\\>=");
@@ -2320,7 +2388,7 @@ public abstract class AbstractCompiler implements Compiler {
 	}
 	public static class ScriptParser extends RegexParser {
 		public ScriptParser() {
-			super(NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, AND, OR, PERCENT, SET, PLUSPLUS, PLUSEQ, MULTIPLYEQ, PLUS, MULTIPLY, SEMICOLON, NEWLINE, NUMBER, VARIABLE, VARIABLEGET, SINGLELINE_COMMENT, MULTILINE_COMMENT, WHITESPACE, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, REGEX);
+			super(NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, NUMBER, VARIABLE, VARIABLEGET, SINGLELINE_COMMENT, MULTILINE_COMMENT, WHITESPACE, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, REGEX);
 		}
 		@Override
 		public void match(Pattern pattern, Matcher matcher, ParserReader reader) {
@@ -2408,6 +2476,8 @@ public abstract class AbstractCompiler implements Compiler {
 				throw new PartExchange(new Not(), matcher.group().length());
 			if(pattern == PLUS)
 				throw new PartExchange(new Plus(), matcher.group().length());
+			if(pattern == MINUS)
+				throw new PartExchange(new Minus(), matcher.group().length());
 			if(pattern == MULTIPLY)
 				throw new PartExchange(new Multiply(), matcher.group().length());
 			if(pattern == EQUALS)
@@ -2425,6 +2495,8 @@ public abstract class AbstractCompiler implements Compiler {
 				throw new PartExchange(new MultiplyEq(), matcher.group().length());
 			if(pattern == PLUSPLUS)
 				throw new PartExchange(new PlusPlus(), matcher.group().length());
+			if(pattern == MINUSMINUS)
+				throw new PartExchange(new MinusMinus(), matcher.group().length());
 			
 			if(pattern == MORETHAN)
 				throw new PartExchange(new MoreThan(), matcher.group().length());
