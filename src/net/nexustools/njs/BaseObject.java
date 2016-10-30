@@ -39,6 +39,14 @@ public interface BaseObject extends Scopeable {
 	public boolean isSealed();
 	public void seal();
 	
+	public byte toByte();
+	public short toShort();
+	public int toInt();
+	public long toLong();
+	public Number.Instance toNumber();
+	public double toDouble();
+	public float toFloat();
+	
 	public Set<Symbol.Instance> ownSymbols();
 	public void set(Symbol.Instance symbol, BaseObject val);
 	public BaseObject get(Symbol.Instance symbol);

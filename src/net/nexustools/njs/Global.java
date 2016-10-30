@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import net.nexustools.njs.compiler.Compiler;
-import net.nexustools.njs.compiler.JavaCompiler;
+import net.nexustools.njs.compiler.JavaTranspiler;
 import net.nexustools.njs.compiler.NullCompiler;
 import net.nexustools.njs.compiler.RuntimeCompiler;
 
@@ -22,7 +22,7 @@ public class Global extends UniqueObject {
 	private static boolean SHOW_UNAVAILABLE_MESSAGE = true;
 	public static Compiler createCompiler() {
 		try {
-			return new JavaCompiler();
+			return new JavaTranspiler();
 		} catch(Throwable t) {
 			try {
 				RuntimeCompiler compiler = new RuntimeCompiler();
@@ -54,12 +54,9 @@ public class Global extends UniqueObject {
 	public final Array Array;
 	
 	public final Number.Instance NaN;
-	public final Number.Instance PositiveInfinity;
-	public final Number.Instance NegativeInfinity;
-	public final Number.Instance NegativeOne;
 	public final Number.Instance PositiveOne;
+	public final Number.Instance NegativeOne;
 	public final Number.Instance Zero;
-	
 	public Global() {
 		this(createCompiler());
 	}
@@ -67,10 +64,18 @@ public class Global extends UniqueObject {
 	public Global(Compiler compiler) {
 		this.compiler = compiler;
 		
-		Object.initPrototype(Object);
-		Function.initPrototype(Object);
-		String.initPrototype(Object);
-		Number.initPrototype(Object);
+		Object.initPrototype(Object, null);
+		Number.initPrototype(Object, null);
+		Number.initConstants();
+		Function.initPrototype(Object, Number.NaN);
+		String.initPrototype(Object, Number.NaN);
+		
+		NaN = Number.NaN;
+		PositiveOne = Number.PositiveOne;
+		NegativeOne = Number.NegativeOne;
+		Zero = Number.Zero;
+		
+		Object.setupNaN(Number.NaN);
 		
 		Object.setHidden("__proto__", Function.prototype());
 		Function.setHidden("__proto__", Function.prototype());
@@ -87,30 +92,19 @@ public class Global extends UniqueObject {
 		Error = new Error(this);
 		Array = new Array(this);
 		
-		Zero = Number.wrap(0);
-		PositiveOne = Number.wrap(1);
-		NegativeOne = Number.wrap(-1);
-		NaN = Number.wrap(Double.NaN);
-		PositiveInfinity = Number.wrap(Double.POSITIVE_INFINITY);
-		NegativeInfinity = Number.wrap(Double.NEGATIVE_INFINITY);
-		PositiveInfinity.seal();
-		NegativeInfinity.seal();
-		PositiveOne.seal();
-		NegativeOne.seal();
-		Zero.seal();
-		NaN.seal();
+		
 	}
 	
 	public void initStandards() {
 		setHidden("constructor", Object);
 		setHidden("__proto__", Object.prototype());
 		
-		setHidden("NaN", NaN);
-		setHidden("Infinity", PositiveInfinity);
+		setHidden("NaN", Number.NaN);
+		setHidden("Infinity", Number.PositiveInfinity);
 		setHidden("isNaN", new AbstractFunction(this) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				return Double.isNaN(Number.from(params[0]).number) ? Boolean.TRUE : Boolean.FALSE;
+				return Double.isNaN(params[0].toDouble()) ? Boolean.TRUE : Boolean.FALSE;
 			}
 		});
 		setHidden("Function", Function);
@@ -182,18 +176,6 @@ public class Global extends UniqueObject {
 			WRAPS.add(new WeakReference(wrapper));
 			return wrapper;
 		}
-	}
-
-	public Number.Instance toNumber(BaseObject param) {
-		return Number.from(param);
-	}
-	
-	public int toArrayRange(BaseObject param) {
-		Number.Instance number = Number.from(param);
-		double newLength = ((Number.Instance)number).number;
-		if(newLength < 0 || newLength > Integer.MAX_VALUE || (int)newLength != newLength)
-			throw new Error.JavaException("RangeError", "Invalid array length");
-		return ((Number.Instance)number).toInt();
 	}
 	
 	public BaseObject javaToJS(java.lang.Object javaObject) {

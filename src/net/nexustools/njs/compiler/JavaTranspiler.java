@@ -46,7 +46,7 @@ import net.nexustools.njs.Global;
  *
  * @author kate
  */
-public class JavaCompiler extends AbstractCompiler {
+public class JavaTranspiler extends AbstractCompiler {
 	private static final List<java.lang.String> RESTRICTED_NAMES = Arrays.asList(new java.lang.String[]{"try", "catch", "finally", "if", "do", "while", "for", "switch", "case", "default", "enum", "Arguments", "CompiledScript", "Debuggable", "Optimized", "String", "Number", "RegEx", "Global", "Scope", "exec", "call", "multiply", "plus", "divide", "or", "BaseObject", "BaseFunction", "AbstractFunction", "GenericObject", "GenericArray", "ConstructableFunction", "JSHelper"});
 
 
@@ -97,9 +97,36 @@ public class JavaCompiler extends AbstractCompiler {
 		else
 			return "<anonymous>";
 	}
+	
+	private void generateStringSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName) {
+		if(part instanceof String) {
+			sourceBuilder.append("\"");
+			sourceBuilder.append(convertStringSource(((String)part).string));
+			sourceBuilder.append("\"");
+		} else if(part instanceof Plus && ((Plus)part).isStringReferenceChain()) {
+			generateStringSource(sourceBuilder, ((Plus)part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(" + ");
+			generateStringSource(sourceBuilder, ((Plus)part).rhs, methodPrefix, baseScope, fileName);
+		} else
+			generateParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName);
+	}
 
 	private void generateMath(SourceBuilder sourceBuilder, Parsed lhs, Parsed rhs, java.lang.String op, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName) {
-		if(lhs instanceof NumberReferency) {
+		if((lhs instanceof StringReferency && !isNumber(lhs)) || (rhs instanceof StringReferency && !isNumber(rhs)) && op.equals("plus")) {
+			sourceBuilder.append("global.wrap(");
+			generateStringSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(" + ");
+			generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(")");
+			return;
+		} else if(((lhs instanceof Plus && ((Plus)lhs).isStringReferenceChain()) || (rhs instanceof Plus && ((Plus)rhs).isStringReferenceChain())) && op.equals("plus")) {
+			sourceBuilder.append("global.wrap(");
+			generateStringSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(" + ");
+			generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(")");
+			return;
+		} else if(lhs instanceof NumberReferency) {
 			generateParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(".");
 			sourceBuilder.append(op);
@@ -108,24 +135,13 @@ public class JavaCompiler extends AbstractCompiler {
 			if(rhs instanceof NumberReferency)
 				generateParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
 			else {
-				sourceBuilder.append("global.Number.from(JSHelper.valueOf(");
+				sourceBuilder.append("global.Number.fromValueOf(");
 				generateParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
-				sourceBuilder.append("))");
+				sourceBuilder.append(")");
 			}
 
 			sourceBuilder.append(")");
 			return;
-		} else if(lhs instanceof StringReferency && op.equals("plus")) {
-			if(lhs instanceof String) {
-				sourceBuilder.append("global.wrap(\"");
-				sourceBuilder.append(convertStringSource(((String)lhs).string));
-				sourceBuilder.append("\" + ");
-				generateParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
-				sourceBuilder.append(")");
-				return;
-			}
-			
-			throw new RuntimeException("Cannot compile math: " + describe(lhs));
 		}
 		
 		sourceBuilder.append(op);
@@ -200,8 +216,9 @@ public class JavaCompiler extends AbstractCompiler {
 			generateParsedSource(sourceBuilder, ((NotEquals) part).rhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append("))");
 		} else if(part instanceof StrictEquals) {
+			sourceBuilder.append("(BaseObject)");
 			generateParsedSource(sourceBuilder, ((StrictEquals) part).lhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(" == ");
+			sourceBuilder.append(" == (BaseObject)");
 			generateParsedSource(sourceBuilder, ((StrictEquals) part).rhs, methodPrefix, baseScope, fileName);
 		} else if(part instanceof StrictNotEquals) {
 			generateParsedSource(sourceBuilder, ((StrictNotEquals) part).lhs, methodPrefix, baseScope, fileName);
@@ -236,6 +253,29 @@ public class JavaCompiler extends AbstractCompiler {
 			generateParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(")");
 		}
+	}
+
+	private void generateStringNumberIndex(SourceBuilder sourceBuilder, java.lang.String ref) {
+		try {
+			if(ref.endsWith(".0"))
+				ref = ref.substring(0, ref.length()-2);
+			if(java.lang.Integer.valueOf(ref) < 0)
+				throw new NumberFormatException();
+			sourceBuilder.append(ref);
+		} catch(NumberFormatException ex) {
+			sourceBuilder.append("\"");
+			sourceBuilder.append(convertStringSource(ref));
+			sourceBuilder.append("\"");
+		}
+	}
+
+	private boolean isNumber(Parsed lhs) {
+		if(lhs instanceof String)
+			try {
+				Double.valueOf(((String)lhs).string);
+				return true;
+			} catch(NumberFormatException ex) {}
+		return lhs instanceof Number || lhs instanceof Integer;
 	}
 
 	private static class SourceBuilder {
@@ -288,7 +328,7 @@ public class JavaCompiler extends AbstractCompiler {
 		if (JAVA_COMPILER == null)
 			throw new RuntimeException("Could not get Java compiler. Please, ensure that JDK is used instead of JRE.");
 		STANDARD_FILE_MANAGER = JAVA_COMPILER.getStandardFileManager(null, null, null);
-		assert ((new JavaCompiler().compile("(function munchkin(){\n\tfunction yellow(){\n\t\treturn 55;\n\t}\n\treturn yellow()\n\t})()", "JavaCompilerStaticTest", false)).exec(new Global(), null).toString().equals("55"));
+		assert ((new JavaTranspiler().compile("(function munchkin(){\n\tfunction yellow(){\n\t\treturn 55;\n\t}\n\treturn yellow()\n\t})()", "JavaCompilerStaticTest", false)).exec(new Global(), null).toString().equals("55"));
 	}
 
 	private static enum SourceState {
@@ -297,10 +337,10 @@ public class JavaCompiler extends AbstractCompiler {
 		Function
 	}
 	public final boolean addDebugging;
-	public JavaCompiler() {
+	public JavaTranspiler() {
 		this(true);
 	}
-	public JavaCompiler(boolean addDebugging) {
+	public JavaTranspiler(boolean addDebugging) {
 		this.addDebugging = addDebugging;
 	}
 	
@@ -433,9 +473,18 @@ public class JavaCompiler extends AbstractCompiler {
 			return;
 			
 		} else if (part instanceof Number) {
-			sourceBuilder.append("global.wrap(");
-			sourceBuilder.append(java.lang.String.valueOf(((Number) part).value));
-			sourceBuilder.append(")");
+			double value = ((Number) part).value;
+			if(value == 0)
+				sourceBuilder.append("global.Zero");
+			else if(value == 1)
+				sourceBuilder.append("global.PositiveOne");
+			else if(value == -1)
+				sourceBuilder.append("global.NegativeOne");
+			else {
+				sourceBuilder.append("global.wrap(");
+				sourceBuilder.append(java.lang.String.valueOf(value));
+				sourceBuilder.append(")");
+			}
 			return;
 		} else if (part instanceof Integer) {
 			int value = ((Integer) part).value;
@@ -529,9 +578,9 @@ public class JavaCompiler extends AbstractCompiler {
 		} else if(part instanceof RightReference) {
 			generateParsedSource(sourceBuilder, ((RightReference) part).ref, methodPrefix, baseScope, fileName);
 			for(java.lang.String key : ((RightReference)part).chain) {
-				sourceBuilder.append(".get(\"");
-				sourceBuilder.append(convertStringSource(key));
-				sourceBuilder.append("\")");
+				sourceBuilder.append(".get(");
+				generateStringNumberIndex(sourceBuilder, key);
+				sourceBuilder.append(")");
 			}
 			return;
 		} else if(part instanceof Throw) {
@@ -613,16 +662,16 @@ public class JavaCompiler extends AbstractCompiler {
 			sourceBuilder.append(") ? global.Boolean.FALSE : global.Boolean.TRUE)");
 			return;
 		} else if(part instanceof StrictEquals) {
-			sourceBuilder.append("((");
+			sourceBuilder.append("(((BaseObject)");
 			generateParsedSource(sourceBuilder, ((StrictEquals) part).lhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(" == ");
+			sourceBuilder.append(" == (BaseObject)");
 			generateParsedSource(sourceBuilder, ((StrictEquals) part).rhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
 			return;
 		} else if(part instanceof StrictNotEquals) {
-			sourceBuilder.append("((");
+			sourceBuilder.append("(((BaseObject)");
 			generateParsedSource(sourceBuilder, ((StrictNotEquals) part).lhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(" == ");
+			sourceBuilder.append(" == (BaseObject)");
 			generateParsedSource(sourceBuilder, ((StrictNotEquals) part).rhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(") ? global.Boolean.FALSE : global.Boolean.TRUE)");
 			return;
@@ -633,9 +682,9 @@ public class JavaCompiler extends AbstractCompiler {
 			sourceBuilder.append(convertStringSource(first));
 			sourceBuilder.append("\")");
 			for(java.lang.String ref : ((ReferenceChain)part).chain) {
-				sourceBuilder.append(".get(\"");
-				sourceBuilder.append(convertStringSource(ref));
-				sourceBuilder.append("\")");
+				sourceBuilder.append(".get(");
+				generateStringNumberIndex(sourceBuilder, ref);
+				sourceBuilder.append(")");
 			}
 			return;
 		} else if(part instanceof IntegerReference) {
@@ -721,9 +770,9 @@ public class JavaCompiler extends AbstractCompiler {
 					sourceBuilder.append(convertStringSource(first));
 					sourceBuilder.append("\")");
 					for(java.lang.String k : chain) {
-						sourceBuilder.append(".get(\"");
-						sourceBuilder.append(convertStringSource(k));
-						sourceBuilder.append("\")");
+						sourceBuilder.append(".get(");
+						generateStringNumberIndex(sourceBuilder, k);
+						sourceBuilder.append(")");
 					}
 					sourceBuilder.append(", \"");
 					sourceBuilder.append(convertStringSource(key));
@@ -1610,7 +1659,7 @@ public class JavaCompiler extends AbstractCompiler {
 			return;
 		}
 		
-		JavaCompiler compiler = new JavaCompiler(addDebugging);
+		JavaTranspiler compiler = new JavaTranspiler(addDebugging);
 		
 		final java.lang.String className;
 		final java.lang.String baseName;

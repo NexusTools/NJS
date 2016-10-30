@@ -204,4 +204,49 @@ public final class Null implements BaseObject {
 	public boolean hasProperty(java.lang.String name, BaseObject _this) {
 		throw new Error.JavaException("TypeError", "Cannot read property \"" + name + "\" from null");
 	}
+
+	@Override
+	public byte toByte() {
+		return 0;
+	}
+
+	@Override
+	public short toShort() {
+		return 0;
+	}
+
+	@Override
+	public int toInt() {
+		return 0;
+	}
+
+	@Override
+	public long toLong() {
+		return 0;
+	}
+
+	@Override
+	public Number.Instance toNumber() {
+		return null;
+	}
+
+	@Override
+	public double toDouble() {
+		return 0;
+	}
+
+	@Override
+	public float toFloat() {
+		return 0;
+	}
+
+	@Override
+	public boolean equals(java.lang.Object obj) {
+		if(this == obj)
+			return true;
+		
+		return obj == Undefined.INSTANCE;
+	}
+	
+	
 }

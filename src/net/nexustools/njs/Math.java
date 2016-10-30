@@ -23,7 +23,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.abs(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.abs(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -35,7 +35,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.acos(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.acos(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -47,7 +47,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				double a = global.toNumber(params[0]).number;
+				double a = params[0].toDouble();
 				return global.wrap(FastMath.log(a + java.lang.Math.sqrt(a * a - 1)));
 			}
 			@Override
@@ -60,7 +60,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.asin(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.asin(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -72,7 +72,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.asinh(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.asinh(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -84,7 +84,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.atan(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.atan(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -96,7 +96,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.atanh(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.atanh(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -108,7 +108,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length < 2)
 					return global.NaN;
-				return global.wrap(FastMath.atan2(global.toNumber(params[0]).number, global.toNumber(params[1]).number));
+				return global.wrap(FastMath.atan2(params[0].toDouble(), params[1].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -120,7 +120,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.cbrt(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.cbrt(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -132,7 +132,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.ceil(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.ceil(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -144,7 +144,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.clz32(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.clz32(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -156,7 +156,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.cos(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.cos(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -168,7 +168,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.cosh(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.cosh(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -180,7 +180,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.exp(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.exp(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -192,7 +192,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.expm1(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.expm1(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -204,7 +204,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.floor(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.floor(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -216,7 +216,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.fround(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.fround(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -228,7 +228,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length < 2)
 					return global.NaN;
-				return global.wrap(FastMath.hypot(global.toNumber(params[0]).number, global.toNumber(params[1]).number));
+				return global.wrap(FastMath.hypot(params[0].toDouble(), global.toNumber(params[1]).number));
 			}
 			@Override
 			public java.lang.String name() {
@@ -240,7 +240,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.imul(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.imul(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -252,7 +252,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.log(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.log(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -264,7 +264,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.log1p(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.log1p(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -276,7 +276,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.log10(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.log10(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -288,7 +288,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.log2(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.log2(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -302,7 +302,7 @@ public class Math extends GenericObject {
 					return global.NaN;
 				double max = Double.NEGATIVE_INFINITY;
 				for(BaseObject param : params) {
-					double value = global.toNumber(param).number;
+					double value = param.toDouble();
 					if(value > max)
 						max = value;
 				}
@@ -320,7 +320,7 @@ public class Math extends GenericObject {
 					return global.NaN;
 				double max = Double.POSITIVE_INFINITY;
 				for(BaseObject param : params) {
-					double value = global.toNumber(param).number;
+					double value = param.toDouble();
 					if(value < max)
 						max = value;
 				}
@@ -336,7 +336,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length < 2)
 					return global.NaN;
-				return global.wrap(FastMath.pow(global.toNumber(params[0]).number, global.toNumber(params[1]).number));
+				return global.wrap(FastMath.pow(params[0].toDouble(), params[1].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -348,7 +348,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.round(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.round(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -360,7 +360,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				double number = global.toNumber(params[0]).number;
+				double number = params[0].toDouble();
 				if(Double.isNaN(number))
 					return global.NaN;
 				if(number == 0)
@@ -379,7 +379,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.sin(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.sin(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -391,7 +391,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.sinh(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.sinh(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -403,7 +403,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.sqrt(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.sqrt(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -415,7 +415,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.tan(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.tan(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -427,7 +427,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.tanh(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.tanh(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -449,7 +449,7 @@ public class Math extends GenericObject {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length == 0)
 					return global.NaN;
-				return global.wrap(FastMath.trunc(global.toNumber(params[0]).number));
+				return global.wrap(FastMath.trunc(params[0].toDouble()));
 			}
 			@Override
 			public java.lang.String name() {

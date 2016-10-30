@@ -14,8 +14,8 @@ public abstract class ConstructableFunction extends AbstractFunction {
 	public ConstructableFunction(Global global) {
 		super(global);
 	}
-	public ConstructableFunction(String String, Object Object, Function Function) {
-		super(String, Object, Function);
+	public ConstructableFunction(String String, Object Object, Function Function, Number.Instance NaN) {
+		super(String, Object, Function, NaN);
 	}
 
 	@Override

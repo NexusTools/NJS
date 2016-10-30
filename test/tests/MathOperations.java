@@ -8,7 +8,7 @@ package tests;
 import java.io.InputStreamReader;
 import net.nexustools.njs.JSHelper;
 import net.nexustools.njs.compiler.Compiler;
-import net.nexustools.njs.compiler.JavaCompiler;
+import net.nexustools.njs.compiler.JavaTranspiler;
 import net.nexustools.njs.compiler.RuntimeCompiler;
 
 import org.junit.After;
@@ -26,7 +26,7 @@ public class MathOperations {
 	@Before
 	public void setUp() {
 		compilers = new Compiler[]{
-			new JavaCompiler(),
+			new JavaTranspiler(),
 			new RuntimeCompiler()
 		};
 	}

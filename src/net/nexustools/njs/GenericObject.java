@@ -15,7 +15,7 @@ import java.util.Set;
  *
  * @author kate
  */
-public class GenericObject implements BaseObject {
+public class GenericObject extends NumberObject {
 
 	public static interface ArrayOverride {
 		public BaseObject get(int i, BaseObject _this, Or<BaseObject> or);
@@ -171,15 +171,32 @@ public class GenericObject implements BaseObject {
 	protected final Map<java.lang.String, Property> properties = new HashMap();
 	
 	public GenericObject(Global global) {
-		this(global.Object);
+		this(global.Object, global.Number.NaN);
 	}
-	public GenericObject(Object Object) {
-		this(Object.prototype(), Object);
+	public GenericObject(Global global, Number.Instance number) {
+		this(global.Object, number);
+	}
+	public GenericObject(Object Object, Number.Instance number) {
+		this(Object.prototype(), Object, number);
+	}
+	public GenericObject(Object Object, Number Number) {
+		this(Object.prototype(), Object, Number);
 	}
 	public GenericObject(BaseObject __proto__, BaseFunction constructor) {
+		super((Number)null);
 		init(__proto__, constructor);
 	}
-	protected GenericObject() {}
+	public GenericObject(BaseObject __proto__, BaseFunction constructor, Number.Instance number) {
+		super(number);
+		init(__proto__, constructor);
+	}
+	public GenericObject(BaseObject __proto__, BaseFunction constructor, Number Number) {
+		super(Number);
+		init(__proto__, constructor);
+	}
+	protected GenericObject() {
+		super((Number)null);
+	}
 	
 	protected void init(Global global) {
 		init(global.Object);
@@ -267,22 +284,6 @@ public class GenericObject implements BaseObject {
 
 	@Override
 	public final void set(java.lang.String key, BaseObject val, BaseObject _this, Or<Void> or) {
-		assert(val != null);
-		
-		if(hasArrayOverride) {
-			while(true) {
-				int i;
-				try {
-					i = JSHelper.toArrayIndex(key);
-				} catch(NumberFormatException ex) {
-					break;
-				}
-				arrayOverride.set(i, val, _this);
-				return;
-			}
-		}
-		
-		assert(key != null);
 		Iterator<Map.Entry<java.lang.String, Property>> it = properties.entrySet().iterator();
 		while(it.hasNext()) {
 			Map.Entry<java.lang.String, Property> entry = it.next();
@@ -349,17 +350,6 @@ public class GenericObject implements BaseObject {
 
 	@Override
 	public final BaseObject get(java.lang.String key, BaseObject _this, Or<BaseObject> or) {
-		if(hasArrayOverride)
-			while(true) {
-				int i;
-				try {
-					i = JSHelper.toArrayIndex(key);
-				} catch(NumberFormatException ex) {
-					break;
-				}
-				return arrayOverride.get(i, _this, or);
-			}
-		
 		if(key.equals("__proto__")) {
 			Iterator<Map.Entry<java.lang.String, Property>> it = properties.entrySet().iterator();
 			while(it.hasNext()) {
@@ -440,17 +430,6 @@ public class GenericObject implements BaseObject {
 	
 	@Override
 	public final boolean delete(java.lang.String key, Or<java.lang.Boolean> or) {
-		if(hasArrayOverride)
-			while(true) {
-				int i;
-				try {
-					i = JSHelper.toArrayIndex(key);
-				} catch(NumberFormatException ex) {
-					break;
-				}
-				return arrayOverride.delete(i, this, or);
-			}
-		
 		Iterator<Map.Entry<java.lang.String, Property>> it = properties.entrySet().iterator();
 		while(it.hasNext()) {
 			Map.Entry<java.lang.String, Property> entry = it.next();
@@ -471,17 +450,6 @@ public class GenericObject implements BaseObject {
 	}
 	
 	public final BaseObject getDirectly(java.lang.String key, Or<BaseObject> or) {
-		if(hasArrayOverride)
-			while(true) {
-				int i;
-				try {
-					i = JSHelper.toArrayIndex(key);
-				} catch(NumberFormatException ex) {
-					break;
-				}
-				return arrayOverride.get(i, this, or);
-			}
-		
 		return properties.get(key).get(this);
 	}
 	
@@ -643,21 +611,11 @@ public class GenericObject implements BaseObject {
 	
 	@Override
 	public boolean hasProperty(java.lang.String name, BaseObject _this) {
-		if(hasArrayOverride)
-			try {
-				if(arrayOverride.has(JSHelper.toArrayIndex(name), _this))
-					return true;
-			} catch(NumberFormatException ex) {}
 		return properties.containsKey(name);
 	}
 	
 	@Override
 	public boolean hasProperty(java.lang.String name) {
-		if(hasArrayOverride)
-			try {
-				if(arrayOverride.has(JSHelper.toArrayIndex(name), this))
-					return true;
-			} catch(NumberFormatException ex) {}
 		return properties.containsKey(name);
 	}
 

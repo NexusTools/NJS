@@ -25,7 +25,7 @@ public class Array extends AbstractFunction {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				BaseObject target = params[0];
-				int length = global.toNumber(target.get("length")).toInt();
+				int length = target.get("length").toInt();
 				if(length < 1)
 					return new GenericArray(global);
 				
@@ -59,22 +59,22 @@ public class Array extends AbstractFunction {
 					case 0:
 						start = 0;
 						value = Undefined.INSTANCE;
-						end = global.toNumber(_this.get("length")).toInt();
+						end = _this.get("length").toInt();
 						break;
 					case 1:
 						start = 0;
 						value = params[0];
-						end = global.toNumber(_this.get("length")).toInt();
+						end = _this.get("length").toInt();
 						break;
 					case 2:
 						value = params[0];
-						start = global.toNumber(params[1]).toInt();
-						end = global.toNumber(_this.get("length")).toInt();
+						start = params[1].toInt();
+						end = _this.get("length").toInt();
 						break;
 					default:
 						value = params[0];
-						start = global.toNumber(params[1]).toInt();
-						end = global.toNumber(params[2]).toInt();
+						start = params[1].toInt();
+						end = params[2].toInt();
 						break;
 				}
 				for(; start < end; start++) {
@@ -86,7 +86,7 @@ public class Array extends AbstractFunction {
 		prototype.setHidden("shift", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				int length = (int)global.toNumber(_this.get("length")).number;
+				int length = _this.get("length").toInt();
 				if(length < 1)
 					return Undefined.INSTANCE;
 				
@@ -101,7 +101,7 @@ public class Array extends AbstractFunction {
 		prototype.setHidden("reverse", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				int length = (int)global.toNumber(_this.get("length")).number;
+				int length = _this.get("length").toInt();
 				if(length < 2)
 					return _this;
 				
@@ -171,7 +171,7 @@ public class Array extends AbstractFunction {
 					comparator = new Comparator<BaseObject>() {
 						@Override
 						public int compare(BaseObject o1, BaseObject o2) {
-							return global.toNumber(compareFunction.call(Undefined.INSTANCE, o1, o2)).toInt();
+							return compareFunction.call(Undefined.INSTANCE, o1, o2).toInt();
 						}
 					};
 				} else
@@ -181,7 +181,7 @@ public class Array extends AbstractFunction {
 					GenericArray ga = (GenericArray)_this;
 					Arrays.sort(ga.arrayStorage, 0, ga.length(), comparator);
 				} else {
-					int length = global.toNumber(_this.get("length")).toInt();
+					int length = _this.get("length").toInt();
 					if(length > 0) {
 						BaseObject[] objects = new BaseObject[length];
 						for(int i=0; i<length; i++)
@@ -197,7 +197,7 @@ public class Array extends AbstractFunction {
 		prototype.setHidden("pop", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				int length = (int)global.toNumber(_this.get("length")).number;
+				int length = _this.get("length").toInt();
 				if(length < 1)
 					return Undefined.INSTANCE;
 				
@@ -211,7 +211,7 @@ public class Array extends AbstractFunction {
 		prototype.setHidden("filter", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				int length = global.toNumber(_this.get("length")).toInt();
+				int length = _this.get("length").toInt();
 				if(length < 1)
 					return new GenericArray(global);
 				
@@ -228,15 +228,15 @@ public class Array extends AbstractFunction {
 		prototype.setHidden("push", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				_this.set(global.toNumber(_this.get("length")).toInt(), params[0]);
-				return global.toNumber(_this.get("length"));
+				_this.set(_this.get("length").toInt(), params[0]);
+				return _this.get("length");
 			}
 		});
 		prototype.setHidden("forEach", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				BaseFunction it = (BaseFunction)params[0];
-				for(int i=0; i<global.toNumber(_this.get("length")).number; i++) {
+				for(int i=0; i<_this.get("length").toInt(); i++) {
 					it.call(Undefined.INSTANCE, _this.get(i));
 				}
 				return Undefined.INSTANCE;
@@ -246,7 +246,7 @@ public class Array extends AbstractFunction {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				StringBuilder builder = new StringBuilder();
-				for(int i=0; i<global.toNumber(_this.get("length")).toInt(); i++) {
+				for(int i=0; i<_this.get("length").toInt(); i++) {
 					if(i > 0)
 						builder.append(',');
 					BaseObject value = _this.get(i, OR_NULL);
@@ -262,7 +262,7 @@ public class Array extends AbstractFunction {
 	public BaseObject construct(BaseObject... params) {
 		if(params.length > 1)
 			return new GenericArray(global, this, params);
-		return new GenericArray(global, this, params.length > 0 ? global.toArrayRange(params[0]) : 0);
+		return new GenericArray(global, this, params.length > 0 ? params[0].toInt() : 0);
 	}
 
 	@Override

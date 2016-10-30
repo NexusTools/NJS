@@ -17,20 +17,17 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 		super(__proto__, constructor);
 		this.arrayStorage = storage;
 		this.actualLength = storageSize();
-		final Number Number = global.Number;
+		final Number Number0 = global.Number;
 		defineProperty("length", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				return Number.wrap(actualLength);
+				return Number0.wrap(actualLength);
 			}
 		}, new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				Number.Instance number = Number.from(params[0]);
-				if(!(number instanceof Number.Instance))
-					throw new Error.JavaException("RangeError", "Invalid array length");
-				double newLength = ((Number.Instance)number).number;
-				if(newLength < 0 || newLength > Integer.MAX_VALUE || (int)newLength != newLength)
+				double newLength = params[0].toInt();
+				if(newLength < 0)
 					throw new Error.JavaException("RangeError", "Invalid array length");
 				if(newLength > storageSize()) {
 					O newArray = createStorage(nextPowerOf2((int)newLength));

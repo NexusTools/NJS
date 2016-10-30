@@ -10,7 +10,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.nexustools.njs.JSHelper;
 import net.nexustools.njs.compiler.Compiler;
-import net.nexustools.njs.compiler.JavaCompiler;
+import net.nexustools.njs.compiler.JavaTranspiler;
 import net.nexustools.njs.compiler.RuntimeCompiler;
 
 import org.junit.After;
@@ -28,7 +28,7 @@ public class Array {
 	@Before
 	public void setUp() {
 		compilers = new Compiler[]{
-			new JavaCompiler(),
+			new JavaTranspiler(),
 			new RuntimeCompiler()
 		};
 	}
@@ -81,6 +81,11 @@ public class Array {
 	@Test
 	public void shift() {
 		test("shift");
+	}
+
+	@Test
+	public void indexes() {
+		test("indexes");
 	}
 
 	public void test(String name) {

@@ -16,13 +16,28 @@ import java.util.List;
  */
 public class String extends AbstractFunction {
 	public static class Instance extends UniqueObject {
+		private static double stringToDouble(java.lang.String input) {
+			try {
+				return Double.valueOf(input);
+			} catch(NumberFormatException ex) {
+				return Double.NaN;
+			}
+		}
+		
 		public final java.lang.String string;
 		public final String String;
 		Instance(Number Number, final String String, final java.lang.String string) {
-			this(Number.wrap(string.length()), String, string);
+			this(Number.wrap(string.length()), Number, String, string);
 		}
-		Instance(BaseObject length, final String String, final java.lang.String string) {
-			super(String.prototype(), String);
+		Instance(Number.Instance length, Number Number, final String String, final java.lang.String string) {
+			super(String.prototype(), String, Number);
+			this.String = String;
+			this.string = string;
+			
+			setReadOnly("length", length);
+		}
+		Instance(Number.Instance length, Number.Instance number, final String String, final java.lang.String string) {
+			super(String.prototype(), String, number);
 			this.String = String;
 			this.string = string;
 			
@@ -49,7 +64,9 @@ public class String extends AbstractFunction {
 		}
 		@Override
 		public Instance clone() {
-			return new Instance(getDirectly("length"), String, string);
+			if(number != null)
+				return new Instance((Number.Instance)getDirectly("length"), number, String, string);
+			return new Instance(Number, String, string);
 		}
 		@Override
 		public java.lang.String toString() {
@@ -78,9 +95,9 @@ public class String extends AbstractFunction {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params.length > 1)
-					return wrap(((Instance)_this).string.substring(Number.from(params[0]).toInt(), Number.from(params[1]).toInt()));
+					return wrap(((Instance)_this).string.substring(params[0].toInt(), params[1].toInt()));
 				else
-					return wrap(((Instance)_this).string.substring(Number.from(params[0]).toInt()));
+					return wrap(((Instance)_this).string.substring(params[0].toInt()));
 			}
 			@Override
 			public java.lang.String name() {
@@ -130,7 +147,7 @@ public class String extends AbstractFunction {
 		prototype.setHidden("charCodeAt", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				return Number.wrap(((Instance)_this).string.charAt(params.length > 0 ? Number.from(params[0]).toInt() : 0));
+				return Number.wrap(((Instance)_this).string.charAt(params.length > 0 ? params[0].toInt() : 0));
 			}
 			@Override
 			public java.lang.String name() {
@@ -177,7 +194,9 @@ public class String extends AbstractFunction {
 	
 	@Override
 	public BaseObject call(BaseObject _this, BaseObject... params) {
-		throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+		if(!_this.instanceOf(this))
+			return construct(params);
+		return _this;
 	}
 
 	public Instance wrap(java.lang.String string) {

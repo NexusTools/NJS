@@ -44,7 +44,7 @@ public class Int16Array extends Uint16Array {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				StringBuilder builder = new StringBuilder();
-				for(int i=0; i<global.toNumber(_this.get("length")).toInt(); i++) {
+				for(int i=0; i<_this.get("length").toInt(); i++) {
 					if(i > 0)
 						builder.append(',');
 					BaseObject value = _this.get(i, OR_NULL);
@@ -58,7 +58,7 @@ public class Int16Array extends Uint16Array {
 
 	@Override
 	public BaseObject construct(BaseObject... params) {
-		return new Instance(global, this, params.length > 0 ? global.toArrayRange(params[0]) : 0);
+		return new Instance(global, this, params.length > 0 ? params[0].toInt() : 0);
 	}
 	
 	

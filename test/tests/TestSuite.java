@@ -18,8 +18,9 @@ import org.junit.runners.Suite;
 	Comparisons.class,
 	Blocks.class,
 	
+	String.class,
 	Array.class,
 	
-	RedefineGlobal.class})
+	Eval.class})
 public class TestSuite {
 }

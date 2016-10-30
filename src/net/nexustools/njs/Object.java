@@ -18,6 +18,10 @@ public class Object extends AbstractFunction {
 	public static final Pattern BUILT_IN = Pattern.compile("^net\\.nexustools\\.njs\\.([a-zA-Z])$");
 	
 	public Object() {}
+	
+	public void setupNaN(Number.Instance NaN) {
+		number = NaN;
+	}
 
 	public void initPrototypeFunctions(final Global global) {
 		setHidden("defineProperty", new AbstractFunction(global) {
@@ -141,10 +145,10 @@ public class Object extends AbstractFunction {
 	@Override
 	public BaseObject construct(BaseObject... params) {
 		if(params.length == 0)
-			return new GenericObject(this);
+			return new GenericObject(this, number);
 		
 		BaseObject src = params[0];
-		GenericObject copy = new GenericObject(this);
+		GenericObject copy = new GenericObject(this, number);
 		for(java.lang.String key : src.keys())
 			copy.set(key, src.get(key));
 		return copy;

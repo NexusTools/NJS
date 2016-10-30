@@ -151,7 +151,10 @@ public abstract class AbstractCompiler implements Compiler {
 	}
 	public static interface NumberReferency {}
 	public static interface StringReferency {}
-	public static abstract class PrimitiveReferency extends Parsed {
+	public static interface BaseReferency {
+		public Parsed transformFallback(Parsed part);
+	}
+	public static abstract class PrimitiveReferency extends Parsed implements BaseReferency {
 		public boolean newline;
 		public PrimitiveReferency extend(DirectReference reference) {
 			return new RightReference(this, reference.ref);
@@ -1631,6 +1634,104 @@ public abstract class AbstractCompiler implements Compiler {
 			return toRPadString(lhs) + op() + toLPadString(rhs);
 		}
 	}
+	public static abstract class RhLhReferency extends RhLh implements BaseReferency {
+		private boolean newline;
+		
+		public RhLhReferency() {}
+		public RhLhReferency(Parsed lhs) {
+			super(lhs);
+		}
+		public RhLhReferency(Parsed lhs, Parsed rhs) {
+			super(lhs, rhs);
+		}
+		
+		@Override
+		public Parsed transform(Parsed part) {
+			if(rhs == null) {
+				if(!part.isStandalone())
+					throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + describe(this));
+				rhs = part;
+				return this;
+			}
+			
+			if(rhs.isIncomplete()) {
+				rhs = rhs.transform(part);
+				return this;
+			}
+			
+			if(part instanceof OpenBracket) {
+				rhs = rhs.transform(part);
+				return this;
+			} else if(part instanceof OpenArray) {
+				rhs = rhs.transform(part);
+				return this;
+			} else if(part instanceof DirectReference) {
+				rhs = rhs.transform(part);
+				return this;
+			} else if(part instanceof IntegerReference) {
+				rhs = rhs.transform(part);
+				return this;
+			}
+			
+			if(part instanceof SemiColon)
+				throw new CompleteException();
+			if(part instanceof NewLine) {
+				newline = true;
+				return this;
+			}
+			
+			if(part instanceof InstanceOf)
+				return new InstanceOf(this);
+			else if(part instanceof MoreThan)
+				return new MoreThan(this);
+			else if(part instanceof LessThan)
+				return new LessThan(this);
+			else if(part instanceof MoreEqual)
+				return new MoreEqual(this);
+			else if(part instanceof LessEqual)
+				return new LessEqual(this);
+			else if(part instanceof StrictEquals)
+				return new StrictEquals(this);
+			else if(part instanceof NotEquals)
+				return new NotEquals(this);
+			else if(part instanceof StrictNotEquals)
+				return new StrictNotEquals(this);
+			else if(part instanceof Equals)
+				return new Equals(this);
+			else if(part instanceof Multiply)
+				return new Multiply(this);
+			else if(part instanceof Plus)
+				return new Plus(this);
+			else if(part instanceof Minus)
+				return new Minus(this);
+			else if(part instanceof Set)
+				return new Set(this);
+			else if(part instanceof Percent)
+				return new Percent(this);
+			else if(part instanceof And)
+				return new And(this);
+			else if(part instanceof Or)
+				return new Or(this);
+			else if(part instanceof AndAnd)
+				return new AndAnd(this);
+			else if(part instanceof OrOr)
+				return new OrOr(this);
+			else if(part instanceof Number && ((Number)part).value < 0)
+				return new Minus(this, new Number(-((Number)part).value));
+			else if(part instanceof Integer && ((Integer)part).value < 0)
+				return new Minus(this, new Number(-((Integer)part).value));
+			else
+				return transformFallback(part);
+		}
+
+		public Parsed transformFallback(Parsed part) {
+			if(newline)
+				throw new CompleteException(part);
+			
+			throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + describe(this));
+		}
+		
+	}
 	public static class Not extends Rh {
 
 		@Override
@@ -1720,7 +1821,7 @@ public abstract class AbstractCompiler implements Compiler {
 			return "===";
 		}
 	}
-	public static class Percent extends RhLh implements NumberReferency {
+	public static class Percent extends RhLhReferency implements NumberReferency {
 		public Percent() {
 			super();
 		}
@@ -1732,7 +1833,7 @@ public abstract class AbstractCompiler implements Compiler {
 			return "%";
 		}
 	}
-	public static class Or extends RhLh {
+	public static class Or extends RhLhReferency {
 		public Or() {
 			super();
 		}
@@ -1744,7 +1845,7 @@ public abstract class AbstractCompiler implements Compiler {
 			return "|";
 		}
 	}
-	public static class And extends RhLh {
+	public static class And extends RhLhReferency {
 		public And() {
 			super();
 		}
@@ -1756,7 +1857,7 @@ public abstract class AbstractCompiler implements Compiler {
 			return "&";
 		}
 	}
-	public static class Plus extends RhLh implements NumberReferency {
+	public static class Plus extends RhLhReferency {
 		public Plus() {
 			super(new Number(0));
 		}
@@ -1767,8 +1868,20 @@ public abstract class AbstractCompiler implements Compiler {
 		public java.lang.String op() {
 			return "+";
 		}
+
+		public boolean isStringReferenceChain() {
+			Parsed l = rhs;
+			while(l instanceof Plus)
+				l = ((Plus)l).rhs;
+			if(l instanceof StringReferency)
+				return true;
+			l = lhs;
+			while(l instanceof Plus)
+				l = ((Plus)l).lhs;
+			return l instanceof StringReferency;
+		}
 	}
-	public static class Minus extends RhLh implements NumberReferency {
+	public static class Minus extends RhLhReferency implements NumberReferency {
 		public Minus() {
 			super(new Number(0));
 		}

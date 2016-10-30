@@ -581,7 +581,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
-						return new ValueReferenceable(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).multiply(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
+						return new ValueReferenceable(global.Number.fromValueOf(JSHelper.valueOf(lhs.run(global, scope).get())).multiply(global.Number.fromValueOf(JSHelper.valueOf(rhs.run(global, scope).get()))));
 					} finally {
 						el.finishCall();
 					}
@@ -595,7 +595,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
-						return new ValueReferenceable(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).minus(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
+						return new ValueReferenceable(global.Number.fromValueOf(JSHelper.valueOf(lhs.run(global, scope).get())).minus(global.Number.fromValueOf(JSHelper.valueOf(rhs.run(global, scope).get()))));
 					} finally {
 						el.finishCall();
 					}
@@ -609,7 +609,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
-						return new ValueReferenceable(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).percent(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
+						return new ValueReferenceable(global.Number.fromValueOf(JSHelper.valueOf(lhs.run(global, scope).get())).percent(global.Number.fromValueOf(JSHelper.valueOf(rhs.run(global, scope).get()))));
 					} finally {
 						el.finishCall();
 					}
@@ -623,7 +623,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
-						return new ValueReferenceable(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).and(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
+						return new ValueReferenceable(global.Number.fromValueOf(JSHelper.valueOf(lhs.run(global, scope).get())).and(global.Number.fromValueOf(JSHelper.valueOf(rhs.run(global, scope).get()))));
 					} finally {
 						el.finishCall();
 					}
@@ -645,7 +645,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
-						return new ValueReferenceable(global.Number.from(JSHelper.valueOf(lhs.run(global, scope).get())).or(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
+						return new ValueReferenceable(global.Number.fromValueOf(JSHelper.valueOf(lhs.run(global, scope).get())).or(global.Number.fromValueOf(JSHelper.valueOf(rhs.run(global, scope).get()))));
 					} finally {
 						el.finishCall();
 					}
@@ -721,7 +721,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 						if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
 							return new ValueReferenceable(global.wrap(JSHelper.stringLessThan(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string)));
 
-						return new ValueReferenceable(global.wrap(global.toNumber(lhs).number < global.toNumber(rhs).number));
+						return new ValueReferenceable(global.wrap(lhs.toDouble() < rhs.toDouble()));
 					} finally {
 						el.finishCall();
 					}
@@ -741,7 +741,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 						if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
 							return new ValueReferenceable(global.wrap(JSHelper.stringLessEqual(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string)));
 
-						return new ValueReferenceable(global.wrap(global.toNumber(lhs).number <= global.toNumber(rhs).number));
+						return new ValueReferenceable(global.wrap(lhs.toDouble() <= rhs.toDouble()));
 					} finally {
 						el.finishCall();
 					}
@@ -761,7 +761,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 						if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
 							return new ValueReferenceable(global.wrap(JSHelper.stringMoreThan(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string)));
 
-						return new ValueReferenceable(global.wrap(global.toNumber(lhs).number > global.toNumber(rhs).number));
+						return new ValueReferenceable(global.wrap(lhs.toDouble() > rhs.toDouble()));
 					} finally {
 						el.finishCall();
 					}
@@ -781,7 +781,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 						if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
 							return new ValueReferenceable(global.wrap(JSHelper.stringMoreEqual(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string)));
 
-						return new ValueReferenceable(global.wrap(global.toNumber(lhs).number >= global.toNumber(rhs).number));
+						return new ValueReferenceable(global.wrap(lhs.toDouble() >= rhs.toDouble()));
 					} finally {
 						el.finishCall();
 					}
@@ -797,7 +797,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 					try {
 						Referenceable ref = lhs.run(global, scope);
 
-						net.nexustools.njs.Number.Instance number = global.Number.from(JSHelper.valueOf(ref.get())).multiply(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get())));
+						net.nexustools.njs.Number.Instance number = global.Number.fromValueOf(JSHelper.valueOf(ref.get())).multiply(global.Number.fromValueOf(JSHelper.valueOf(rhs.run(global, scope).get())));
 						ref.set(number);
 						return new ValueReferenceable(number);
 					} finally {
@@ -814,13 +814,14 @@ public class RuntimeCompiler extends AbstractCompiler {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						BaseObject l = JSHelper.valueOf(lhs.run(global, scope).get());
-						if(l instanceof net.nexustools.njs.Number.Instance)
-							return new ValueReferenceable(global.Number.from(l).plus(global.Number.from(JSHelper.valueOf(rhs.run(global, scope).get()))));
+						BaseObject r = JSHelper.valueOf(rhs.run(global, scope).get());
 
-						StringBuilder builder = new StringBuilder();
-						builder.append(l.toString());
-						builder.append(JSHelper.valueOf(rhs.run(global, scope).get()).toString());
-						return new ValueReferenceable(global.wrap(builder.toString()));
+						net.nexustools.njs.Number.Instance _lhs = l.toNumber();
+						net.nexustools.njs.Number.Instance _rhs = r.toNumber();
+						if((!_lhs.isNaN() && !_rhs.isNaN()) || (lhs instanceof net.nexustools.njs.Number.Instance && rhs instanceof net.nexustools.njs.Number.Instance))
+							return new ValueReferenceable(_lhs.plus(_rhs));
+
+						return new ValueReferenceable(global.wrap(l.toString() + r.toString()));
 					} finally {
 						el.finishCall();
 					}
@@ -1060,7 +1061,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 						JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 						try {
 							Referenceable ref = _ref.run(global, scope);
-							net.nexustools.njs.Number.Instance val = global.toNumber(ref.get());
+							net.nexustools.njs.Number.Instance val = ref.get().toNumber();
 							ref.set(global.wrap(val.number + 1));
 							return new ValueReferenceable(val);
 						} finally {
@@ -1075,7 +1076,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 						JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 						try {
 							Referenceable ref = _ref.run(global, scope);
-							net.nexustools.njs.Number.Instance val = global.toNumber(ref.get());
+							net.nexustools.njs.Number.Instance val = ref.get().toNumber();
 							ref.set(val = global.wrap(val.number+1));
 							return new ValueReferenceable(val);
 						} finally {
@@ -1093,7 +1094,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 						JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 						try {
 							Referenceable ref = _ref.run(global, scope);
-							net.nexustools.njs.Number.Instance val = global.toNumber(ref.get());
+							net.nexustools.njs.Number.Instance val = ref.get().toNumber();
 							ref.set(global.wrap(val.number - 1));
 							return new ValueReferenceable(val);
 						} finally {
@@ -1108,7 +1109,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 						JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 						try {
 							Referenceable ref = _ref.run(global, scope);
-							net.nexustools.njs.Number.Instance val = global.toNumber(ref.get());
+							net.nexustools.njs.Number.Instance val = ref.get().toNumber();
 							ref.set(val = global.wrap(val.number - 1));
 							return new ValueReferenceable(val);
 						} finally {

@@ -517,21 +517,11 @@ public class JSHelper {
 		else
 			return _this.delete(key.toString());
 	}
-	
-	public static int toArrayIndex(java.lang.String input) {
-		int value = Integer.valueOf(input);
-		if(value < 0)
-			throw new NumberFormatException("Cannot be less than zero");
-		return value;
-	}
 
 	public static BaseObject valueOf(BaseObject val) {
 		if(isUndefined(val))
 			return val;
-		BaseFunction valueOf = (BaseFunction)val.get("valueOf", Scopeable.OR_NULL);
-		if(valueOf != null)
-			return valueOf.call(val);
-		return val;
+		return ((BaseFunction)val.get("valueOf", Scopeable.OR_NULL)).call(val);
 	}
 
 	public static boolean isTrue(BaseObject valueOf) {

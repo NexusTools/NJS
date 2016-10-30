@@ -48,27 +48,36 @@ public class Number extends AbstractFunction {
 		public Instance divide(Instance rhs) {
 			return Number.wrap(number / rhs.number);
 		}
+		public boolean isNaN() {
+			return Double.isNaN(number);
+		}
+		@Override
 		public byte toByte() {
 			return (byte)number;
 		}
-		public byte toClampedByte() {
-			if(number > 255)
-				return (byte)255;
-			if(number < 0)
-				return 0;
-			return (byte)number;
-		}
+		@Override
 		public short toShort() {
 			return (short)number;
 		}
+		@Override
 		public int toInt() {
 			return (int)number;
 		}
+		@Override
 		public long toLong() {
 			return (long)number;
 		}
+		@Override
 		public float toFloat() {
 			return (float)number;
+		}
+		@Override
+		public double toDouble() {
+			return number;
+		}
+		@Override
+		public Instance toNumber() {
+			return this;
 		}
 		@Override
 		public Instance clone() {
@@ -81,10 +90,10 @@ public class Number extends AbstractFunction {
 		@Override
 		public boolean equals(java.lang.Object obj) {
 			if(obj == this)
-				return true;
+				return !Double.isNaN(number);
 			
 			if(obj instanceof Instance)
-				return ((Instance)obj).number == number;
+				return ((Instance)obj).number == number && !Double.isNaN(number);
 			
 			if(obj instanceof java.lang.Number)
 				return ((Number)obj).equals(number);
@@ -108,7 +117,28 @@ public class Number extends AbstractFunction {
 	}
 	
 	private final List<WeakReference<Instance>> INSTANCES = new ArrayList();
+	public Number.Instance NaN;
+	public Number.Instance PositiveInfinity;
+	public Number.Instance NegativeInfinity;
+	public Number.Instance NegativeOne;
+	public Number.Instance PositiveOne;
+	public Number.Instance Zero;
 	public Number() {}
+
+	public void initConstants() {
+		NaN = wrap(Double.NaN);
+		Zero = wrap(0);
+		PositiveOne = wrap(1);
+		NegativeOne = wrap(-1);
+		PositiveInfinity = wrap(Double.POSITIVE_INFINITY);
+		NegativeInfinity = wrap(Double.NEGATIVE_INFINITY);
+		PositiveInfinity.seal();
+		NegativeInfinity.seal();
+		PositiveOne.seal();
+		NegativeOne.seal();
+		Zero.seal();
+		NaN.seal();
+	}
 	
 	protected void initPrototypeFunctions(final Global global) {
 		GenericObject prototype = prototype();
@@ -125,7 +155,7 @@ public class Number extends AbstractFunction {
 		if(params.length == 0)
 			return wrap(0).clone();
 		
-		return from(params[0]).clone();
+		return params[0].toNumber().clone();
 	}
 	
 	@Override
@@ -135,7 +165,7 @@ public class Number extends AbstractFunction {
 		return _this;
 	}
 	
-	public Instance wrap(double number) {
+	public final Instance wrap(double number) {
 		synchronized(INSTANCES) {
 			Iterator<WeakReference<Instance>> it = INSTANCES.iterator();
 			while(it.hasNext()) {
@@ -151,25 +181,6 @@ public class Number extends AbstractFunction {
 			um.seal();
 			INSTANCES.add(new WeakReference(um));
 			return um;
-		}
-	}
-	
-	public Instance from(BaseObject param) {
-		if(param == Undefined.INSTANCE)
-			return wrap(Double.NaN);
-		if(param == Null.INSTANCE)
-			return wrap(0);
-		
-		BaseObject valueOf = param.get("valueOf");
-		if(valueOf != null && valueOf instanceof BaseFunction)
-			param = ((BaseFunction)valueOf).call(param);
-		if(param instanceof Instance)
-			return (Instance)param;
-		
-		try {
-			return new Instance(this, Double.valueOf(param.toString()));
-		} catch(NumberFormatException ex) {
-			return new Instance(this, Double.NaN);
 		}
 	}
 	
@@ -205,4 +216,48 @@ public class Number extends AbstractFunction {
 			return dlbString.substring(0, dlbString.length()-2);
 		return dlbString;
 	}
+
+	@Override
+	public byte toByte() {
+		return 0;
+	}
+
+	@Override
+	public short toShort() {
+		return 0;
+	}
+
+	@Override
+	public int toInt() {
+		return 0;
+	}
+
+	@Override
+	public long toLong() {
+		return 0;
+	}
+
+	@Override
+	public Number.Instance toNumber() {
+		return NaN;
+	}
+
+	@Override
+	public double toDouble() {
+		return 0;
+	}
+
+	@Override
+	public float toFloat() {
+		return 0;
+	}
+
+	public Instance fromValueOf(BaseObject valueOf) {
+		if(valueOf == Null.INSTANCE)
+			return Zero;
+		if(valueOf == Undefined.INSTANCE)
+			return NaN;
+		return JSHelper.valueOf(valueOf).toNumber();
+	}
+	
 }

@@ -6,8 +6,7 @@
 package tests;
 
 import java.io.InputStreamReader;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
 import net.nexustools.njs.JSHelper;
 import net.nexustools.njs.compiler.Compiler;
 import net.nexustools.njs.compiler.JavaTranspiler;
@@ -21,7 +20,7 @@ import org.junit.Test;
  *
  * @author kate
  */
-public class Blocks {
+public class String {
 	
 	Compiler[] compilers;
 	
@@ -39,32 +38,14 @@ public class Blocks {
 	}
 	
 	@Test
-	public void _if() {
-		test("if");
+	public void construct() {
+		test("construct");
 	}
 	
-	@Test
-	public void _for() {
-		test("for");
-	}
-	
-	@Test
-	public void _while() {
-		test("while");
-	}
-	
-	@Test
-	public void _try() {
-		test("try");
-	}
-
-	public void test(String name) {
+	public void test(java.lang.String name) {
 		for(Compiler compiler : compilers) {
 			try {
-				compiler.compile(new InputStreamReader(Blocks.class.getResourceAsStream("/tests/blocks/" + name + ".js")), name + ".js", false).exec(JSHelper.createExtendedGlobal(), null);
-			} catch(net.nexustools.njs.Error.ConvertedException re) {
-				re.printStackTrace();
-				throw re;
+				compiler.compile(new InputStreamReader(String.class.getResourceAsStream("/tests/string/" + name + ".js")), name + ".js", false).exec(JSHelper.createExtendedGlobal(), null);
 			} catch(java.lang.RuntimeException re) {
 				System.err.println(JSHelper.extractStack(re.toString(), re));
 				throw re;

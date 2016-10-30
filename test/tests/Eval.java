@@ -9,7 +9,7 @@ import java.io.InputStreamReader;
 
 import net.nexustools.njs.JSHelper;
 import net.nexustools.njs.compiler.Compiler;
-import net.nexustools.njs.compiler.JavaCompiler;
+import net.nexustools.njs.compiler.JavaTranspiler;
 import net.nexustools.njs.compiler.RuntimeCompiler;
 
 import org.junit.After;
@@ -20,14 +20,14 @@ import org.junit.Test;
  *
  * @author kate
  */
-public class RedefineGlobal {
+public class Eval {
 	
 	Compiler[] compilers;
 	
 	@Before
 	public void setUp() {
 		compilers = new Compiler[]{
-			new JavaCompiler(),
+			new JavaTranspiler(),
 			new RuntimeCompiler()
 		};
 	}
@@ -41,7 +41,7 @@ public class RedefineGlobal {
 	public void test() {
 		for(Compiler compiler : compilers) {
 			try {
-				compiler.compile(new InputStreamReader(RedefineGlobal.class.getResourceAsStream("/tests/evaltests.js")), "evaltests.js", false).exec(JSHelper.createExtendedGlobal(), null);
+				compiler.compile(new InputStreamReader(Eval.class.getResourceAsStream("/tests/eval.js")), "eval.js", false).exec(JSHelper.createExtendedGlobal(), null);
 			} catch(java.lang.RuntimeException re) {
 				System.err.println(JSHelper.extractStack(re.toString(), re));
 				throw re;

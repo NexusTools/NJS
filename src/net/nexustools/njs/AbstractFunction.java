@@ -12,30 +12,30 @@ package net.nexustools.njs;
 public abstract class AbstractFunction extends UniqueObject implements BaseFunction {
 	
 	public AbstractFunction(Global global) {
-		this(global.String, global.Object, global.Function);
+		this(global.String, global.Object, global.Function, global.NaN);
 	}
 	public AbstractFunction(Global global, String.Instance name) {
-		this(global.String, global.Object, global.Function, name);
+		this(global.String, global.Object, global.Function, global.NaN, name);
 	}
 	public AbstractFunction(Global global, java.lang.String name) {
-		this(global.String, global.Object, global.Function, global.wrap(name));
+		this(global.String, global.Object, global.Function, global.NaN, global.wrap(name));
 	}
-	public AbstractFunction(String String, Object Object, Function Function) {
+	public AbstractFunction(String String, Object Object, Function Function, Number.Instance NaN) {
 		super(Function.prototype(), Function);
 		
-		GenericObject prototype = new GenericObject(Object);
+		GenericObject prototype = new GenericObject(Object, NaN);
 		prototype.setStorage("constructor", this, false);
 		setStorage("prototype", prototype, false);
 		if(name() != null)
 			setStorage("name", String.wrap(name()), false);
 	}
-	public AbstractFunction(String String, Object Object, Function Function, java.lang.String name) {
-		this(String, Object, Function, String.wrap(name));
+	public AbstractFunction(String String, Object Object, Function Function, Number.Instance NaN, java.lang.String name) {
+		this(String, Object, Function, NaN, String.wrap(name));
 	}
-	public AbstractFunction(String String, Object Object, Function Function, String.Instance name) {
+	public AbstractFunction(String String, Object Object, Function Function, Number.Instance NaN, String.Instance name) {
 		super(Function.prototype(), Function);
 		
-		GenericObject prototype = new GenericObject(Object);
+		GenericObject prototype = new GenericObject(Object, NaN);
 		prototype.setStorage("constructor", this, false);
 		setStorage("prototype", prototype, false);
 		setStorage("name", name, false);
@@ -44,26 +44,28 @@ public abstract class AbstractFunction extends UniqueObject implements BaseFunct
 	
 	@Override
 	protected void init(Global global) {
-		init(global.String, global.Object, global.Function);
+		init(global.String, global.Object, global.Function, global.NaN);
 	}
-	protected GenericObject init(String String, Object Object, Function Function) {
+	protected GenericObject init(String String, Object Object, Function Function, Number.Instance NaN) {
 		if(!(this instanceof Function))
 			super.init(Function.prototype(), Function);
 		
 		try {
-			return initPrototype(Object);
+			return initPrototype(Object, NaN);
 		} finally {
 			setStorage("name", String.wrap(name()), false);
 		}
 	}
 	
-	protected GenericObject initPrototype(Object Object) {
+	protected GenericObject initPrototype(Object Object, Number.Instance NaN) {
 		GenericObject prototype;
 		if(this instanceof Object) {
 			prototype = new GenericObject();
 			prototype.setStorage("constructor", this, false);
-		} else
-			prototype = new GenericObject(Object);
+		} else if(NaN != null)
+			prototype = new GenericObject(Object, NaN);
+		else
+			prototype = new GenericObject(Object, (Number)null);
 		
 		setStorage("prototype", prototype, false);
 		if(this instanceof Function)

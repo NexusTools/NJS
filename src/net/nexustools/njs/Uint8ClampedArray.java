@@ -32,10 +32,12 @@ public class Uint8ClampedArray extends Uint8Array {
 		@Override
 		protected void put0(int index, BaseObject obj) throws ArrayIndexOutOfBoundsException {
 			try {
-				Number.Instance num = Number.from(obj);
-				if(!(num instanceof Number.Instance))
-					throw new NullPointerException();
-				arrayStorage[index] = ((Number.Instance)num).toClampedByte();
+				double number = obj.toDouble();
+				if(number > 255)
+					number = 255;
+				if(number < 0)
+					number = 0;
+				arrayStorage[index] = (byte)number;
 			} catch(NullPointerException ex) {
 				arrayStorage[index] = 0;
 			}
@@ -48,7 +50,7 @@ public class Uint8ClampedArray extends Uint8Array {
 
 	@Override
 	public BaseObject construct(BaseObject... params) {
-		return new Instance(global, this, params.length > 0 ? global.toArrayRange(params[0]) : 0);
+		return new Instance(global, this, params.length > 0 ? params[0].toInt() : 0);
 	}
 
 }
