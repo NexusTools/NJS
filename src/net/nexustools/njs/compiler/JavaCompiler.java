@@ -169,16 +169,30 @@ public class JavaCompiler extends AbstractCompiler {
 	}
 
 	private void generateBooleanSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName) {
+		while(part instanceof OpenBracket)
+			part = ((OpenBracket)part).contents;
+		
 		if(part instanceof Boolean) {
 			if(((Boolean)part).value)
 				sourceBuilder.append("true");
 			else
 				sourceBuilder.append("false");
+		} else if(part instanceof Not) {
+			sourceBuilder.append("!");
+			generateBooleanSource(sourceBuilder, ((Not) part).rhs, methodPrefix, baseScope, fileName);
 		} else if(part instanceof Equals) {
 			generateParsedSource(sourceBuilder, ((Equals) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(".equals(");
 			generateParsedSource(sourceBuilder, ((Equals) part).rhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(")");
+		} else if(part instanceof OrOr) {
+			generateParsedSource(sourceBuilder, ((OrOr) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(" || ");
+			generateBooleanSource(sourceBuilder, ((OrOr) part).rhs, methodPrefix, baseScope, fileName);
+		} else if(part instanceof AndAnd) {
+			generateBooleanSource(sourceBuilder, ((AndAnd) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(" && ");
+			generateBooleanSource(sourceBuilder, ((AndAnd) part).rhs, methodPrefix, baseScope, fileName);
 		} else if(part instanceof NotEquals) {
 			sourceBuilder.append("(!");
 			generateParsedSource(sourceBuilder, ((NotEquals) part).lhs, methodPrefix, baseScope, fileName);
@@ -306,6 +320,9 @@ public class JavaCompiler extends AbstractCompiler {
 	}
 		
 	protected void generateParsedSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName) {
+		while(part instanceof OpenBracket)
+			part = ((OpenBracket)part).contents;
+		
 		if (part instanceof Return) {
 			sourceBuilder.append("return ");
 			generateParsedSource(sourceBuilder, ((Return) part).rhs, methodPrefix, baseScope, fileName);
@@ -517,11 +534,6 @@ public class JavaCompiler extends AbstractCompiler {
 				sourceBuilder.append("\")");
 			}
 			return;
-		} else if(part instanceof OpenBracket) {
-			sourceBuilder.append("(");
-			generateParsedSource(sourceBuilder, ((OpenBracket) part).contents, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(")");
-			return;
 		} else if(part instanceof Throw) {
 			sourceBuilder.append("throw new net.nexustools.njs.Error.Thrown(");
 			generateParsedSource(sourceBuilder, ((Throw) part).rhs, methodPrefix, baseScope, fileName);
@@ -573,11 +585,18 @@ public class JavaCompiler extends AbstractCompiler {
 			sourceBuilder.append(")");
 			return;
 		} else if(part instanceof OrOr) {
-			sourceBuilder.append("orOr(");
+			sourceBuilder.append("(orOr(");
 			generateParsedSource(sourceBuilder, ((OrOr) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(", ");
 			generateParsedSource(sourceBuilder, ((OrOr) part).rhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(")");
+			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
+			return;
+		} else if(part instanceof AndAnd) {
+			sourceBuilder.append("(andAnd(");
+			generateParsedSource(sourceBuilder, ((AndAnd) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(", ");
+			generateParsedSource(sourceBuilder, ((AndAnd) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
 			return;
 		} else if(part instanceof Equals) {
 			sourceBuilder.append("(");
@@ -811,6 +830,38 @@ public class JavaCompiler extends AbstractCompiler {
 			sourceBuilder.appendln(") {");
 			sourceBuilder.indent();
 			generateBlockSource(sourceBuilder, ((While)part).impl, methodPrefix, baseScope, fileName);
+			sourceBuilder.unindent();
+			sourceBuilder.appendln("}");
+			return;
+		} else if(part instanceof For) {
+			if(((For)part).simpleimpl != null) {
+				if(((For)part).init != null) {
+					generateParsedSource(sourceBuilder, ((For)part).init, methodPrefix, baseScope, fileName);
+					sourceBuilder.appendln(";");
+				}
+				sourceBuilder.append("for(; ");
+				generateBooleanSource(sourceBuilder, ((For)part).condition, methodPrefix, baseScope, fileName);
+				sourceBuilder.append("; ");
+				if(((For)part).loop != null)
+					generateParsedSource(sourceBuilder, ((For)part).loop, methodPrefix, baseScope, fileName);
+				sourceBuilder.appendln(")");
+				sourceBuilder.append("\t");
+				generateParsedSource(sourceBuilder, ((For)part).simpleimpl, methodPrefix, baseScope, fileName);
+				return;
+			}
+
+			if(((For)part).init != null) {
+				generateParsedSource(sourceBuilder, ((For)part).init, methodPrefix, baseScope, fileName);
+				sourceBuilder.appendln(";");
+			}
+			sourceBuilder.append("for(; ");
+			generateBooleanSource(sourceBuilder, ((For)part).condition, methodPrefix, baseScope, fileName);
+			sourceBuilder.append("; ");
+			if(((For)part).loop != null)
+				generateParsedSource(sourceBuilder, ((For)part).loop, methodPrefix, baseScope, fileName);
+			sourceBuilder.appendln(") {");
+			sourceBuilder.indent();
+			generateBlockSource(sourceBuilder, ((For)part).impl, methodPrefix, baseScope, fileName);
 			sourceBuilder.unindent();
 			sourceBuilder.appendln("}");
 			return;
@@ -1082,7 +1133,7 @@ public class JavaCompiler extends AbstractCompiler {
 					sourceBuilder.appendln(";");
 				}
 				if (i == script.impl.length - 1 && !(part instanceof Throw)) {
-					if(!(part instanceof Var) && !(part instanceof If) && !(part instanceof While))
+					if(!(part instanceof Var) && !(part instanceof If) && !(part instanceof While) && !(part instanceof For) && !(part instanceof Switch))
 						sourceBuilder.append("return ");
 					else
 						needReturn = true;

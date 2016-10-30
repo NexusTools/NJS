@@ -267,6 +267,8 @@ public class GenericObject implements BaseObject {
 
 	@Override
 	public final void set(java.lang.String key, BaseObject val, BaseObject _this, Or<Void> or) {
+		assert(val != null);
+		
 		if(hasArrayOverride) {
 			while(true) {
 				int i;
@@ -327,6 +329,8 @@ public class GenericObject implements BaseObject {
 
 	@Override
 	public final void set(int i, BaseObject val, BaseObject _this, Or<Void> or) {
+		assert(val != null);
+		
 		if(hasArrayOverride)
 			arrayOverride.set(i, val, _this);
 		

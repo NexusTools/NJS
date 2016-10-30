@@ -658,18 +658,7 @@ public abstract class AbstractCompiler implements Compiler {
 					}
 					break;
 				case InCondition:
-					if(condition == null)
-						condition = part;
-					else {
-						if(!condition.isIncomplete()) {
-							if(part instanceof CloseBracket) {
-								condition.finish();
-								state = State.AfterCondition;
-								return this;
-							}
-						}
-						condition = condition.transform(part);
-					}
+					transformCondition(part);
 					return this;
 				case AfterCondition:
 					if(part instanceof NewLine)
@@ -701,6 +690,27 @@ public abstract class AbstractCompiler implements Compiler {
 			}
 			
 			throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " (" + state + ":" + getClass().getSimpleName() + ")");
+		}
+		public void transformCondition(Parsed part) {
+			if(condition == null)
+				condition = part;
+			else {
+				if(!condition.isIncomplete()) {
+					if(part instanceof CloseBracket) {
+						condition = condition.finish();
+						finishCondition();
+						return;
+					}
+				}
+				try {
+					condition = condition.transform(part);
+				} catch(CompleteException ex) {
+					throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part);
+				}
+			}
+		}
+		public void finishCondition() {
+			state = State.AfterCondition;
 		}
 		public Parsed transformImpl(Parsed part) {
 			throw new UnsupportedOperationException();
@@ -739,7 +749,9 @@ public abstract class AbstractCompiler implements Compiler {
 			StringBuilder builder = new StringBuilder("while (");
 			builder.append(condition);
 			builder.append(") {");
-			if(impl == null)
+			if(simpleimpl != null)
+				builder.append(simpleimpl);
+			else if(impl == null)
 				builder.append("<unparsed>");
 			else
 				join(Arrays.asList(impl), ';', builder);
@@ -955,6 +967,105 @@ public abstract class AbstractCompiler implements Compiler {
 			return false;
 		}
 	}
+	public static class For extends Block {
+		static enum ForConditionState {
+			DuringInit,
+			DuringCondition,
+			DuringLoop
+		}
+		
+		Parsed init;
+		Parsed loop;
+		ForConditionState state = ForConditionState.DuringInit;
+		public For() {}
+		@Override
+		public java.lang.String toSource() {
+			StringBuilder builder = new StringBuilder("for (");
+			builder.append(unparsed(init));
+			builder.append("; ");
+			builder.append(unparsed(condition));
+			builder.append("; ");
+			builder.append(unparsed(loop));
+			builder.append(") {");
+			if(simpleimpl != null)
+				builder.append(simpleimpl);
+			else if(impl == null)
+				builder.append("<unparsed>");
+			else
+				join(Arrays.asList(impl), ';', builder);
+			builder.append("}");
+			return builder.toString();
+		}
+		@Override
+		public void transformCondition(Parsed part) {
+			switch(state) {
+				case DuringInit:
+					if(init == null) {
+						if(part instanceof SemiColon) {
+							state = ForConditionState.DuringCondition;
+							return;
+						}
+						init = part;
+					} else {
+						if(!init.isIncomplete()) {
+							if(part instanceof SemiColon) {
+								init = init.finish();
+								state = ForConditionState.DuringCondition;
+								return;
+							}
+						}
+						try {
+							init = init.transform(part);
+						} catch(CompleteException ex) {
+							throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part);
+						}
+					}
+					break;
+				case DuringCondition:
+					if(condition == null)
+						condition = part;
+					else {
+						if(!condition.isIncomplete()) {
+							if(part instanceof SemiColon) {
+								condition = condition.finish();
+								state = ForConditionState.DuringLoop;
+								return;
+							}
+						}
+						try {
+							condition = condition.transform(part);
+						} catch(CompleteException ex) {
+							throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part);
+						}
+					}
+					break;
+				case DuringLoop:
+					if(loop == null) {
+						if(part instanceof CloseBracket) {
+							finishCondition();
+							return;
+						}
+						loop = part;
+					} else {
+						if(!loop.isIncomplete()) {
+							if(part instanceof CloseBracket) {
+								loop = loop.finish();
+								finishCondition();
+								return;
+							}
+						}
+						try {
+							loop = loop.transform(part);
+						} catch(CompleteException ex) {
+							throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part);
+						}
+					}
+					break;
+			}
+			
+			return;
+		}
+	}
 	public static class If extends Block {
 		public Else el;
 		public If() {}
@@ -963,7 +1074,9 @@ public abstract class AbstractCompiler implements Compiler {
 			StringBuilder builder = new StringBuilder("if (");
 			builder.append(condition);
 			builder.append(") {");
-			if(impl == null)
+			if(simpleimpl != null)
+				builder.append(simpleimpl);
+			else if(impl == null)
 				builder.append("<unparsed>");
 			else
 				join(Arrays.asList(impl), ';', builder);
@@ -988,7 +1101,6 @@ public abstract class AbstractCompiler implements Compiler {
 			
 			return this;
 		}
-		
 	}
 	public static class ElseIf extends Else {
 		public Else el;
@@ -1000,7 +1112,9 @@ public abstract class AbstractCompiler implements Compiler {
 			StringBuilder builder = new StringBuilder("else if (");
 			builder.append(condition);
 			builder.append(") {");
-			if(impl == null)
+			if(simpleimpl != null)
+				builder.append(simpleimpl);
+			else if(impl == null)
 				builder.append("<unparsed>");
 			else
 				join(Arrays.asList(impl), ';', builder);
@@ -1036,7 +1150,9 @@ public abstract class AbstractCompiler implements Compiler {
 		@Override
 		public java.lang.String toSource() {
 			StringBuilder builder = new StringBuilder("else {");
-			if(impl == null)
+			if(simpleimpl != null)
+				builder.append(simpleimpl);
+			else if(impl == null)
 				builder.append("<unparsed>");
 			else
 				join(Arrays.asList(impl), ';', builder);
@@ -1999,7 +2115,18 @@ public abstract class AbstractCompiler implements Compiler {
 		}
 		@Override
 		public java.lang.String toSource() {
-			return "var " + join(sets, ',');
+			StringBuilder builder = new StringBuilder("var ");
+			join(sets, ',', builder);
+			if(currentSet != null) {
+				if(!sets.isEmpty())
+					builder.append(", ");
+				builder.append(currentSet.lhs);
+				if(currentSet.rhs != null) {
+					builder.append(" = ");
+					builder.append(currentSet.rhs);
+				}
+			}
+			return builder.toString();
 		}
 		@Override
 		public boolean isStandalone() {
@@ -2007,7 +2134,7 @@ public abstract class AbstractCompiler implements Compiler {
 		}
 		@Override
 		public boolean isIncomplete() {
-			return sets.isEmpty() || (currentSet != null && currentSet.rhs != null && currentSet.rhs.isIncomplete());
+			return (currentSet == null && sets.isEmpty()) || (currentSet != null && currentSet.rhs != null && currentSet.rhs.isIncomplete());
 		}
 		@Override
 		public Parsed finish() {
@@ -2431,6 +2558,8 @@ public abstract class AbstractCompiler implements Compiler {
 					throw new PartExchange(new Else(), ref.length());
 				else if(ref.equals("delete"))
 					throw new PartExchange(new Delete(), ref.length());
+				else if(ref.equals("for"))
+					throw new PartExchange(new For(), ref.length());
 				else if(ref.equals("try"))
 					throw new PartExchange(new Try(), ref.length());
 				else if(ref.equals("catch"))

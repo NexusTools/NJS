@@ -90,6 +90,14 @@ public abstract class CompiledScript implements Script {
 		}
 	}
 	
+	public BaseObject exec() {
+		return exec(JSHelper.createExtendedGlobal(), null);
+	}
+	
+	public BaseObject exec(Global global) {
+		return exec(global, null);
+	}
+	
 	public static net.nexustools.njs.Number.Instance plusPlusLeft(Global global, java.lang.String key, Scopeable _this) {
 		net.nexustools.njs.Number.Instance incremented = global.Number.from(JSHelper.valueOf(_this.get(key))).plus(global.PositiveOne);
 		_this.set(key, incremented);
@@ -117,7 +125,8 @@ public abstract class CompiledScript implements Script {
 	public static BaseObject percent(Global global, BaseObject lhs, BaseObject rhs) {
 		lhs = JSHelper.valueOf(lhs);
 		rhs = JSHelper.valueOf(rhs);
-		return global.toNumber(lhs).percent(global.toNumber(rhs));
+		return global.toNumber(lhs)
+			.percent(global.toNumber(rhs));
 	}
 	
 	public static BaseObject and(Global global, BaseObject lhs, BaseObject rhs) {
@@ -165,6 +174,12 @@ public abstract class CompiledScript implements Script {
 		return rhs;
 	}
 	
+	public static BaseObject andAnd(BaseObject lhs, BaseObject rhs) {
+		if(JSHelper.isTrue(lhs))
+			return rhs;
+		return lhs;
+	}
+	
 	public static BaseObject less(Global global, BaseObject lhs, BaseObject rhs) {
 		net.nexustools.njs.Number.Instance _lhs = global.toNumber(lhs);
 		net.nexustools.njs.Number.Instance _rhs = global.toNumber(rhs);
@@ -192,36 +207,28 @@ public abstract class CompiledScript implements Script {
 		return val;
 	}
 	
-	public BaseObject exec() {
-		return exec(JSHelper.createExtendedGlobal(), null);
-	}
-	
-	public BaseObject exec(Global global) {
-		return exec(global, null);
-	}
-	
-	public boolean moreThan(Global global, BaseObject lhs, BaseObject rhs) {
+	public static boolean moreThan(Global global, BaseObject lhs, BaseObject rhs) {
 		if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
 			return JSHelper.stringMoreThan(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string);
 		
 		return global.toNumber(lhs).number > global.toNumber(rhs).number;
 	}
 	
-	public boolean lessThan(Global global, BaseObject lhs, BaseObject rhs) {
+	public static boolean lessThan(Global global, BaseObject lhs, BaseObject rhs) {
 		if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
 			return JSHelper.stringLessThan(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string);
 		
 		return global.toNumber(lhs).number < global.toNumber(rhs).number;
 	}
 	
-	public boolean moreEqual(Global global, BaseObject lhs, BaseObject rhs) {
+	public static boolean moreEqual(Global global, BaseObject lhs, BaseObject rhs) {
 		if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
 			return JSHelper.stringMoreEqual(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string);
 		
 		return global.toNumber(lhs).number >= global.toNumber(rhs).number;
 	}
 	
-	public boolean lessEqual(Global global, BaseObject lhs, BaseObject rhs) {
+	public static boolean lessEqual(Global global, BaseObject lhs, BaseObject rhs) {
 		if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
 			return JSHelper.stringLessEqual(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string);
 		

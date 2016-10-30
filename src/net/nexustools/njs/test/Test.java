@@ -33,14 +33,9 @@ public class Test {
 			}
 		});
 		
-		eval(new InputStreamReader(Test.class.getResourceAsStream("/net/nexustools/njs/test/test.js")), "test.js", global);
+		//eval(new InputStreamReader(Test.class.getResourceAsStream("/net/nexustools/njs/test/test.js")), "test.js", global);
 		//eval("/home/kate/Projects/SnappFu/JNode12/node/node.js", global);
-		
-		while(true) {
-			try {
-				Thread.sleep(50000);
-			} catch (InterruptedException ex) {}
-		}
+		eval("/home/kate/Desktop/prime.js", global);
 	}
 	
 	public static void eval(String fileName, Global global) throws FileNotFoundException {

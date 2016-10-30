@@ -45,6 +45,8 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 		setArrayOverride(new ArrayOverride() {
 			@Override
 			public BaseObject get(int i, BaseObject _this, Or<BaseObject> or) {
+				if(i >=  actualLength)
+					return or.or(java.lang.String.valueOf(i));
 				try {
 					return get0(i);
 				} catch(ArrayIndexOutOfBoundsException ex) {

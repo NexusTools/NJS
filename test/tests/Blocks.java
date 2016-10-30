@@ -44,6 +44,11 @@ public class Blocks {
 	}
 	
 	@Test
+	public void _for() {
+		test("for");
+	}
+	
+	@Test
 	public void _while() {
 		test("while");
 	}

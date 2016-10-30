@@ -1034,6 +1034,23 @@ public class RuntimeCompiler extends AbstractCompiler {
 					}
 				}
 			};
+		} else if(object instanceof AndAnd) {
+			final Impl lhs = compile(data, ((AndAnd)object).lhs);
+			final Impl rhs = compile(data, ((AndAnd)object).rhs);
+			return new Impl() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
+					try {
+						BaseObject l = lhs.run(global, scope).get();
+						if(JSHelper.isTrue(l))
+							return rhs.run(global, scope);
+						return new ValueReferenceable(l);
+					} finally {
+						el.finishCall();
+					}
+				}
+			};
 		} else if(object instanceof PlusPlus) {
 			final Impl _ref = compile(data, ((PlusPlus)object).ref);
 			if(((PlusPlus)object).right) {
@@ -1067,7 +1084,6 @@ public class RuntimeCompiler extends AbstractCompiler {
 					}
 				};
 			}
-		
 		} else if(object instanceof MinusMinus) {
 			final Impl _ref = compile(data, ((MinusMinus)object).ref);
 			if(((MinusMinus)object).right) {
@@ -1101,7 +1117,6 @@ public class RuntimeCompiler extends AbstractCompiler {
 					}
 				};
 			}
-		
 		} else if(object instanceof OpenGroup) {
 			final Map<java.lang.String, Impl> compiled = new HashMap();
 			for(Map.Entry<java.lang.String, Parsed> entry : ((OpenGroup)object).entries.entrySet()) {
@@ -1305,6 +1320,138 @@ public class RuntimeCompiler extends AbstractCompiler {
 					} finally {
 						el.finishCall();
 					}
+				}
+			};
+		} else if(object instanceof For) {
+			Parsed _init = ((For)object).init;
+			Parsed _loop = ((For)object).loop;
+			final Impl condition = compile(data, ((For)object).condition);
+			if(_init != null && _loop != null) {
+				final Impl init = compile(data, _init);
+				final Impl loop = compile(data, _loop);
+
+				if(((For)object).simpleimpl != null) {
+					final Impl impl = compile(data, ((For)object).simpleimpl);
+					return new Impl() {
+						@Override
+						public Referenceable run(Global global, Scope scope) {
+							for(init.run(global, scope).get(); JSHelper.isTrue(condition.run(global, scope).get()); loop.run(global, scope).get()) {
+								Referenceable ref = impl.run(global, scope);
+								if(ref instanceof Return)
+									return ref;
+								ref.get();
+							}
+
+							return UNDEFINED_REFERENCE;
+						}
+					};
+				}
+				final Script impl = compileScript(((For)object).impl, data.fileName, ScriptType.Block);
+				return new Impl() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						for(init.run(global, scope).get(); JSHelper.isTrue(condition.run(global, scope).get()); loop.run(global, scope).get()) {
+							BaseObject ret = impl.exec(global, scope);
+							if(ret != null)
+								return new ValueReferenceable(ret);
+						}
+
+						return UNDEFINED_REFERENCE;
+					}
+				};
+			} else if(_loop != null) {
+				final Impl loop = compile(data, _loop);
+
+				if(((For)object).simpleimpl != null) {
+					final Impl impl = compile(data, ((For)object).simpleimpl);
+					return new Impl() {
+						@Override
+						public Referenceable run(Global global, Scope scope) {
+							for(; JSHelper.isTrue(condition.run(global, scope).get()); loop.run(global, scope).get()) {
+								Referenceable ref = impl.run(global, scope);
+								if(ref instanceof Return)
+									return ref;
+								ref.get();
+							}
+
+							return UNDEFINED_REFERENCE;
+						}
+					};
+				}
+				final Script impl = compileScript(((For)object).impl, data.fileName, ScriptType.Block);
+				return new Impl() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						for(; JSHelper.isTrue(condition.run(global, scope).get()); loop.run(global, scope).get()) {
+							BaseObject ret = impl.exec(global, scope);
+							if(ret != null)
+								return new ValueReferenceable(ret);
+						}
+
+						return UNDEFINED_REFERENCE;
+					}
+				};
+			} else if(_init != null && _loop != null) {
+				final Impl init = compile(data, _init);
+
+				if(((For)object).simpleimpl != null) {
+					final Impl impl = compile(data, ((For)object).simpleimpl);
+					return new Impl() {
+						@Override
+						public Referenceable run(Global global, Scope scope) {
+							for(init.run(global, scope).get(); JSHelper.isTrue(condition.run(global, scope).get()); ) {
+								Referenceable ref = impl.run(global, scope);
+								if(ref instanceof Return)
+									return ref;
+								ref.get();
+							}
+
+							return UNDEFINED_REFERENCE;
+						}
+					};
+				}
+				final Script impl = compileScript(((For)object).impl, data.fileName, ScriptType.Block);
+				return new Impl() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						for(init.run(global, scope).get(); JSHelper.isTrue(condition.run(global, scope).get()); ) {
+							BaseObject ret = impl.exec(global, scope);
+							if(ret != null)
+								return new ValueReferenceable(ret);
+						}
+
+						return UNDEFINED_REFERENCE;
+					}
+				};
+			}
+
+			if(((For)object).simpleimpl != null) {
+				final Impl impl = compile(data, ((For)object).simpleimpl);
+				return new Impl() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						for(; JSHelper.isTrue(condition.run(global, scope).get()); ) {
+							Referenceable ref = impl.run(global, scope);
+							if(ref instanceof Return)
+								return ref;
+							ref.get();
+						}
+
+						return UNDEFINED_REFERENCE;
+					}
+				};
+			}
+			final Script impl = compileScript(((For)object).impl, data.fileName, ScriptType.Block);
+			return new Impl() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					for(; JSHelper.isTrue(condition.run(global, scope).get()); ) {
+						BaseObject ret = impl.exec(global, scope);
+						if(ret != null)
+							return new ValueReferenceable(ret);
+					}
+
+					return UNDEFINED_REFERENCE;
 				}
 			};
 		} else if(object instanceof Try) {

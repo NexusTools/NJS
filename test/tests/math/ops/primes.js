@@ -1,21 +1,17 @@
 var Assert = importClass("org.junit.Assert");
 
-var numbers = [], primes = [], maxNumber = 100;
-
-var i = 2;
-while(i<=maxNumber) {
-	numbers.push(i);  
-	i++; 
+function getPrimes(x){
+  var ar = [];
+  for (var counter = 0; counter <= x; counter++) {
+      var notPrime = false;
+      for (var i = 2; (i <= ar.length) && !notPrime; i++) {
+          if ((counter%ar[i])===0) {
+              notPrime = true;
+          }
+      }
+      if (notPrime === false) ar.push(counter);
+  }
+  return ar;
 }
 
-while(numbers.length) {
-	var lastPrime;
-	primes.push(lastPrime = numbers.shift());
-	numbers = numbers.filter(function(i){
-		return (i % lastPrime) !== 0;
-	});
-}
-
-
-Assert.assertTrue(numbers.length === 0);
-Assert.assertTrue(primes.length === 25);
+Assert.assertTrue(getPrimes(1000).length === 170);
