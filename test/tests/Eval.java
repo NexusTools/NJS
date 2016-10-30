@@ -41,7 +41,7 @@ public class Eval {
 	public void test() {
 		for(Compiler compiler : compilers) {
 			try {
-				compiler.compile(new InputStreamReader(Eval.class.getResourceAsStream("/tests/eval.js")), "eval.js", false).exec(JSHelper.createExtendedGlobal(), null);
+				compiler.compile(new InputStreamReader(Eval.class.getResourceAsStream("/tests/eval.js")), "eval.js", false).exec(JSHelper.createExtendedGlobal(compiler), null);
 			} catch(java.lang.RuntimeException re) {
 				System.err.println(JSHelper.extractStack(re.toString(), re));
 				throw re;

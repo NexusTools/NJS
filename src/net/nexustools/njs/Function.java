@@ -116,11 +116,39 @@ public class Function extends AbstractFunction {
 
 	@Override
 	public BaseObject construct(BaseObject... params) {
-		final java.lang.String source = params[1].toString();
-		final java.lang.String arguments = params[0].toString();
-		final Script compiled = global.compiler.compile(source, "<Function>", true);
-		final java.lang.String[] args = arguments.split("\\s*,\\s*");
+		final java.lang.String source;
+		final java.lang.String[] args;
+		final java.lang.String arguments;
+		switch(params.length) {
+			case 0:
+				source = "";
+				arguments = "";
+				args = new java.lang.String[0];
+				break;
+			case 1:
+				arguments = "";
+				source = params[0].toString();
+				args = new java.lang.String[0];
+				break;
+			case 2:
+				source = params[1].toString();
+				arguments = params[0].toString();
+				args = arguments.split("\\s*,\\s*");
+				break;
+			default:
+				int argCount = params.length-1;
+				source = params[argCount].toString();
+				args = new java.lang.String[argCount];
+				StringBuilder _arguments = new StringBuilder();
+				for(int i=0; i<argCount; i++) {
+					if(_arguments.length() > 0)
+						_arguments.append(", ");
+					_arguments.append(args[i] = params[i].toString());
+				}
+				arguments = _arguments.toString();
+		}
 		
+		final Script compiled = global.compiler.compile(source, "<Function>", true);
 		return new AbstractFunction(global, "<Function>") {
 			@Override
 			public BaseObject call(BaseObject _this, final BaseObject... params) {

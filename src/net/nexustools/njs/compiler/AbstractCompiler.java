@@ -198,6 +198,8 @@ public abstract class AbstractCompiler implements Compiler {
 				return new StrictNotEquals(this);
 			else if(part instanceof Equals)
 				return new Equals(this);
+			else if(part instanceof Divide)
+				return new Divide(this);
 			else if(part instanceof Multiply)
 				return new Multiply(this);
 			else if(part instanceof Plus)
@@ -1698,9 +1700,15 @@ public abstract class AbstractCompiler implements Compiler {
 				return new StrictNotEquals(this);
 			else if(part instanceof Equals)
 				return new Equals(this);
-			else if(part instanceof Multiply)
-				return new Multiply(this);
-			else if(part instanceof Plus)
+			else if(part instanceof Multiply) {
+				if(this instanceof Divide)
+					return new Multiply(this);
+				rhs = new Multiply(rhs);
+				return this;
+			} else if(part instanceof Divide) {
+				rhs = new Divide(rhs);
+				return this;
+			} else if(part instanceof Plus)
 				return new Plus(this);
 			else if(part instanceof Minus)
 				return new Minus(this);
@@ -1771,7 +1779,7 @@ public abstract class AbstractCompiler implements Compiler {
 			return "*=";
 		}
 	}
-	public static class Multiply extends RhLh implements NumberReferency {
+	public static class Multiply extends RhLhReferency implements NumberReferency {
 		public Multiply() {}
 		public Multiply(Parsed lhs) {
 			super(lhs);
@@ -1779,6 +1787,16 @@ public abstract class AbstractCompiler implements Compiler {
 		@Override
 		public java.lang.String op() {
 			return "*";
+		}
+	}
+	public static class Divide extends RhLhReferency implements NumberReferency {
+		public Divide() {}
+		public Divide(Parsed lhs) {
+			super(lhs);
+		}
+		@Override
+		public java.lang.String op() {
+			return "/";
 		}
 	}
 	public static class Equals extends RhLh {
@@ -2337,6 +2355,7 @@ public abstract class AbstractCompiler implements Compiler {
 	public static final Pattern PLUSPLUS = Pattern.compile("^\\+\\+");
 	public static final Pattern MINUSMINUS = Pattern.compile("^\\-\\-");
 	public static final Pattern MULTIPLY = Pattern.compile("^\\*");
+	public static final Pattern DIVIDE = Pattern.compile("^/");
 	public static final Pattern MINUS = Pattern.compile("^\\-");
 	public static final Pattern MORETHAN = Pattern.compile("^\\>");
 	public static final Pattern LESSTHAN = Pattern.compile("^\\<");
@@ -2629,7 +2648,7 @@ public abstract class AbstractCompiler implements Compiler {
 	}
 	public static class ScriptParser extends RegexParser {
 		public ScriptParser() {
-			super(NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, NUMBER, VARIABLE, VARIABLEGET, SINGLELINE_COMMENT, MULTILINE_COMMENT, WHITESPACE, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, REGEX);
+			super(NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, NUMBER, VARIABLE, VARIABLEGET, SINGLELINE_COMMENT, MULTILINE_COMMENT, DIVIDE, WHITESPACE, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, REGEX);
 		}
 		@Override
 		public void match(Pattern pattern, Matcher matcher, ParserReader reader) {
@@ -2721,6 +2740,8 @@ public abstract class AbstractCompiler implements Compiler {
 				throw new PartExchange(new Plus(), matcher.group().length());
 			if(pattern == MINUS)
 				throw new PartExchange(new Minus(), matcher.group().length());
+			if(pattern == DIVIDE)
+				throw new PartExchange(new Divide(), matcher.group().length());
 			if(pattern == MULTIPLY)
 				throw new PartExchange(new Multiply(), matcher.group().length());
 			if(pattern == EQUALS)

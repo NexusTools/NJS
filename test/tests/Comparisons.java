@@ -48,7 +48,7 @@ public class Comparisons {
 		test("greaterLess");
 	}
 
-	public void test(String name) {
+	public void test(java.lang.String name) {
 		for(Compiler compiler : compilers) {
 			try {
 				compiler.compile(new InputStreamReader(Comparisons.class.getResourceAsStream("/tests/comparisons/" + name + ".js")), name + ".js", false).exec(JSHelper.createExtendedGlobal(), null);

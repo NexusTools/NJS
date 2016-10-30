@@ -581,7 +581,21 @@ public class RuntimeCompiler extends AbstractCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
-						return new ValueReferenceable(global.Number.fromValueOf(JSHelper.valueOf(lhs.run(global, scope).get())).multiply(global.Number.fromValueOf(JSHelper.valueOf(rhs.run(global, scope).get()))));
+						return new ValueReferenceable(global.Number.fromValueOf(lhs.run(global, scope).get()).multiply(global.Number.fromValueOf(rhs.run(global, scope).get())));
+					} finally {
+						el.finishCall();
+					}
+				}
+			};
+		} else if(object instanceof Divide) {
+			final Impl lhs = compile(data, ((Divide)object).lhs);
+			final Impl rhs = compile(data, ((Divide)object).rhs);
+			return new Impl() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
+					try {
+						return new ValueReferenceable(global.Number.fromValueOf(lhs.run(global, scope).get()).divide(global.Number.fromValueOf(rhs.run(global, scope).get())));
 					} finally {
 						el.finishCall();
 					}
@@ -595,7 +609,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
-						return new ValueReferenceable(global.Number.fromValueOf(JSHelper.valueOf(lhs.run(global, scope).get())).minus(global.Number.fromValueOf(JSHelper.valueOf(rhs.run(global, scope).get()))));
+						return new ValueReferenceable(global.Number.fromValueOf(lhs.run(global, scope).get()).minus(global.Number.fromValueOf(rhs.run(global, scope).get())));
 					} finally {
 						el.finishCall();
 					}
@@ -609,7 +623,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
-						return new ValueReferenceable(global.Number.fromValueOf(JSHelper.valueOf(lhs.run(global, scope).get())).percent(global.Number.fromValueOf(JSHelper.valueOf(rhs.run(global, scope).get()))));
+						return new ValueReferenceable(global.Number.fromValueOf(lhs.run(global, scope).get()).percent(global.Number.fromValueOf(rhs.run(global, scope).get())));
 					} finally {
 						el.finishCall();
 					}
@@ -623,7 +637,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
-						return new ValueReferenceable(global.Number.fromValueOf(JSHelper.valueOf(lhs.run(global, scope).get())).and(global.Number.fromValueOf(JSHelper.valueOf(rhs.run(global, scope).get()))));
+						return new ValueReferenceable(global.Number.fromValueOf(lhs.run(global, scope).get()).and(global.Number.fromValueOf(rhs.run(global, scope).get())));
 					} finally {
 						el.finishCall();
 					}
@@ -645,7 +659,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
-						return new ValueReferenceable(global.Number.fromValueOf(JSHelper.valueOf(lhs.run(global, scope).get())).or(global.Number.fromValueOf(JSHelper.valueOf(rhs.run(global, scope).get()))));
+						return new ValueReferenceable(global.Number.fromValueOf(lhs.run(global, scope).get()).or(global.Number.fromValueOf(rhs.run(global, scope).get())));
 					} finally {
 						el.finishCall();
 					}
@@ -797,7 +811,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 					try {
 						Referenceable ref = lhs.run(global, scope);
 
-						net.nexustools.njs.Number.Instance number = global.Number.fromValueOf(JSHelper.valueOf(ref.get())).multiply(global.Number.fromValueOf(JSHelper.valueOf(rhs.run(global, scope).get())));
+						net.nexustools.njs.Number.Instance number = global.Number.fromValueOf(ref.get()).multiply(global.Number.fromValueOf(rhs.run(global, scope).get()));
 						ref.set(number);
 						return new ValueReferenceable(number);
 					} finally {

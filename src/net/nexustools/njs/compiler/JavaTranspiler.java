@@ -530,6 +530,11 @@ public class JavaTranspiler extends AbstractCompiler {
 			Parsed rhs = ((Multiply)part).rhs;
 			generateMath(sourceBuilder, lhs, rhs, "multiply", methodPrefix, baseScope, fileName);
 			return;
+		} else if (part instanceof Divide) {
+			Parsed lhs = ((Divide)part).lhs;
+			Parsed rhs = ((Divide)part).rhs;
+			generateMath(sourceBuilder, lhs, rhs, "divide", methodPrefix, baseScope, fileName);
+			return;
 		} else if (part instanceof And) {
 			Parsed lhs = ((And)part).lhs;
 			Parsed rhs = ((And)part).rhs;
@@ -1120,7 +1125,7 @@ public class JavaTranspiler extends AbstractCompiler {
 			sourceBuilder.appendln("\";");
 			sourceBuilder.appendln("}");
 		}
-		if (scope.isFunction()) {
+		if (scope == SourceScope.Function) {
 			sourceBuilder.appendln("@Override");
 			sourceBuilder.appendln("public String name() {");
 			sourceBuilder.append("\treturn \"");
@@ -1282,7 +1287,7 @@ public class JavaTranspiler extends AbstractCompiler {
 			sourceBuilder.appendln("\tbaseScope = scope;");
 			sourceBuilder.appendln("}");
 
-			generateScriptSource(sourceBuilder, function.impl, methodPrefix, fileName, scope == SourceScope.Function ? SourceScope.Function : SourceScope.GlobalFunction);
+			generateScriptSource(sourceBuilder, function.impl, methodPrefix, fileName, SourceScope.Function);
 
 			sourceBuilder.unindent();
 			sourceBuilder.appendln("}");
@@ -1317,7 +1322,7 @@ public class JavaTranspiler extends AbstractCompiler {
 		sourceBuilder.indent();
 
 		try {
-			generateScriptSource(sourceBuilder, script, script.methodName, fileName, SourceScope.GlobalScript);
+			generateScriptSource(sourceBuilder, script, script.methodName, fileName, inFunction ? SourceScope.GlobalFunction : SourceScope.GlobalScript);
 		} catch(RuntimeException t) {
 			System.err.println(sourceBuilder.toString());
 			throw t;

@@ -421,11 +421,20 @@ public class JSHelper {
 	public static Global createStandardGlobal() {
 		return createGlobal("eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float64Array");
 	}
+	public static Global createStandardGlobal(net.nexustools.njs.compiler.Compiler compiler) {
+		return createGlobal(compiler, "eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float64Array");
+	}
 	public static Global createExtendedGlobal() {
 		return createGlobal("eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float64Array", "importClass");
 	}
+	public static Global createExtendedGlobal(net.nexustools.njs.compiler.Compiler compiler) {
+		return createGlobal(compiler, "eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float64Array", "importClass");
+	}
 	public static Global createGlobal(java.lang.String... standards) {
-		final Global global = new Global();
+		return createGlobal(Global.createCompiler(), standards);
+	}
+	public static Global createGlobal(net.nexustools.njs.compiler.Compiler compiler, java.lang.String... standards) {
+		final Global global = new Global(compiler);
 		global.initStandards();
 		for(java.lang.String standard : standards) {
 			if(standard.equals("JSON"))

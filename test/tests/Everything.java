@@ -18,9 +18,11 @@ import org.junit.runners.Suite;
 	Comparisons.class,
 	Blocks.class,
 	
+	Function.class,
 	String.class,
 	Array.class,
+	JSON.class,
 	
 	Eval.class})
-public class TestSuite {
+public class Everything {
 }

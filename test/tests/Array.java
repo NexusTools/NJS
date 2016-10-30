@@ -88,7 +88,7 @@ public class Array {
 		test("indexes");
 	}
 
-	public void test(String name) {
+	public void test(java.lang.String name) {
 		for(Compiler compiler : compilers) {
 			try {
 				compiler.compile(new InputStreamReader(Array.class.getResourceAsStream("/tests/array/" + name + ".js")), name + ".js", false).exec(JSHelper.createExtendedGlobal(), null);

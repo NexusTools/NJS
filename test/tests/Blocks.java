@@ -58,7 +58,7 @@ public class Blocks {
 		test("try");
 	}
 
-	public void test(String name) {
+	public void test(java.lang.String name) {
 		for(Compiler compiler : compilers) {
 			try {
 				compiler.compile(new InputStreamReader(Blocks.class.getResourceAsStream("/tests/blocks/" + name + ".js")), name + ".js", false).exec(JSHelper.createExtendedGlobal(), null);
