@@ -47,7 +47,7 @@ import net.nexustools.njs.Global;
  * @author kate
  */
 public class JavaCompiler extends AbstractCompiler {
-	private static final List<java.lang.String> RESTRICTED_NAMES = Arrays.asList(new java.lang.String[]{"if", "do", "while", "for", "switch", "case", "default", "enum", "Arguments", "CompiledScript", "Debuggable", "Optimized", "String", "Number", "RegEx", "Global", "Scope", "exec", "call", "multiply", "plus", "divide", "or", "BaseObject", "BaseFunction", "AbstractFunction", "GenericObject", "GenericArray", "ConstructableFunction", "JSHelper"});
+	private static final List<java.lang.String> RESTRICTED_NAMES = Arrays.asList(new java.lang.String[]{"try", "catch", "finally", "if", "do", "while", "for", "switch", "case", "default", "enum", "Arguments", "CompiledScript", "Debuggable", "Optimized", "String", "Number", "RegEx", "Global", "Scope", "exec", "call", "multiply", "plus", "divide", "or", "BaseObject", "BaseFunction", "AbstractFunction", "GenericObject", "GenericArray", "ConstructableFunction", "JSHelper"});
 
 
 	private static final Map<java.lang.String, AtomicInteger> USED_NAMES = new HashMap();
@@ -741,7 +741,51 @@ public class JavaCompiler extends AbstractCompiler {
 			Catch c = ((Try)part).c;
 			Finally f = ((Try)part).f;
 			if(c != null && f != null) {
-				
+				sourceBuilder.appendln("try {");
+				sourceBuilder.indent();
+				generateBlockSource(sourceBuilder, ((Try)part).impl, methodPrefix, baseScope, fileName);
+				sourceBuilder.unindent();
+				sourceBuilder.appendln("} catch(net.nexustools.njs.Error.InvisibleException ex) {");
+				sourceBuilder.appendln("\tthrow ex;");
+				sourceBuilder.appendln("} catch(Throwable t) {");
+				sourceBuilder.indent();
+				java.lang.String newScope;
+				if(baseScope.equals("catchScope")) {
+					int count;
+					if(baseScope.length() > 10)
+						count = java.lang.Integer.valueOf(baseScope.substring(10));
+					else
+						count = 0;
+					newScope = "catchScope" + (count+1);
+				} else
+					newScope = "catchScope";
+				sourceBuilder.append("final Scope ");
+				sourceBuilder.append(newScope);
+				sourceBuilder.append(" = ");
+				sourceBuilder.append(baseScope);
+				sourceBuilder.appendln(".beginBlock();");
+				sourceBuilder.append(newScope);
+				sourceBuilder.appendln(".enter();");
+				sourceBuilder.appendln("try {");
+				sourceBuilder.indent();
+				sourceBuilder.append(newScope);
+				sourceBuilder.append(".param(\"");
+				sourceBuilder.append(convertStringSource(((Reference)c.condition).ref));
+				sourceBuilder.appendln("\", global.wrap(t));");
+				generateBlockSource(sourceBuilder, c.impl, methodPrefix, newScope, fileName);
+				sourceBuilder.unindent();
+				sourceBuilder.appendln("} finally {");
+				sourceBuilder.append("\t");
+				sourceBuilder.append(newScope);
+				sourceBuilder.appendln(".exit();");
+				sourceBuilder.appendln("}");
+				sourceBuilder.unindent();
+				sourceBuilder.appendln("} finally {");
+				sourceBuilder.indent();
+				generateBlockSource(sourceBuilder, f.impl, methodPrefix, baseScope, fileName);
+				sourceBuilder.unindent();
+				sourceBuilder.appendln("}");
+				return;
 			} else if(c != null) {
 				sourceBuilder.appendln("try {");
 				sourceBuilder.indent();
@@ -785,8 +829,17 @@ public class JavaCompiler extends AbstractCompiler {
 				sourceBuilder.appendln("}");
 				return;
 			}
-
-			throw new UnsupportedOperationException("Cannot compile try: " + describe(c) + describe(f));
+			
+			sourceBuilder.appendln("try {");
+			sourceBuilder.indent();
+			generateBlockSource(sourceBuilder, ((Try)part).impl, methodPrefix, baseScope, fileName);
+			sourceBuilder.unindent();
+			sourceBuilder.appendln("} finally {");
+			sourceBuilder.indent();
+			generateBlockSource(sourceBuilder, f.impl, methodPrefix, baseScope, fileName);
+			sourceBuilder.unindent();
+			sourceBuilder.appendln("}");
+			return;
 		} else if(part instanceof If) {
 			if(((If)part).simpleimpl != null) {
 				sourceBuilder.append("if(");
@@ -1133,7 +1186,7 @@ public class JavaCompiler extends AbstractCompiler {
 					sourceBuilder.appendln(";");
 				}
 				if (i == script.impl.length - 1 && !(part instanceof Throw)) {
-					if(!(part instanceof Var) && !(part instanceof If) && !(part instanceof While) && !(part instanceof For) && !(part instanceof Switch))
+					if(!(part instanceof Var) && !(part instanceof Try) && !(part instanceof If) && !(part instanceof While) && !(part instanceof For) && !(part instanceof Switch))
 						sourceBuilder.append("return ");
 					else
 						needReturn = true;

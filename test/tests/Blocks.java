@@ -52,6 +52,11 @@ public class Blocks {
 	public void _while() {
 		test("while");
 	}
+	
+	@Test
+	public void _try() {
+		test("try");
+	}
 
 	public void test(String name) {
 		for(Compiler compiler : compilers) {

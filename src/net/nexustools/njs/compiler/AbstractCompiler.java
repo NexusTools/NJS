@@ -719,6 +719,7 @@ public abstract class AbstractCompiler implements Compiler {
 			throw new ParseBlock(this);
 		}
 		public Parsed complete(Parsed part) {
+			state = State.Complete;
 			throw new CompleteException(part);
 		}
 		@Override
@@ -793,10 +794,15 @@ public abstract class AbstractCompiler implements Compiler {
 		@Override
 		public Parsed complete(Parsed part) {
 			if(!(part instanceof NewLine)) {
-				if(c != null) {
+				if(f != null) {
+					if(f.isIncomplete())
+						f = (Finally)f.transform(part);
+					else 
+						throw new CompleteException(part);
+				} else if(c != null) {
 					if(c.isIncomplete())
 						c = (Catch)c.transform(part);
-					else if(f instanceof Finally) {
+					else if(part instanceof Finally) {
 						if(f != null)
 							f = (Finally)f.transform(part);
 						else if(part instanceof Finally)
@@ -804,11 +810,6 @@ public abstract class AbstractCompiler implements Compiler {
 						else
 							throw new CompleteException(part);
 					} else
-						throw new CompleteException(part);
-				} else if(f != null) {
-					if(f.isIncomplete())
-						f = (Finally)f.transform(part);
-					else 
 						throw new CompleteException(part);
 				} else if(part instanceof Catch)
 					c = (Catch)part;

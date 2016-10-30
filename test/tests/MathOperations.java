@@ -6,8 +6,6 @@
 package tests;
 
 import java.io.InputStreamReader;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import net.nexustools.njs.JSHelper;
 import net.nexustools.njs.compiler.Compiler;
 import net.nexustools.njs.compiler.JavaCompiler;
@@ -66,7 +64,7 @@ public class MathOperations {
 	public void test(String name) {
 		for(Compiler compiler : compilers) {
 			try {
-				compiler.compile(new InputStreamReader(MathOperations.class.getResourceAsStream("/tests/math/ops/" + name + ".js")), name, false).exec(JSHelper.createExtendedGlobal(), null);
+				compiler.compile(new InputStreamReader(MathOperations.class.getResourceAsStream("/tests/math/ops/" + name + ".js")), name + ".js", false).exec(JSHelper.createExtendedGlobal(), null);
 			} catch(java.lang.RuntimeException re) {
 				System.err.println(JSHelper.extractStack(re.toString(), re));
 				throw re;

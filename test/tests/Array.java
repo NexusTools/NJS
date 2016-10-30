@@ -86,7 +86,7 @@ public class Array {
 	public void test(String name) {
 		for(Compiler compiler : compilers) {
 			try {
-				compiler.compile(new InputStreamReader(Array.class.getResourceAsStream("/tests/array/" + name + ".js")), name, false).exec(JSHelper.createExtendedGlobal(), null);
+				compiler.compile(new InputStreamReader(Array.class.getResourceAsStream("/tests/array/" + name + ".js")), name + ".js", false).exec(JSHelper.createExtendedGlobal(), null);
 			} catch(java.lang.RuntimeException re) {
 				System.err.println(JSHelper.extractStack(re.toString(), re));
 				throw re;
