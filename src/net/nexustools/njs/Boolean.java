@@ -13,7 +13,7 @@ public class Boolean extends AbstractFunction {
 	public static class Instance extends GenericObject {
 		public final boolean value;
 		private Instance(Boolean Boolean, Number.Instance number, Global global, boolean value) {
-			super(Boolean.prototype(), Boolean, global, number);
+			super(Boolean, global);
 			this.value = value;
 		}
 		@Override

@@ -23,13 +23,11 @@ public class Number extends AbstractFunction {
 			super(Number, iterator, String, (Number)null);
 			this.Number = Number;
 			this.value = number;
-			this.number = this;
 		}
 		Instance(Number Number, Global global, double number) {
 			super(Number, global);
 			this.Number = Number;
 			this.value = number;
-			this.number = this;
 		}
 		Instance(Global global, double number) {
 			this(global.Number, global, number);

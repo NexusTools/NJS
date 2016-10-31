@@ -157,8 +157,8 @@ public class Error extends AbstractFunction implements BaseFunction {
 	
 	public static class Instance extends GenericObject {
 		public final java.lang.String name, message, stack;
-		public Instance(String String, Error Error, Symbol.Instance iterator, Number.Instance NaN, java.lang.String name, java.lang.String message, java.lang.String stack) {
-			super(Error, iterator, String, NaN);
+		public Instance(String String, Error Error, Symbol.Instance iterator, Number Number, java.lang.String name, java.lang.String message, java.lang.String stack) {
+			super(Error, iterator, String, Number);
 			setHidden("name", String.wrap(this.name = name));
 			if(message != null)
 				setHidden("message", String.wrap(this.message = message));
@@ -180,7 +180,7 @@ public class Error extends AbstractFunction implements BaseFunction {
 				BaseObject message = _this.get("message", OR_NULL);
 				if(message != null)
 					return global.wrap(_this.get("name") + ": " + message);
-				return ((BaseFunction)_this.get("toString")).call(_this);
+				return global.wrap(_this.get("name"));
 			}
 		});
 	}
@@ -188,8 +188,8 @@ public class Error extends AbstractFunction implements BaseFunction {
 	@Override
 	public BaseObject construct(BaseObject... params) {
 		if(params.length > 0)
-			return new Instance(String, this, iterator, number, "Error", params[0].toString(), JSHelper.extractStack("Error: " + params[0].toString(), new Throwable()));
-		return new Instance(String, this, iterator, number, "Error", null, JSHelper.extractStack("Error", new Throwable()));
+			return new Instance(String, this, iterator, Number, "Error", params[0].toString(), JSHelper.extractStack("Error: " + params[0].toString(), new Throwable()));
+		return new Instance(String, this, iterator, Number, "Error", null, JSHelper.extractStack("Error", new Throwable()));
 	}
 	
 	@Override

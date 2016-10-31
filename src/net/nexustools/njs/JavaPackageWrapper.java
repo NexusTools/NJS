@@ -49,11 +49,6 @@ public class JavaPackageWrapper implements BaseObject {
 	}
 
 	@Override
-	public BaseFunction constructor() {
-		return null;
-	}
-
-	@Override
 	public boolean instanceOf(BaseFunction constructor) {
 		return false;
 	}

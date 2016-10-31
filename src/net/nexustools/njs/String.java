@@ -31,14 +31,8 @@ public class String extends AbstractFunction {
 			
 			setReadOnly("length", Number.wrap(string.length()));
 		}
-		Instance(Number.Instance length, Number.Instance number, Symbol.Instance iterator, String String, final java.lang.String string) {
-			super(String.prototype(), String, iterator, String, number);
-			this.string = string;
-			
-			setReadOnly("length", length);
-		}
 		Instance(Number.Instance length, Number Number, Symbol.Instance iterator, String String, final java.lang.String string) {
-			super(String.prototype(), String, iterator, String, Number);
+			super(String.prototype(), iterator, String, Number);
 			this.string = string;
 			
 			setReadOnly("length", length);
@@ -64,8 +58,6 @@ public class String extends AbstractFunction {
 		}
 		@Override
 		public Instance clone() {
-			if(number != null)
-				return new Instance((Number.Instance)getDirectly("length"), number, iterator, String, string);
 			return new Instance((Number.Instance)getDirectly("length"), Number, iterator, String, string);
 		}
 		@Override
@@ -76,7 +68,9 @@ public class String extends AbstractFunction {
 	
 	private Global global;
 	final List<WeakReference<Instance>> WRAPS = new ArrayList();
-	public String() {}
+	public String() {
+		this.String = this;
+	}
 	
 	protected void initPrototypeFunctions(Global global) {
 		this.global = global;

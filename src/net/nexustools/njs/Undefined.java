@@ -72,11 +72,6 @@ public final class Undefined implements BaseObject {
 	}
 
 	@Override
-	public BaseFunction constructor() {
-		throw new Error.JavaException("TypeError", "Cannot read property \"constructor\" from undefined");
-	}
-
-	@Override
 	public boolean instanceOf(BaseFunction constructor) {
 		return false;
 	}

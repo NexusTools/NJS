@@ -16,7 +16,8 @@ public abstract class AbstractFunction extends UniqueObject implements BaseFunct
 		super(global.Function, global);
 		this.Object = global.Object;
 		
-		setHidden("prototype", create());
+		BaseObject prototype = create0();
+		setHidden("prototype", prototype);
 		if(name != null)
 			setHidden("name", String.wrap(name));
 	}
@@ -24,7 +25,7 @@ public abstract class AbstractFunction extends UniqueObject implements BaseFunct
 		super(global.Function, global);
 		this.Object = global.Object;
 		
-		setHidden("prototype", create());
+		setHidden("prototype", create0());
 		java.lang.String name = name();
 		if(name != null)
 			setHidden("name", String.wrap(name));
@@ -36,29 +37,16 @@ public abstract class AbstractFunction extends UniqueObject implements BaseFunct
 		this.Object = null;
 	}
 
-	@Override
-	public BaseObject create() {
-		GenericObject prototype;
-		if(number == null)
-			prototype = new GenericObject(iterator, String);
-		else
-			prototype = new GenericObject(iterator, String, number);
-		prototype.constructor = constructor;
+	public final GenericObject create0() {
+		GenericObject prototype = new GenericObject(((BaseFunction)get("constructor")).prototype(), iterator, String, Number);
+		prototype.setHidden("constructor", this);
 		return prototype;
 	}
-	
-	protected GenericObject initPrototype(Object Object, Global global) {
-		GenericObject prototype;
-		if(this instanceof Object) {
-			prototype = new GenericObject();
-			prototype.setStorage("constructor", this, false);
-		} else if(global != null)
-			prototype = new GenericObject(Object, global);
-		else
-			prototype = new GenericObject();
-		
-		setStorage("prototype", prototype, false);
-		super.init(prototype, this);
+
+	@Override
+	public BaseObject create() {
+		GenericObject prototype = create0();
+		prototype.__proto__ = prototype();
 		return prototype;
 	}
 

@@ -72,11 +72,6 @@ public final class Null implements BaseObject {
 	}
 
 	@Override
-	public BaseFunction constructor() {
-		throw new Error.JavaException("TypeError", "Cannot read property \"constructor\" from null");
-	}
-
-	@Override
 	public boolean instanceOf(BaseFunction constructor) {
 		return false;
 	}

@@ -6,8 +6,6 @@
 package tests;
 
 import java.io.InputStreamReader;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import net.nexustools.njs.JSHelper;
 import net.nexustools.njs.compiler.Compiler;
 import net.nexustools.njs.compiler.JavaTranspiler;

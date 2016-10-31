@@ -70,26 +70,36 @@ public class Global extends UniqueObject {
 		
 		Symbol = new Symbol(this);
 		Symbol.initConstants();
-		Object.initPrototype(Object, null);
-		Number.initPrototype(Object, null);
-		Function.initPrototype(Object, this);
-		String.initPrototype(Object, this);
-		Symbol.initPrototype(Object, this);
+		GenericObject ObjectPrototype = new GenericObject();
+		ObjectPrototype.setHidden("constructor", Object);
+		Object.setHidden("prototype", ObjectPrototype);
+		GenericObject NumberPrototype = new GenericObject();
+		NumberPrototype.setHidden("constructor", Number);
+		NumberPrototype.__proto__ = ObjectPrototype;
+		Number.setHidden("prototype", NumberPrototype);
+		GenericObject FunctionPrototype = new GenericObject();
+		FunctionPrototype.setHidden("constructor", Function);
+		FunctionPrototype.__proto__ = ObjectPrototype;
+		Function.setHidden("prototype", FunctionPrototype);
+		GenericObject StringPrototype = new GenericObject();
+		StringPrototype.setHidden("constructor", String);
+		StringPrototype.__proto__ = ObjectPrototype;
+		String.setHidden("prototype", StringPrototype);
+		GenericObject SymbolPrototype = new GenericObject();
+		SymbolPrototype.setHidden("constructor", Symbol);
+		SymbolPrototype.__proto__ = ObjectPrototype;
+		Symbol.setHidden("prototype", SymbolPrototype);
 		Number.initConstants();
 		
-		String.Number = Object.Number = Number;
-		NaN = Symbol.iterator.number = Symbol.unscopables.number = this.number = String.number = Symbol.number = Function.number = Number.number = Number.NaN;
+		ObjectPrototype.String = NumberPrototype.String = Object.String = String;
+		ObjectPrototype.Number = NumberPrototype.Number = String.Number = Object.Number = Number;
+		NaN = Number.NaN;
 		
 		PositiveOne = Number.PositiveOne;
 		NegativeOne = Number.NegativeOne;
 		Zero = Number.Zero;
 		
-		Object.setupNaN(Number.NaN);
-		
-		Object.setHidden("__proto__", Function.prototype());
-		Function.setHidden("__proto__", Function.prototype());
-		String.setHidden("__proto__", Function.prototype());
-		Number.setHidden("__proto__", Function.prototype());
+		Symbol.__proto__ = Number.__proto__ = String.__proto__ = Function.__proto__ = Object.__proto__ = Function.prototype();
 		
 		String.initPrototypeFunctions(this);
 		Object.initPrototypeFunctions(this);
@@ -105,7 +115,7 @@ public class Global extends UniqueObject {
 	
 	public void initStandards() {
 		setHidden("constructor", Object);
-		setHidden("__proto__", Object.prototype());
+		__proto__ = Object.prototype();
 		
 		setHidden("NaN", Number.NaN);
 		setHidden("Infinity", Number.PositiveInfinity);
@@ -160,8 +170,8 @@ public class Global extends UniqueObject {
 		if(t instanceof Error.Thrown)
 			return ((Error.Thrown)t).what;
 		if(t instanceof Error.JavaException)
-			return new Error.Instance(String, Error, Symbol.iterator, NaN, ((Error.JavaException)t).type, ((Error.JavaException) t).getUnderlyingMessage(), JSHelper.extractStack(t.getMessage(), t));
-		return new Error.Instance(String, Error, Symbol.iterator, NaN, "JavaError", t.toString(), JSHelper.extractStack("JavaError: " + t.toString(), t));
+			return new Error.Instance(String, Error, Symbol.iterator, Number, ((Error.JavaException)t).type, ((Error.JavaException) t).getUnderlyingMessage(), JSHelper.extractStack(t.getMessage(), t));
+		return new Error.Instance(String, Error, Symbol.iterator, Number, "JavaError", t.toString(), JSHelper.extractStack("JavaError: " + t.toString(), t));
 	}
 
 	private final List<WeakReference<JavaObjectWrapper>> WRAPS = new ArrayList();

@@ -18,10 +18,6 @@ public class Object extends AbstractFunction {
 	public static final Pattern BUILT_IN = Pattern.compile("^net\\.nexustools\\.njs\\.([a-zA-Z])$");
 	
 	public Object() {}
-	
-	public void setupNaN(Number.Instance NaN) {
-		number = NaN;
-	}
 
 	public void initPrototypeFunctions(final Global global) {
 		setHidden("defineProperty", new AbstractFunction(global) {
@@ -65,13 +61,23 @@ public class Object extends AbstractFunction {
 				return "Object_getOwnPropertyNames";
 			}
 		});
+		setHidden("getPrototypeOf", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return params[0].__proto__();
+			}
+			@Override
+			public java.lang.String name() {
+				return "Object_getOwnPropertyNames";
+			}
+		});
 		setHidden("create", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				if(params[0] instanceof BaseFunction)
 					return ((BaseFunction)params[0]).create();
 				GenericObject genericObject = new GenericObject(global);
-				genericObject.setHidden("__proto__", params[0]);
+				genericObject.__proto__ = params[0];
 				return genericObject;
 			}
 			@Override
@@ -99,22 +105,6 @@ public class Object extends AbstractFunction {
 					return _objectArguments;
 				if(_this instanceof Global)
 					return _objectGlobal;
-				
-				try {
-					BaseFunction constructor = _this.constructor();
-					synchronized(constructorNameMap) {
-						String.Instance string = constructorNameMap.get(constructor);
-						if(string != null)
-							return string;
-						Class<?> clazz = constructor.getClass();
-						Matcher matcher = BUILT_IN.matcher(clazz.getName());
-						if(matcher.matches()) {
-							constructorNameMap.put(constructor, string = global.wrap("[object " + matcher.group(1) + "]"));
-							return string;
-						}
-					}
-				} catch(Error.JavaException ex) {
-				} catch(ClassCastException ex) {}
 				
 				return _objectObject;
 			}
@@ -149,10 +139,10 @@ public class Object extends AbstractFunction {
 	@Override
 	public BaseObject construct(BaseObject... params) {
 		if(params.length == 0)
-			return new GenericObject(this, iterator, String, number);
+			return new GenericObject(this, iterator, String, Number);
 		
 		BaseObject src = params[0];
-		GenericObject copy = new GenericObject(this, iterator, String, number);
+		GenericObject copy = new GenericObject(this, iterator, String, Number);
 		for(java.lang.String key : src.keys())
 			copy.set(key, src.get(key));
 		return copy;

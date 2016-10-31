@@ -12,18 +12,15 @@ package net.nexustools.njs;
 public class Date extends AbstractFunction {
 	public static class Instance extends GenericObject {
 		public final java.util.Date date;
-		public Instance(Date Date, Symbol.Instance iterator, String String, Number.Instance instance, java.util.Date date) {
-			super(Date, iterator, String, instance);
+		public Instance(Date Date, Symbol.Instance iterator, String String, Number Number, java.util.Date date) {
+			super(Date, iterator, String, Number);
 			this.date = date;
 		}
 	}
 	
-	private final Number Number;
 	public Date(final Global global) {
 		super(global);
-		Number = global.Number;
 		GenericObject prototype = prototype();
-		prototype.number = global.Zero;
 		prototype.setHidden("valueOf", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
@@ -64,7 +61,7 @@ public class Date extends AbstractFunction {
 			}
 		else
 			date = new java.util.Date();
-		return new Instance(this, iterator, String, Number.wrap(date.getTime()), date);
+		return new Instance(this, iterator, String, Number, date);
 	}
 
 	@Override

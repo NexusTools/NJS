@@ -12,10 +12,9 @@ import java.util.Set;
  * @author kate
  */
 public interface BaseObject extends Scopeable, Iterable<BaseObject> {
-	public BaseObject __proto__();
-	public BaseFunction constructor();
 	public boolean instanceOf(BaseFunction constructor);
 	public java.lang.String typeOf();
+	public BaseObject __proto__();
 	
 	public Set<java.lang.String> keys();
 	public Set<java.lang.String> ownPropertyNames();

@@ -24,7 +24,7 @@ public abstract class CompiledFunction extends AbstractFunction {
 
 	@Override
 	public BaseObject construct(BaseObject... params) {
-		GenericObject _this = new GenericObject(prototype(), this, global, number);
+		BaseObject _this = create();
 		call(_this, params);
 		return _this;
 	}

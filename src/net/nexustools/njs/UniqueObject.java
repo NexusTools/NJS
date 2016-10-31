@@ -13,29 +13,19 @@ public class UniqueObject extends GenericObject {
 	public UniqueObject(Global global) {
 		super(global);
 	}
-	public UniqueObject(BaseFunction constructor, Symbol.Instance iterator, String String, Number.Instance number) {
-		super(constructor.prototype(), constructor, iterator, String, number);
-	}
-	public UniqueObject(BaseFunction constructor, Symbol.Instance iterator, String String, Number Number) {
-		super(constructor.prototype(), constructor, iterator, String, Number);
-	}
 	public UniqueObject(BaseFunction constructor, Global global) {
 		super(constructor, global);
 	}
-	public UniqueObject(BaseObject __proto__, BaseFunction constructor, Global global, Number.Instance number) {
-		super(__proto__, constructor, global, number);
+	public UniqueObject(Symbol.Instance iterator, String String) {
+		super(iterator, String);
 	}
-	public UniqueObject(BaseObject __proto__, BaseFunction constructor, Symbol.Instance iterator, String String, Number.Instance number) {
-		super(__proto__, constructor, iterator, String, number);
+	public UniqueObject(BaseFunction constructor, Symbol.Instance iterator, String String, Number Number) {
+		super(constructor.prototype(), iterator, String, Number);
 	}
-	public UniqueObject(BaseObject __proto__, BaseFunction constructor, Symbol.Instance iterator, String String, Number Number) {
-		super(__proto__, constructor, iterator, String, Number);
-	}
-	public UniqueObject(BaseFunction constructor, Global global, Number.Instance number) {
-		super(constructor, global, number);
+	public UniqueObject(BaseObject __proto__, Symbol.Instance iterator, String String, Number Number) {
+		super(__proto__, iterator, String, Number);
 	}
 	protected UniqueObject() {
-		super();
 	}
 	@Override
 	public int hashCode() {

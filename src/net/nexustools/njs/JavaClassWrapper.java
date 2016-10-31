@@ -36,7 +36,6 @@ public class JavaClassWrapper extends AbstractFunction {
 		this.global = global;
 		
 		setStorage("name", global.wrap(javaClassString), false);
-		
 		setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
@@ -51,10 +50,9 @@ public class JavaClassWrapper extends AbstractFunction {
 		GenericObject prototype = prototype();
 		if(superClass != null) {
 			JavaClassWrapper superConstructor = global.wrap(superClass);
-			prototype.setHidden("__proto__", superConstructor.prototype());
 			prototype.setHidden("constructor", superConstructor);
-			//setHidden("constructor", superConstructor);
-			//setHidden("__proto__", superConstructor.prototype());
+			prototype.__proto__ = superConstructor.prototype();
+			//__proto__ = superConstructor;
 		}
 		
 		Map<java.lang.String, List<Method>> methods = new HashMap();
