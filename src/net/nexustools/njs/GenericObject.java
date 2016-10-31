@@ -180,7 +180,7 @@ public class GenericObject extends NumberObject {
 		this(global.Object.prototype(), global.Object, global, global.Number.NaN);
 	}
 	public GenericObject(BaseFunction constructor, Global global) {
-		super((Number)null);
+		super(global.Number);
 		iterator = global.Symbol.iterator;
 		String = global.String;
 		init(constructor.prototype(), constructor);

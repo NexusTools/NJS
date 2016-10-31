@@ -11,7 +11,7 @@ package net.nexustools.njs;
  */
 public abstract class NumberObject implements BaseObject {
 	
-	protected final Number Number;
+	Number Number;
 	protected Number.Instance number;
 	public NumberObject(Number Number) {
 		this.Number = Number;

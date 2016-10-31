@@ -13,6 +13,7 @@ try {
 }
 
 try {
+	java.lang.System.out.println(Object.keys(this));
 	var tuna = new Error("Tuna Fish");
 	try {
 		try {

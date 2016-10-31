@@ -24,28 +24,21 @@ public class String extends AbstractFunction {
 			}
 		}
 		
-		private final Number Number;
 		public final java.lang.String string;
 		Instance(Global global, final java.lang.String string) {
-			this(global.Number.wrap(string.length()), global, string);
-		}
-		Instance(Number.Instance length, Global global, final java.lang.String string) {
 			super(global.String, global);
-			this.Number = global.Number;
 			this.string = string;
 			
-			setReadOnly("length", length);
+			setReadOnly("length", Number.wrap(string.length()));
 		}
 		Instance(Number.Instance length, Number.Instance number, Symbol.Instance iterator, String String, final java.lang.String string) {
 			super(String.prototype(), String, iterator, String, number);
 			this.string = string;
-			Number = null;
 			
 			setReadOnly("length", length);
 		}
 		Instance(Number.Instance length, Number Number, Symbol.Instance iterator, String String, final java.lang.String string) {
 			super(String.prototype(), String, iterator, String, Number);
-			this.Number = Number;
 			this.string = string;
 			
 			setReadOnly("length", length);
@@ -82,7 +75,7 @@ public class String extends AbstractFunction {
 	}
 	
 	private Global global;
-	private final List<WeakReference<Instance>> WRAPS = new ArrayList();
+	final List<WeakReference<Instance>> WRAPS = new ArrayList();
 	public String() {}
 	
 	protected void initPrototypeFunctions(Global global) {

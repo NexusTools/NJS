@@ -65,6 +65,9 @@ public class Global extends UniqueObject {
 	public Global(Compiler compiler) {
 		this.compiler = compiler;
 		
+		super.Number = Number;
+		super.String = String;
+		
 		Symbol = new Symbol(this);
 		Symbol.initConstants();
 		Object.initPrototype(Object, null);
@@ -74,7 +77,8 @@ public class Global extends UniqueObject {
 		Symbol.initPrototype(Object, this);
 		Number.initConstants();
 		
-		NaN = this.number = String.number = Symbol.number = Function.number = Number.number = Number.NaN;
+		String.Number = Object.Number = Number;
+		NaN = Symbol.iterator.number = Symbol.unscopables.number = this.number = String.number = Symbol.number = Function.number = Number.number = Number.NaN;
 		
 		PositiveOne = Number.PositiveOne;
 		NegativeOne = Number.NegativeOne;
