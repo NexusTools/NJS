@@ -13,12 +13,13 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 	
 	protected O arrayStorage;
 	protected int actualLength;
-	protected AbstractArray(final Global global, BaseObject __proto__, BaseFunction constructor, O storage) {
-		super(__proto__, constructor);
+	protected AbstractArray(final Global global, BaseFunction constructor, O storage) {
+		super(constructor, global);
 		this.arrayStorage = storage;
 		this.actualLength = storageSize();
 		final Number Number0 = global.Number;
 		defineProperty("length", new AbstractFunction(global) {
+			Number.Instance cached;
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				return Number0.wrap(actualLength);

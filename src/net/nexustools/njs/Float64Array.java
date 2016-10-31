@@ -28,7 +28,7 @@ public class Float64Array extends AbstractFunction {
 			this(global, Float64Array, ArrayStorage.BufferStorage.DOUBLE.createOrReuse(len));
 		}
 		protected Instance(Global global, Float64Array Float64Array, double[] storage) {
-			super(global, Float64Array.prototype(), Float64Array, storage);
+			super(global, Float64Array, storage);
 			this.Number = global.Number;
 		}
 

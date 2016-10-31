@@ -277,7 +277,7 @@ public class JSHelper {
 		
 		if(jsObject instanceof Number.Instance) {
 			accuracy.accuracy = 1;
-			double value = (Double)((Number.Instance)jsObject).number;
+			double value = ((Number.Instance)jsObject).value;
 			if(desiredClass == Long.class)
 				return (Long)(long)value;
 			if(desiredClass == Integer.class)
@@ -425,10 +425,10 @@ public class JSHelper {
 		return createGlobal(compiler, "eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float64Array");
 	}
 	public static Global createExtendedGlobal() {
-		return createGlobal("eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float64Array", "importClass");
+		return createGlobal("eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float64Array", "GeneratorFunction", "importClass", "isJavaClass", "isJavaObject", "isJavaPackage", "PackageRoot", "java", "javax", "print");
 	}
 	public static Global createExtendedGlobal(net.nexustools.njs.compiler.Compiler compiler) {
-		return createGlobal(compiler, "eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float64Array", "importClass");
+		return createGlobal(compiler, "eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float64Array", "GeneratorFunction", "importClass", "isJavaClass", "isJavaObject", "isJavaPackage", "PackageRoot", "java", "javax", "print");
 	}
 	public static Global createGlobal(java.lang.String... standards) {
 		return createGlobal(Global.createCompiler(), standards);
@@ -459,6 +459,60 @@ public class JSHelper {
 				global.setHidden("Int32Array", new Int32Array(global));
 			else if(standard.equals("Float64Array"))
 				global.setHidden("Float64Array", new Float64Array(global));
+			else if(standard.equals("GeneratorFunction"))
+				global.setHidden("GeneratorFunction", global.GeneratorFunction);
+			else if(standard.equals("PackageRoot"))
+				global.setHidden("PackageRoot", new JavaPackageWrapper(global));
+			else if(standard.equals("java"))
+				global.setHidden("java", new JavaPackageWrapper(global, "java"));
+			else if(standard.equals("javax"))
+				global.setHidden("javax", new JavaPackageWrapper(global, "javax"));
+			else if(standard.equals("isJavaClass"))
+				global.setHidden("isJavaClass", new AbstractFunction(global) {
+					@Override
+					public BaseObject call(BaseObject _this, BaseObject... params) {
+						return params[0] instanceof JavaClassWrapper ? global.Boolean.TRUE : global.Boolean.FALSE;
+					}
+					@Override
+					public java.lang.String name() {
+						return "isJavaClass";
+					}
+				});
+			else if(standard.equals("isJavaObject"))
+				global.setHidden("isJavaObject", new AbstractFunction(global) {
+					@Override
+					public BaseObject call(BaseObject _this, BaseObject... params) {
+						return params[0] instanceof JavaObjectWrapper ? global.Boolean.TRUE : global.Boolean.FALSE;
+					}
+					@Override
+					public java.lang.String name() {
+						return "isJavaClass";
+					}
+				});
+			else if(standard.equals("isJavaPackage"))
+				global.setHidden("isJavaPackage", new AbstractFunction(global) {
+					@Override
+					public BaseObject call(BaseObject _this, BaseObject... params) {
+						return params[0] instanceof JavaPackageWrapper ? global.Boolean.TRUE : global.Boolean.FALSE;
+					}
+					@Override
+					public java.lang.String name() {
+						return "isJavaPackage";
+					}
+				});
+			else if(standard.equals("print"))
+				global.setHidden("print", new AbstractFunction(global) {
+					@Override
+					public BaseObject call(BaseObject _this, BaseObject... params) {
+						renameMethodCall("print");
+						System.out.println(params[0].toString());
+						return Undefined.INSTANCE;
+					}
+					@Override
+					public java.lang.String name() {
+						return "print";
+					}
+				});
 			else if(standard.equals("eval"))
 				global.setHidden("eval", new AbstractFunction(global) {
 					@Override
@@ -499,9 +553,9 @@ public class JSHelper {
 	public static BaseObject get(BaseObject _this, BaseObject key) {
 		if(key instanceof String.Instance)
 			return _this.get(((String.Instance) key).string);
-		else if(key instanceof Number.Instance && ((Number.Instance)key).number >= 0
-				 && ((Number.Instance)key).number <= Integer.MAX_VALUE && ((Number.Instance)key).number == (int)((Number.Instance)key).number)
-			return _this.get((int)((Number.Instance)key).number);
+		else if(key instanceof Number.Instance && ((Number.Instance)key).value >= 0
+				 && ((Number.Instance)key).value <= Integer.MAX_VALUE && ((Number.Instance)key).value == (int)((Number.Instance)key).value)
+			return _this.get((int)((Number.Instance)key).value);
 		else
 			return _this.get(key.toString());
 	}
@@ -509,9 +563,9 @@ public class JSHelper {
 	public static BaseObject set(BaseObject _this, BaseObject key, BaseObject val) {
 		if(key instanceof String.Instance)
 			_this.set(((String.Instance) key).string, val);
-		else if(key instanceof Number.Instance && ((Number.Instance)key).number >= 0
-				 && ((Number.Instance)key).number <= Integer.MAX_VALUE && ((Number.Instance)key).number == (int)((Number.Instance)key).number)
-			_this.set((int)((Number.Instance)key).number, val);
+		else if(key instanceof Number.Instance && ((Number.Instance)key).value >= 0
+				 && ((Number.Instance)key).value <= Integer.MAX_VALUE && ((Number.Instance)key).value == (int)((Number.Instance)key).value)
+			_this.set((int)((Number.Instance)key).value, val);
 		else
 			_this.set(key.toString(), val);
 		return val;
@@ -520,9 +574,9 @@ public class JSHelper {
 	public static boolean delete(BaseObject _this, BaseObject key) {
 		if(key instanceof String.Instance)
 			return _this.delete(((String.Instance) key).string);
-		else if(key instanceof Number.Instance && ((Number.Instance)key).number >= 0
-				 && ((Number.Instance)key).number <= Integer.MAX_VALUE && ((Number.Instance)key).number == (int)((Number.Instance)key).number)
-			return _this.delete((int)((Number.Instance)key).number);
+		else if(key instanceof Number.Instance && ((Number.Instance)key).value >= 0
+				 && ((Number.Instance)key).value <= Integer.MAX_VALUE && ((Number.Instance)key).value == (int)((Number.Instance)key).value)
+			return _this.delete((int)((Number.Instance)key).value);
 		else
 			return _this.delete(key.toString());
 	}
@@ -530,19 +584,21 @@ public class JSHelper {
 	public static BaseObject valueOf(BaseObject val) {
 		if(isUndefined(val))
 			return val;
-		return ((BaseFunction)val.get("valueOf", Scopeable.OR_NULL)).call(val);
+		BaseObject valueOf = val.get("valueOf");
+		if(valueOf instanceof BaseFunction)
+			return ((BaseFunction)val.get("valueOf", Scopeable.OR_NULL)).call(val);
+		return val;
 	}
 
-	public static boolean isTrue(BaseObject valueOf) {
-		valueOf = valueOf(valueOf);
-		if(isUndefined(valueOf))
+	public static boolean isTrue(BaseObject value) {
+		if(isUndefined(value))
 			return false;
-		if(valueOf instanceof Boolean.Instance)
-			return ((Boolean.Instance)valueOf).value;
-		if(valueOf instanceof Number.Instance)
-			return ((Number.Instance)valueOf).number != 0;
-		if(valueOf instanceof String.Instance)
-			return !((String.Instance)valueOf).string.isEmpty();
+		if(value instanceof Boolean.Instance)
+			return ((Boolean.Instance)value).value;
+		if(value instanceof Number.Instance)
+			return ((Number.Instance)value).value != 0;
+		if(value instanceof String.Instance)
+			return !((String.Instance)value).string.isEmpty();
 		return true;
 	}
 

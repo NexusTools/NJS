@@ -24,5 +24,12 @@ public class BoundFunction extends AbstractFunction {
 		JSHelper.renameMethodCall(targetFunction.name() + " [bound]");
 		return targetFunction.call(targetThis, params);
 	}
+
+	@Override
+	public java.lang.String name() {
+		if(targetFunction == null)
+			return "bound";
+		return "bound " + targetFunction.name();
+	}
 	
 }

@@ -12,17 +12,27 @@ package net.nexustools.njs;
 public class Symbol extends AbstractFunction {
 	public static class Instance extends UniqueObject {
 		public final java.lang.String name;
-		public Instance(Symbol Symbol, java.lang.String name) {
-			super(Symbol.prototype(), Symbol);
+		public Instance(java.lang.String name) {
+			super();
+			this.name = name;
+		}
+		public Instance(Symbol Symbol, java.lang.String name, Global global) {
+			super(Symbol, global);
 			this.name = name;
 		}
 	}
 
-	public final Instance iterator, unscopables;
+	private final Global global;
+	public Instance unscopables;
 	public Symbol(final Global global) {
-		super(global);
-		setHidden("iterator", iterator = new Instance(this, "Symbol.iterator"));
-		setHidden("unscopables", unscopables = new Instance(this, "Symbol.unscopables"));
+		super();
+		this.global = global;
+		if(true)
+			return;
+		
+	}
+
+	protected void initPrototypeFunctions(final Global global) {
 		GenericObject prototype = prototype();
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
@@ -49,12 +59,16 @@ public class Symbol extends AbstractFunction {
 				return "Symbol_prototype_toString";
 			}
 		});
-		// Cannot convert a Symbol value to a number
+	}
+	
+	public void initConstants() {
+		setHidden("iterator", iterator = new Instance("Symbol.iterator"));
+		setHidden("unscopables", unscopables = new Instance("Symbol.unscopables"));
 	}
 
 	@Override
 	public BaseObject construct(BaseObject... params) {
-		return new Instance(this, params[0].toString());
+		return new Instance(this, params[0].toString(), global);
 	}
 
 	@Override

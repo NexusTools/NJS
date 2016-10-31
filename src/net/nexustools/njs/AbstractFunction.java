@@ -11,65 +11,54 @@ package net.nexustools.njs;
  */
 public abstract class AbstractFunction extends UniqueObject implements BaseFunction {
 	
-	public AbstractFunction(Global global) {
-		this(global.String, global.Object, global.Function, global.NaN);
-	}
-	public AbstractFunction(Global global, String.Instance name) {
-		this(global.String, global.Object, global.Function, global.NaN, name);
-	}
+	private final Object Object;
 	public AbstractFunction(Global global, java.lang.String name) {
-		this(global.String, global.Object, global.Function, global.NaN, global.wrap(name));
-	}
-	public AbstractFunction(String String, Object Object, Function Function, Number.Instance NaN) {
-		super(Function.prototype(), Function);
+		super(global.Function, global);
+		this.Object = global.Object;
 		
-		GenericObject prototype = new GenericObject(Object, NaN);
-		prototype.setStorage("constructor", this, false);
-		setStorage("prototype", prototype, false);
-		if(name() != null)
-			setStorage("name", String.wrap(name()), false);
+		setHidden("prototype", create());
+		if(name != null)
+			setHidden("name", String.wrap(name));
 	}
-	public AbstractFunction(String String, Object Object, Function Function, Number.Instance NaN, java.lang.String name) {
-		this(String, Object, Function, NaN, String.wrap(name));
-	}
-	public AbstractFunction(String String, Object Object, Function Function, Number.Instance NaN, String.Instance name) {
-		super(Function.prototype(), Function);
+	public AbstractFunction(Global global) {
+		super(global.Function, global);
+		this.Object = global.Object;
 		
-		GenericObject prototype = new GenericObject(Object, NaN);
-		prototype.setStorage("constructor", this, false);
-		setStorage("prototype", prototype, false);
-		setStorage("name", name, false);
+		setHidden("prototype", create());
+		java.lang.String name = name();
+		if(name != null)
+			setHidden("name", String.wrap(name));
 	}
-	protected AbstractFunction() {}
-	
+	protected AbstractFunction(Object Object) {
+		this.Object = Object;
+	}
+	protected AbstractFunction() {
+		this.Object = null;
+	}
+
 	@Override
-	protected void init(Global global) {
-		init(global.String, global.Object, global.Function, global.NaN);
-	}
-	protected GenericObject init(String String, Object Object, Function Function, Number.Instance NaN) {
-		if(!(this instanceof Function))
-			super.init(Function.prototype(), Function);
-		
-		try {
-			return initPrototype(Object, NaN);
-		} finally {
-			setStorage("name", String.wrap(name()), false);
-		}
+	public BaseObject create() {
+		GenericObject prototype;
+		if(number == null)
+			prototype = new GenericObject(iterator, String);
+		else
+			prototype = new GenericObject(iterator, String, number);
+		prototype.constructor = constructor;
+		return prototype;
 	}
 	
-	protected GenericObject initPrototype(Object Object, Number.Instance NaN) {
+	protected GenericObject initPrototype(Object Object, Global global) {
 		GenericObject prototype;
 		if(this instanceof Object) {
 			prototype = new GenericObject();
 			prototype.setStorage("constructor", this, false);
-		} else if(NaN != null)
-			prototype = new GenericObject(Object, NaN);
+		} else if(global != null)
+			prototype = new GenericObject(Object, global);
 		else
-			prototype = new GenericObject(Object, (Number)null);
+			prototype = new GenericObject();
 		
 		setStorage("prototype", prototype, false);
-		if(this instanceof Function)
-			super.init(prototype, this);
+		super.init(prototype, this);
 		return prototype;
 	}
 

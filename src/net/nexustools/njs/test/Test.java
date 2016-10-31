@@ -14,7 +14,6 @@ import net.nexustools.njs.Global;
 import net.nexustools.njs.JSHelper;
 import net.nexustools.njs.BaseObject;
 import net.nexustools.njs.AbstractFunction;
-import net.nexustools.njs.GenericObject;
 
 /**
  *
@@ -33,12 +32,6 @@ public class Test {
 		
 		//eval(new InputStreamReader(Test.class.getResourceAsStream("/net/nexustools/njs/test/test.js")), "test.js", global);
 		//eval("/home/kate/Projects/SnappFu/JNode12/node/node.js", global);
-		
-		GenericObject java = new GenericObject(global);
-		GenericObject lang = new GenericObject(global);
-		lang.set("System", global.wrap(System.class));
-		java.set("lang", lang);
-		global.set("java", java);
 		eval("/home/kate/Desktop/prime.js", global);
 	}
 	

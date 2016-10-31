@@ -6,7 +6,8 @@
 package tests;
 
 import java.io.InputStreamReader;
-
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import net.nexustools.njs.JSHelper;
 import net.nexustools.njs.compiler.Compiler;
 import net.nexustools.njs.compiler.JavaTranspiler;
@@ -20,7 +21,7 @@ import org.junit.Test;
  *
  * @author kate
  */
-public class Function {
+public class Standards {
 	
 	Compiler[] compilers;
 	
@@ -37,30 +38,24 @@ public class Function {
 		compilers = null;
 	}
 	
+	
 	@Test
-	public void construct() {
-		test("construct");
+	public void inheritance() {
+		test("inheritance");
 	}
 	
 	@Test
-	public void apply() {
-		test("apply");
+	public void valueOf() {
+		test("valueOf");
 	}
-	
-	@Test
-	public void bind() {
-		test("bind");
-	}
-	
-	@Test
-	public void call() {
-		test("call");
-	}
-	
+
 	public void test(java.lang.String name) {
 		for(Compiler compiler : compilers) {
 			try {
-				compiler.compile(new InputStreamReader(Function.class.getResourceAsStream("/tests/function/" + name + ".js")), name + ".js", false).exec(JSHelper.createExtendedGlobal(compiler), null);
+				compiler.compile(new InputStreamReader(Standards.class.getResourceAsStream("/tests/standards/" + name + ".js")), name + ".js", false).exec(JSHelper.createExtendedGlobal(), null);
+			} catch(net.nexustools.njs.Error.ConvertedException re) {
+				re.printStackTrace();
+				throw re;
 			} catch(java.lang.RuntimeException re) {
 				System.err.println(JSHelper.extractStack(re.toString(), re));
 				throw re;

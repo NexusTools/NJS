@@ -11,7 +11,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +53,8 @@ public class JavaClassWrapper extends AbstractFunction {
 			JavaClassWrapper superConstructor = global.wrap(superClass);
 			prototype.setHidden("__proto__", superConstructor.prototype());
 			prototype.setHidden("constructor", superConstructor);
+			//setHidden("constructor", superConstructor);
+			//setHidden("__proto__", superConstructor.prototype());
 		}
 		
 		Map<java.lang.String, List<Method>> methods = new HashMap();
@@ -355,6 +356,11 @@ public class JavaClassWrapper extends AbstractFunction {
 	@Override
 	public java.lang.String name() {
 		return javaClassString;
+	}
+
+	@Override
+	public java.lang.String typeOf() {
+		return "class";
 	}
 	
 }

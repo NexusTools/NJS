@@ -12,8 +12,8 @@ package net.nexustools.njs;
 public class Boolean extends AbstractFunction {
 	public static class Instance extends GenericObject {
 		public final boolean value;
-		private Instance(Boolean Boolean, Number.Instance number, boolean value) {
-			super(Boolean.prototype(), Boolean, number);
+		private Instance(Boolean Boolean, Number.Instance number, Global global, boolean value) {
+			super(Boolean.prototype(), Boolean, global, number);
 			this.value = value;
 		}
 		@Override
@@ -24,15 +24,15 @@ public class Boolean extends AbstractFunction {
 			if(obj instanceof Instance)
 				return ((Instance)obj).value == value;
 			
-			return ((Number.Instance)obj).number == 1;
+			return ((Number.Instance)obj).value == 1;
 		}
 	}
 
 	public final Instance FALSE, TRUE;
 	public Boolean(Global global) {
 		super(global);
-		FALSE = new Instance(this, global.Zero, false);
-		TRUE = new Instance(this, global.PositiveOne, true);
+		FALSE = new Instance(this, global.Zero, global, false);
+		TRUE = new Instance(this, global.PositiveOne, global, true);
 		FALSE.seal();
 		TRUE.seal();
 		

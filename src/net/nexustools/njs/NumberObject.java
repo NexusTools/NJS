@@ -51,7 +51,12 @@ public abstract class NumberObject implements BaseObject {
 			} catch(NumberFormatException ex) {
 				num = Double.NaN;
 			}
-			number = Number.wrap(num);
+			try {
+				number = Number.wrap(num);
+			} catch(NullPointerException ex) {
+				System.err.println(getClass());
+				throw ex;
+			}
 		}
 		return number;
 	}

@@ -50,6 +50,30 @@ public class Array extends AbstractFunction {
 			}
 		});
 		GenericObject prototype = prototype();
+		prototype.setHidden("valueOf", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				if(_this instanceof GenericArray) {
+					switch(((GenericArray)_this).length()) {
+						case 0:
+							return global.Zero;
+						case 1:
+							return _this.get(0);
+						default:
+							return global.wrap(Array.toString(_this));
+					}
+				}
+				
+				switch(_this.get("length").toInt()) {
+					case 0:
+						return global.Zero;
+					case 1:
+						return _this.get(0);
+					default:
+						return global.wrap(Array.toString(_this));
+				}
+			}
+		});
 		prototype.setHidden("fill", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
@@ -245,15 +269,7 @@ public class Array extends AbstractFunction {
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				StringBuilder builder = new StringBuilder();
-				for(int i=0; i<_this.get("length").toInt(); i++) {
-					if(i > 0)
-						builder.append(',');
-					BaseObject value = _this.get(i, OR_NULL);
-					if(value != null)
-						builder.append(value);
-				}
-				return global.wrap(builder.toString());
+				return global.wrap(Array.toString(_this));
 			}
 		});
 	}
@@ -270,6 +286,18 @@ public class Array extends AbstractFunction {
 		if(!_this.instanceOf(this))
 			return construct(params);
 		return _this;
+	}
+	
+	public static java.lang.String toString(BaseObject _this) {
+		StringBuilder builder = new StringBuilder();
+		for(int i=0; i<_this.get("length").toInt(); i++) {
+			if(i > 0)
+				builder.append(',');
+			BaseObject value = _this.get(i, OR_NULL);
+			if(value != null)
+				builder.append(value);
+		}
+		return builder.toString();
 	}
 	
 }

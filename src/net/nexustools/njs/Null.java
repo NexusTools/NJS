@@ -5,6 +5,7 @@
  */
 package net.nexustools.njs;
 
+import java.util.Iterator;
 import java.util.Set;
 
 /**
@@ -52,7 +53,7 @@ public final class Null implements BaseObject {
 
 	@Override
 	public Set<java.lang.String> keys() {
-		throw new UnsupportedOperationException("Not supported on null.");
+		throw new Error.JavaException("TypeError", "Cannot convert undefined or null to object");
 	}
 
 	@Override
@@ -82,11 +83,11 @@ public final class Null implements BaseObject {
 
 	@Override
 	public Set<java.lang.String> ownPropertyNames() {
-		throw new UnsupportedOperationException("Not supported on null.");
+		throw new Error.JavaException("TypeError", "Cannot convert undefined or null to object");
 	}
 
 	@Override
-	public boolean hasProperty(java.lang.String name) {
+	public boolean hasOwnProperty(java.lang.String name) {
 		throw new Error.JavaException("TypeError", "Cannot read property \"" + name + "\" from null");
 	}
 
@@ -246,6 +247,26 @@ public final class Null implements BaseObject {
 			return true;
 		
 		return obj == Undefined.INSTANCE;
+	}
+
+	@Override
+	public java.lang.String typeOf() {
+		return "object";
+	}
+
+	@Override
+	public Iterator<BaseObject> iterator() {
+		return new Iterator<BaseObject>() {
+			@Override
+			public boolean hasNext() {
+				return false;
+			}
+
+			@Override
+			public BaseObject next() {
+				throw new UnsupportedOperationException("Not supported");
+			}
+		};
 	}
 	
 	

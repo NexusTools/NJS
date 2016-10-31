@@ -48,6 +48,7 @@ public class Global extends UniqueObject {
 	public final Object Object = new Object();
 	public final String String = new String();
 	public final Number Number = new Number();
+	public final GeneratorFunction GeneratorFunction;
 	public final Boolean Boolean;
 	public final Symbol Symbol;
 	public final Error Error;
@@ -64,13 +65,17 @@ public class Global extends UniqueObject {
 	public Global(Compiler compiler) {
 		this.compiler = compiler;
 		
+		Symbol = new Symbol(this);
+		Symbol.initConstants();
 		Object.initPrototype(Object, null);
 		Number.initPrototype(Object, null);
+		Function.initPrototype(Object, this);
+		String.initPrototype(Object, this);
+		Symbol.initPrototype(Object, this);
 		Number.initConstants();
-		Function.initPrototype(Object, Number.NaN);
-		String.initPrototype(Object, Number.NaN);
 		
-		NaN = Number.NaN;
+		NaN = this.number = String.number = Symbol.number = Function.number = Number.number = Number.NaN;
+		
 		PositiveOne = Number.PositiveOne;
 		NegativeOne = Number.NegativeOne;
 		Zero = Number.Zero;
@@ -86,13 +91,12 @@ public class Global extends UniqueObject {
 		Object.initPrototypeFunctions(this);
 		Function.initPrototypeFunctions(this);
 		Number.initPrototypeFunctions(this);
+		Symbol.initPrototypeFunctions(this);
 		
+		GeneratorFunction = new GeneratorFunction(this);
 		Boolean = new Boolean(this);
-		Symbol = new Symbol(this);
 		Error = new Error(this);
 		Array = new Array(this);
-		
-		
 	}
 	
 	public void initStandards() {
@@ -128,7 +132,7 @@ public class Global extends UniqueObject {
 		return String.wrap(string);
 	}
 
-	private static final List<WeakReference<JavaClassWrapper>> CONSTRUCTORS = new ArrayList();
+	private final List<WeakReference<JavaClassWrapper>> CONSTRUCTORS = new ArrayList();
 	public JavaClassWrapper wrap(Class<?> javaClass) {
 		assert(javaClass != null);
 		synchronized(CONSTRUCTORS) {
@@ -152,11 +156,11 @@ public class Global extends UniqueObject {
 		if(t instanceof Error.Thrown)
 			return ((Error.Thrown)t).what;
 		if(t instanceof Error.JavaException)
-			return new Error.Instance(String, Error, ((Error.JavaException)t).type, ((Error.JavaException) t).getUnderlyingMessage(), JSHelper.extractStack(t.getMessage(), t));
-		return new Error.Instance(String, Error, "JavaError", t.toString(), JSHelper.extractStack("JavaError: " + t.toString(), t));
+			return new Error.Instance(String, Error, Symbol.iterator, NaN, ((Error.JavaException)t).type, ((Error.JavaException) t).getUnderlyingMessage(), JSHelper.extractStack(t.getMessage(), t));
+		return new Error.Instance(String, Error, Symbol.iterator, NaN, "JavaError", t.toString(), JSHelper.extractStack("JavaError: " + t.toString(), t));
 	}
 
-	private static final List<WeakReference<JavaObjectWrapper>> WRAPS = new ArrayList();
+	private final List<WeakReference<JavaObjectWrapper>> WRAPS = new ArrayList();
 	public BaseObject wrap(java.lang.Object javaObject) {
 		if(javaObject == null)
 			return Undefined.INSTANCE;
@@ -172,7 +176,7 @@ public class Global extends UniqueObject {
 					return wrapper;
 			}
 		
-			JavaObjectWrapper wrapper = new JavaObjectWrapper(javaObject, wrap(javaObject.getClass()));
+			JavaObjectWrapper wrapper = new JavaObjectWrapper(javaObject, wrap(javaObject.getClass()), this);
 			WRAPS.add(new WeakReference(wrapper));
 			return wrapper;
 		}

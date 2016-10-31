@@ -68,7 +68,11 @@ public class Object extends AbstractFunction {
 		setHidden("create", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				return new GenericObject(params[0], params[0].constructor());
+				if(params[0] instanceof BaseFunction)
+					return ((BaseFunction)params[0]).create();
+				GenericObject genericObject = new GenericObject(global);
+				genericObject.setHidden("__proto__", params[0]);
+				return genericObject;
 			}
 			@Override
 			public java.lang.String name() {
@@ -145,10 +149,10 @@ public class Object extends AbstractFunction {
 	@Override
 	public BaseObject construct(BaseObject... params) {
 		if(params.length == 0)
-			return new GenericObject(this, number);
+			return new GenericObject(this, iterator, String, number);
 		
 		BaseObject src = params[0];
-		GenericObject copy = new GenericObject(this, number);
+		GenericObject copy = new GenericObject(this, iterator, String, number);
 		for(java.lang.String key : src.keys())
 			copy.set(key, src.get(key));
 		return copy;

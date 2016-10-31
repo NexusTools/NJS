@@ -5,6 +5,7 @@
  */
 package net.nexustools.njs;
 
+import java.util.Iterator;
 import java.util.Set;
 
 /**
@@ -52,7 +53,7 @@ public final class Undefined implements BaseObject {
 
 	@Override
 	public Set<java.lang.String> keys() {
-		throw new UnsupportedOperationException("Not supported on undefined.");
+		throw new Error.JavaException("TypeError", "Cannot convert undefined or null to object");
 	}
 
 	@Override
@@ -82,12 +83,12 @@ public final class Undefined implements BaseObject {
 
 	@Override
 	public Set<java.lang.String> ownPropertyNames() {
-		throw new UnsupportedOperationException("Not supported on undefined.");
+		throw new Error.JavaException("TypeError", "Cannot convert undefined or null to object");
 	}
 
 	@Override
-	public boolean hasProperty(java.lang.String name) {
-		throw new Error.JavaException("TypeError", "Cannot read property \"" + name + "\" from undefined");
+	public boolean hasOwnProperty(java.lang.String name) {
+		return false;
 	}
 
 	@Override
@@ -245,6 +246,26 @@ public final class Undefined implements BaseObject {
 			return true;
 		
 		return obj == Null.INSTANCE;
+	}
+
+	@Override
+	public java.lang.String typeOf() {
+		return "undefined";
+	}
+
+	@Override
+	public Iterator<BaseObject> iterator() {
+		return new Iterator<BaseObject>() {
+			@Override
+			public boolean hasNext() {
+				return false;
+			}
+
+			@Override
+			public BaseObject next() {
+				throw new UnsupportedOperationException("Not supported");
+			}
+		};
 	}
 	
 }

@@ -17,63 +17,70 @@ import java.util.List;
 public class Number extends AbstractFunction {
 
 	public static class Instance extends UniqueObject {
-		public final double number;
+		public final double value;
 		private final Number Number;
-		Instance(Number Number, double number) {
-			super(Number.prototype(), Number);
+		Instance(Number Number, Symbol.Instance iterator, String String, double number) {
+			super(Number, iterator, String, (Number)null);
 			this.Number = Number;
-			this.number = number;
+			this.value = number;
+			this.number = this;
+		}
+		Instance(Number Number, Global global, double number) {
+			super(Number, global);
+			this.Number = Number;
+			this.value = number;
+			this.number = this;
 		}
 		Instance(Global global, double number) {
-			this(global.Number, number);
+			this(global.Number, global, number);
 		}
 		public Instance percent(Instance rhs) {
-			return Number.wrap(number % rhs.number);
+			return Number.wrap(value % rhs.value);
 		}
 		public Instance and(Instance rhs) {
-			return Number.wrap((long)number & (long)rhs.number);
+			return Number.wrap((long)value & (long)rhs.value);
 		}
 		public Instance or(Instance rhs) {
-			return Number.wrap((long)number | (long)rhs.number);
+			return Number.wrap((long)value | (long)rhs.value);
 		}
 		public Instance plus(Instance rhs) {
-			return Number.wrap(number + rhs.number);
+			return Number.wrap(value + rhs.value);
 		}
 		public Instance minus(Instance rhs) {
-			return Number.wrap(number - rhs.number);
+			return Number.wrap(value - rhs.value);
 		}
 		public Instance multiply(Instance rhs) {
-			return Number.wrap(number * rhs.number);
+			return Number.wrap(value * rhs.value);
 		}
 		public Instance divide(Instance rhs) {
-			return Number.wrap(number / rhs.number);
+			return Number.wrap(value / rhs.value);
 		}
 		public boolean isNaN() {
-			return Double.isNaN(number);
+			return Double.isNaN(value);
 		}
 		@Override
 		public byte toByte() {
-			return (byte)number;
+			return (byte)value;
 		}
 		@Override
 		public short toShort() {
-			return (short)number;
+			return (short)value;
 		}
 		@Override
 		public int toInt() {
-			return (int)number;
+			return (int)value;
 		}
 		@Override
 		public long toLong() {
-			return (long)number;
+			return (long)value;
 		}
 		@Override
 		public float toFloat() {
-			return (float)number;
+			return (float)value;
 		}
 		@Override
 		public double toDouble() {
-			return number;
+			return value;
 		}
 		@Override
 		public Instance toNumber() {
@@ -81,33 +88,33 @@ public class Number extends AbstractFunction {
 		}
 		@Override
 		public Instance clone() {
-			return new Instance(Number, number);
+			return new Instance(Number, iterator, String, value);
 		}
 		@Override
 		public java.lang.String toString() {
-			return net.nexustools.njs.Number.toString(number);
+			return net.nexustools.njs.Number.toString(value);
 		}
 		@Override
 		public boolean equals(java.lang.Object obj) {
 			if(obj == this)
-				return !Double.isNaN(number);
+				return !Double.isNaN(value);
 			
 			if(obj instanceof Instance)
-				return ((Instance)obj).number == number && !Double.isNaN(number);
+				return ((Instance)obj).value == value && !Double.isNaN(value);
 			
 			if(obj instanceof java.lang.Number)
-				return ((Number)obj).equals(number);
+				return ((Number)obj).equals(value);
 			
 			if(obj instanceof java.lang.String)
 				try {
-					return number == Double.valueOf((java.lang.String)obj);
+					return value == Double.valueOf((java.lang.String)obj);
 				} catch(NumberFormatException ex) {
 					return false;
 				}
 			
 			if(obj instanceof String.Instance)
 				try {
-					return number == Double.valueOf(((String.Instance)obj).string);
+					return value == Double.valueOf(((String.Instance)obj).string);
 				} catch(NumberFormatException ex) {
 					return false;
 				}
@@ -145,7 +152,7 @@ public class Number extends AbstractFunction {
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				return global.wrap(Number.toString(((Instance)_this).number));
+				return global.wrap(Number.toString(((Instance)_this).value));
 			}
 		});
 	}
@@ -173,11 +180,11 @@ public class Number extends AbstractFunction {
 				Instance um = ref.get();
 				if(um == null)
 					it.remove();
-				else if(number == um.number)
+				else if(number == um.value)
 					return um;
 			}
 			
-			Instance um = new Instance(this, number);
+			Instance um = new Instance(this, iterator, String, number);
 			um.seal();
 			INSTANCES.add(new WeakReference(um));
 			return um;

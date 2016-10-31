@@ -11,14 +11,15 @@ import java.util.Set;
  *
  * @author kate
  */
-public interface BaseObject extends Scopeable {
+public interface BaseObject extends Scopeable, Iterable<BaseObject> {
 	public BaseObject __proto__();
 	public BaseFunction constructor();
 	public boolean instanceOf(BaseFunction constructor);
+	public java.lang.String typeOf();
 	
 	public Set<java.lang.String> keys();
 	public Set<java.lang.String> ownPropertyNames();
-	public boolean hasProperty(java.lang.String name);
+	public boolean hasOwnProperty(java.lang.String name);
 	public boolean hasProperty(java.lang.String name, BaseObject _this);
 	public void defineGetter(java.lang.String key, BaseFunction impl);
 	public void defineSetter(java.lang.String key, BaseFunction impl);

@@ -28,7 +28,7 @@ public class Uint8Array extends AbstractFunction {
 			this(global, Uint8Array, ArrayStorage.BufferStorage.BYTE.createOrReuse(len));
 		}
 		protected Instance(Global global, Uint8Array Uint8Array, byte[] storage) {
-			super(global, Uint8Array.prototype(), Uint8Array, storage);
+			super(global, Uint8Array, storage);
 			this.Number = global.Number;
 		}
 

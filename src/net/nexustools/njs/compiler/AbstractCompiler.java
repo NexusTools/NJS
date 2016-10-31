@@ -401,6 +401,12 @@ public abstract class AbstractCompiler implements Compiler {
 			return false;
 		}
 		public Parsed finish() {
+			if(lhs == null) {
+				OpenArray array = new OpenArray();
+				array.entries.add(new Number(ref));
+				array.closed = true;
+				return array;
+			}
 			return this;
 		}
 	}
@@ -526,6 +532,13 @@ public abstract class AbstractCompiler implements Compiler {
 		@Override
 		public java.lang.String op() {
 			return "delete";
+		}
+	}
+	public static class TypeOf extends RhReferency {
+		public TypeOf() {}
+		@Override
+		public java.lang.String op() {
+			return "typeof";
 		}
 	}
 	public static class Yield extends Rh {
@@ -1362,7 +1375,7 @@ public abstract class AbstractCompiler implements Compiler {
 		}
 		@Override
 		public boolean isIncomplete() {
-			return !closed && currentEntry != null;
+			return !closed;
 		}
 		public Parsed finish() {
 			return this;
@@ -1650,9 +1663,15 @@ public abstract class AbstractCompiler implements Compiler {
 		@Override
 		public Parsed transform(Parsed part) {
 			if(rhs == null) {
-				if(!part.isStandalone())
-					throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + describe(this));
-				rhs = part;
+				if(part instanceof IntegerReference) {
+					rhs = new OpenArray();
+					((OpenArray)rhs).entries.add(new Number(((IntegerReference)part).ref));
+					((OpenArray)rhs).closed = true;
+				} else {
+					if(!part.isStandalone())
+						throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + describe(this));
+					rhs = part;
+				}
 				return this;
 			}
 			
@@ -1703,6 +1722,111 @@ public abstract class AbstractCompiler implements Compiler {
 			else if(part instanceof Multiply) {
 				if(this instanceof Divide)
 					return new Multiply(this);
+				rhs = new Multiply(rhs);
+				return this;
+			} else if(part instanceof Divide) {
+				rhs = new Divide(rhs);
+				return this;
+			} else if(part instanceof Plus)
+				return new Plus(this);
+			else if(part instanceof Minus)
+				return new Minus(this);
+			else if(part instanceof Set)
+				return new Set(this);
+			else if(part instanceof Percent)
+				return new Percent(this);
+			else if(part instanceof And)
+				return new And(this);
+			else if(part instanceof Or)
+				return new Or(this);
+			else if(part instanceof AndAnd)
+				return new AndAnd(this);
+			else if(part instanceof OrOr)
+				return new OrOr(this);
+			else if(part instanceof Number && ((Number)part).value < 0)
+				return new Minus(this, new Number(-((Number)part).value));
+			else if(part instanceof Integer && ((Integer)part).value < 0)
+				return new Minus(this, new Number(-((Integer)part).value));
+			else
+				return transformFallback(part);
+		}
+
+		public Parsed transformFallback(Parsed part) {
+			if(newline)
+				throw new CompleteException(part);
+			
+			throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + describe(this));
+		}
+		
+	}
+	public static abstract class RhReferency extends Rh implements BaseReferency {
+		private boolean newline;
+		
+		public RhReferency() {}
+		public RhReferency(Parsed rhs) {
+			super(rhs);
+		}
+		
+		@Override
+		public Parsed transform(Parsed part) {
+			if(rhs == null) {
+				if(part instanceof IntegerReference) {
+					rhs = new OpenArray();
+					((OpenArray)rhs).entries.add(new Number(((IntegerReference)part).ref));
+					((OpenArray)rhs).closed = true;
+				} else {
+					if(!part.isStandalone())
+						throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + describe(this));
+					rhs = part;
+				}
+				return this;
+			}
+			
+			if(rhs.isIncomplete()) {
+				rhs = rhs.transform(part);
+				return this;
+			}
+			
+			if(part instanceof OpenBracket) {
+				rhs = rhs.transform(part);
+				return this;
+			} else if(part instanceof OpenArray) {
+				rhs = rhs.transform(part);
+				return this;
+			} else if(part instanceof DirectReference) {
+				rhs = rhs.transform(part);
+				return this;
+			} else if(part instanceof IntegerReference) {
+				rhs = rhs.transform(part);
+				return this;
+			}
+			
+			if(part instanceof SemiColon)
+				throw new CompleteException();
+			if(part instanceof NewLine) {
+				newline = true;
+				return this;
+			}
+			
+			if(part instanceof InstanceOf)
+				return new InstanceOf(this);
+			else if(part instanceof MoreThan)
+				return new MoreThan(this);
+			else if(part instanceof LessThan)
+				return new LessThan(this);
+			else if(part instanceof MoreEqual)
+				return new MoreEqual(this);
+			else if(part instanceof LessEqual)
+				return new LessEqual(this);
+			else if(part instanceof StrictEquals)
+				return new StrictEquals(this);
+			else if(part instanceof NotEquals)
+				return new NotEquals(this);
+			else if(part instanceof StrictNotEquals)
+				return new StrictNotEquals(this);
+			else if(part instanceof Equals)
+				return new Equals(this);
+			else if(part instanceof Multiply) {
 				rhs = new Multiply(rhs);
 				return this;
 			} else if(part instanceof Divide) {
@@ -2142,7 +2266,8 @@ public abstract class AbstractCompiler implements Compiler {
 				}
 			} else if(part instanceof OpenBracket)
 				arguments = new ArrayList();
-			
+			else
+				reference = reference.transform(part);
 			return this;
 		}
 		@Override
@@ -2707,6 +2832,8 @@ public abstract class AbstractCompiler implements Compiler {
 					throw new PartExchange(new Throw(), ref.length());
 				else if(ref.equals("switch"))
 					throw new PartExchange(new Switch(), ref.length());
+				else if(ref.equals("typeof"))
+					throw new PartExchange(new TypeOf(), ref.length());
 				else if(ref.equals("case"))
 					throw new PartExchange(new Case(), ref.length());
 				else if(ref.equals("return"))
@@ -2859,7 +2986,7 @@ public abstract class AbstractCompiler implements Compiler {
 			if(DEBUG)
 				System.out.println("Compiling " + join(Arrays.asList(script), ';'));
 			return script;
-		} catch(net.nexustools.njs.Error.JavaException ex) {
+		/*} catch(net.nexustools.njs.Error.JavaException ex) {
 			if(ex.type.equals("SyntaxError") && reader != null) {
 				StringBuilder builder = new StringBuilder(ex.getUnderlyingMessage());
 				builder.append(" (");
@@ -2873,7 +3000,7 @@ public abstract class AbstractCompiler implements Compiler {
 				builder.append(')');
 				throw new net.nexustools.njs.Error.JavaException("SyntaxError", builder.toString(), ex);
 			}
-			throw ex;
+			throw ex;*/
 		} catch(IOException ex) {
 			throw new Error.JavaException("EvalError", "IO Exception While Evaluating Script: " + ex.getMessage(), ex);
 		}

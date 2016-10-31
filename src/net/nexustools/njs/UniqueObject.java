@@ -11,27 +11,32 @@ package net.nexustools.njs;
  */
 public class UniqueObject extends GenericObject {
 	public UniqueObject(Global global) {
-		super(global.Object, global.NaN);
+		super(global);
 	}
-	public UniqueObject(Global global, Number.Instance number) {
-		super(global.Object, number);
+	public UniqueObject(BaseFunction constructor, Symbol.Instance iterator, String String, Number.Instance number) {
+		super(constructor.prototype(), constructor, iterator, String, number);
 	}
-	public UniqueObject(Global global, Number Number) {
-		super(global.Object, Number);
+	public UniqueObject(BaseFunction constructor, Symbol.Instance iterator, String String, Number Number) {
+		super(constructor.prototype(), constructor, iterator, String, Number);
 	}
-	public UniqueObject(Object Object) {
-		super(Object.prototype(), Object);
+	public UniqueObject(BaseFunction constructor, Global global) {
+		super(constructor, global);
 	}
-	public UniqueObject(BaseObject __proto__, BaseFunction constructor) {
-		super(__proto__, constructor);
+	public UniqueObject(BaseObject __proto__, BaseFunction constructor, Global global, Number.Instance number) {
+		super(__proto__, constructor, global, number);
 	}
-	public UniqueObject(BaseObject __proto__, BaseFunction constructor, Number.Instance number) {
-		super(__proto__, constructor, number);
+	public UniqueObject(BaseObject __proto__, BaseFunction constructor, Symbol.Instance iterator, String String, Number.Instance number) {
+		super(__proto__, constructor, iterator, String, number);
 	}
-	public UniqueObject(BaseObject __proto__, BaseFunction constructor, Number Number) {
-		super(__proto__, constructor, Number);
+	public UniqueObject(BaseObject __proto__, BaseFunction constructor, Symbol.Instance iterator, String String, Number Number) {
+		super(__proto__, constructor, iterator, String, Number);
 	}
-	protected UniqueObject() {}
+	public UniqueObject(BaseFunction constructor, Global global, Number.Instance number) {
+		super(constructor, global, number);
+	}
+	protected UniqueObject() {
+		super();
+	}
 	@Override
 	public int hashCode() {
 		return super.hashCode() ^ toString().hashCode();

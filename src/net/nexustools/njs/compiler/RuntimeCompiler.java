@@ -10,7 +10,6 @@ import net.nexustools.njs.BaseObject;
 import net.nexustools.njs.Global;
 import net.nexustools.njs.JSHelper;
 import net.nexustools.njs.Scope;
-import net.nexustools.njs.ConstructableFunction;
 import net.nexustools.njs.GenericArray;
 import net.nexustools.njs.GenericObject;
 import net.nexustools.njs.Scopeable;
@@ -194,9 +193,9 @@ public class RuntimeCompiler extends AbstractCompiler {
 		public BaseObject get() {
 			if(key instanceof net.nexustools.njs.String.Instance)
 				return parent.get(((net.nexustools.njs.String.Instance) key).string);
-			else if(key instanceof net.nexustools.njs.Number.Instance && ((net.nexustools.njs.Number.Instance)key).number >= 0
-					 && ((net.nexustools.njs.Number.Instance)key).number <= java.lang.Integer.MAX_VALUE && ((net.nexustools.njs.Number.Instance)key).number == (int)((net.nexustools.njs.Number.Instance)key).number)
-				return parent.get((int)((net.nexustools.njs.Number.Instance)key).number);
+			else if(key instanceof net.nexustools.njs.Number.Instance && ((net.nexustools.njs.Number.Instance)key).value >= 0
+					 && ((net.nexustools.njs.Number.Instance)key).value <= java.lang.Integer.MAX_VALUE && ((net.nexustools.njs.Number.Instance)key).value == (int)((net.nexustools.njs.Number.Instance)key).value)
+				return parent.get((int)((net.nexustools.njs.Number.Instance)key).value);
 			else
 				return parent.get(key.toString());
 		}
@@ -204,9 +203,9 @@ public class RuntimeCompiler extends AbstractCompiler {
 		public void set(BaseObject val) {
 			if(key instanceof net.nexustools.njs.String.Instance)
 				parent.set(((net.nexustools.njs.String.Instance) key).string, val);
-			else if(key instanceof net.nexustools.njs.Number.Instance && ((net.nexustools.njs.Number.Instance)key).number >= 0
-					 && ((net.nexustools.njs.Number.Instance)key).number <= java.lang.Integer.MAX_VALUE && ((net.nexustools.njs.Number.Instance)key).number == (int)((net.nexustools.njs.Number.Instance)key).number)
-				parent.set((int)((net.nexustools.njs.Number.Instance)key).number, val);
+			else if(key instanceof net.nexustools.njs.Number.Instance && ((net.nexustools.njs.Number.Instance)key).value >= 0
+					 && ((net.nexustools.njs.Number.Instance)key).value <= java.lang.Integer.MAX_VALUE && ((net.nexustools.njs.Number.Instance)key).value == (int)((net.nexustools.njs.Number.Instance)key).value)
+				parent.set((int)((net.nexustools.njs.Number.Instance)key).value, val);
 			else
 				parent.set(key.toString(), val);
 		}
@@ -214,9 +213,9 @@ public class RuntimeCompiler extends AbstractCompiler {
 		public boolean delete() {
 			if(key instanceof net.nexustools.njs.String.Instance)
 				return parent.delete(((net.nexustools.njs.String.Instance) key).string);
-			else if(key instanceof net.nexustools.njs.Number.Instance && ((net.nexustools.njs.Number.Instance)key).number >= 0
-					 && ((net.nexustools.njs.Number.Instance)key).number <= java.lang.Integer.MAX_VALUE && ((net.nexustools.njs.Number.Instance)key).number == (int)((net.nexustools.njs.Number.Instance)key).number)
-				return parent.delete((int)((net.nexustools.njs.Number.Instance)key).number);
+			else if(key instanceof net.nexustools.njs.Number.Instance && ((net.nexustools.njs.Number.Instance)key).value >= 0
+					 && ((net.nexustools.njs.Number.Instance)key).value <= java.lang.Integer.MAX_VALUE && ((net.nexustools.njs.Number.Instance)key).value == (int)((net.nexustools.njs.Number.Instance)key).value)
+				return parent.delete((int)((net.nexustools.njs.Number.Instance)key).value);
 			else
 				return parent.delete(key.toString());
 		}
@@ -733,9 +732,9 @@ public class RuntimeCompiler extends AbstractCompiler {
 						BaseObject rhs = _rhs.run(global, scope).get();
 						
 						if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
-							return new ValueReferenceable(global.wrap(JSHelper.stringLessThan(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string)));
+							return new ValueReferenceable(JSHelper.stringLessThan(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string) ? global.Boolean.TRUE : global.Boolean.FALSE);
 
-						return new ValueReferenceable(global.wrap(lhs.toDouble() < rhs.toDouble()));
+						return new ValueReferenceable((global.Number.fromValueOf(lhs).value < global.Number.fromValueOf(rhs).value) ? global.Boolean.TRUE : global.Boolean.FALSE);
 					} finally {
 						el.finishCall();
 					}
@@ -753,9 +752,9 @@ public class RuntimeCompiler extends AbstractCompiler {
 						BaseObject rhs = _rhs.run(global, scope).get();
 						
 						if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
-							return new ValueReferenceable(global.wrap(JSHelper.stringLessEqual(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string)));
+							return new ValueReferenceable(JSHelper.stringLessEqual(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string) ? global.Boolean.TRUE : global.Boolean.FALSE);
 
-						return new ValueReferenceable(global.wrap(lhs.toDouble() <= rhs.toDouble()));
+						return new ValueReferenceable((global.Number.fromValueOf(lhs).value <= global.Number.fromValueOf(rhs).value) ? global.Boolean.TRUE : global.Boolean.FALSE);
 					} finally {
 						el.finishCall();
 					}
@@ -773,9 +772,9 @@ public class RuntimeCompiler extends AbstractCompiler {
 						BaseObject rhs = _rhs.run(global, scope).get();
 						
 						if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
-							return new ValueReferenceable(global.wrap(JSHelper.stringMoreThan(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string)));
+							return new ValueReferenceable(JSHelper.stringMoreThan(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string) ? global.Boolean.TRUE : global.Boolean.FALSE);
 
-						return new ValueReferenceable(global.wrap(lhs.toDouble() > rhs.toDouble()));
+						return new ValueReferenceable((global.Number.fromValueOf(lhs).value > global.Number.fromValueOf(rhs).value) ? global.Boolean.TRUE : global.Boolean.FALSE);
 					} finally {
 						el.finishCall();
 					}
@@ -793,9 +792,9 @@ public class RuntimeCompiler extends AbstractCompiler {
 						BaseObject rhs = _rhs.run(global, scope).get();
 						
 						if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
-							return new ValueReferenceable(global.wrap(JSHelper.stringMoreEqual(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string)));
+							return new ValueReferenceable(JSHelper.stringMoreEqual(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string) ? global.Boolean.TRUE : global.Boolean.FALSE);
 
-						return new ValueReferenceable(global.wrap(lhs.toDouble() >= rhs.toDouble()));
+						return new ValueReferenceable((global.Number.fromValueOf(lhs).value >= global.Number.fromValueOf(rhs).value) ? global.Boolean.TRUE : global.Boolean.FALSE);
 					} finally {
 						el.finishCall();
 					}
@@ -959,7 +958,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 			return new Impl() {
 				@Override
 				public Referenceable run(final Global global, final Scope scope) {
-					ConstructableFunction func = new ConstructableFunction(global) {
+					CompiledFunction func = new CompiledFunction(global) {
 						@Override
 						public BaseObject call(BaseObject _this, BaseObject... params) {
 							JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(stackName, data.fileName, subRows, subColumns);
@@ -1076,7 +1075,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 						try {
 							Referenceable ref = _ref.run(global, scope);
 							net.nexustools.njs.Number.Instance val = ref.get().toNumber();
-							ref.set(global.wrap(val.number + 1));
+							ref.set(global.wrap(val.value + 1));
 							return new ValueReferenceable(val);
 						} finally {
 							el.finishCall();
@@ -1091,7 +1090,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 						try {
 							Referenceable ref = _ref.run(global, scope);
 							net.nexustools.njs.Number.Instance val = ref.get().toNumber();
-							ref.set(val = global.wrap(val.number+1));
+							ref.set(val = global.wrap(val.value+1));
 							return new ValueReferenceable(val);
 						} finally {
 							el.finishCall();
@@ -1109,7 +1108,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 						try {
 							Referenceable ref = _ref.run(global, scope);
 							net.nexustools.njs.Number.Instance val = ref.get().toNumber();
-							ref.set(global.wrap(val.number - 1));
+							ref.set(global.wrap(val.value - 1));
 							return new ValueReferenceable(val);
 						} finally {
 							el.finishCall();
@@ -1124,7 +1123,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 						try {
 							Referenceable ref = _ref.run(global, scope);
 							net.nexustools.njs.Number.Instance val = ref.get().toNumber();
-							ref.set(val = global.wrap(val.number - 1));
+							ref.set(val = global.wrap(val.value - 1));
 							return new ValueReferenceable(val);
 						} finally {
 							el.finishCall();
@@ -1321,6 +1320,14 @@ public class RuntimeCompiler extends AbstractCompiler {
 					} finally {
 						el.finishCall();
 					}
+				}
+			};
+		} else if(object instanceof TypeOf) {
+			final Impl rhs = compile(data, ((TypeOf)object).rhs);
+			return new Impl() {
+				@Override
+				public Referenceable run(Global global, Scope scope) {
+					return new ValueReferenceable(global.wrap(rhs.run(global, scope).get().typeOf()));
 				}
 			};
 		} else if(object instanceof InstanceOf) {

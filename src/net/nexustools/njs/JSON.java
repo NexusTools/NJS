@@ -62,7 +62,7 @@ public class JSON extends GenericObject {
 					builder.append(object.toString());
 					builder.append('"');
 				} else if(object instanceof Number.Instance) {
-					double number = ((Number.Instance)object).number;
+					double number = ((Number.Instance)object).value;
 					if(Double.isNaN(number) || Double.isInfinite(number))
 						builder.append("null");
 					

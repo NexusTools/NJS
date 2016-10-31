@@ -88,6 +88,11 @@ public class Array {
 		test("indexes");
 	}
 
+	@Test
+	public void valueOf() {
+		test("valueOf");
+	}
+
 	public void test(java.lang.String name) {
 		for(Compiler compiler : compilers) {
 			try {

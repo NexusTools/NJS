@@ -14,15 +14,17 @@ import org.junit.runners.Suite;
  */
 @RunWith(Suite.class)
 @Suite.SuiteClasses({
-	MathOperations.class,
-	Comparisons.class,
 	Blocks.class,
+	Comparisons.class,
+	MathOperations.class,
+	//Standards.class,
 	
 	Function.class,
 	String.class,
 	Array.class,
 	JSON.class,
 	
+	Extended.class,
 	Eval.class})
 public class Everything {
 }

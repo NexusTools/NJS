@@ -24,21 +24,28 @@ public class String extends AbstractFunction {
 			}
 		}
 		
+		private final Number Number;
 		public final java.lang.String string;
-		public final String String;
-		Instance(Number Number, final String String, final java.lang.String string) {
-			this(Number.wrap(string.length()), Number, String, string);
+		Instance(Global global, final java.lang.String string) {
+			this(global.Number.wrap(string.length()), global, string);
 		}
-		Instance(Number.Instance length, Number Number, final String String, final java.lang.String string) {
-			super(String.prototype(), String, Number);
-			this.String = String;
+		Instance(Number.Instance length, Global global, final java.lang.String string) {
+			super(global.String, global);
+			this.Number = global.Number;
 			this.string = string;
 			
 			setReadOnly("length", length);
 		}
-		Instance(Number.Instance length, Number.Instance number, final String String, final java.lang.String string) {
-			super(String.prototype(), String, number);
-			this.String = String;
+		Instance(Number.Instance length, Number.Instance number, Symbol.Instance iterator, String String, final java.lang.String string) {
+			super(String.prototype(), String, iterator, String, number);
+			this.string = string;
+			Number = null;
+			
+			setReadOnly("length", length);
+		}
+		Instance(Number.Instance length, Number Number, Symbol.Instance iterator, String String, final java.lang.String string) {
+			super(String.prototype(), String, iterator, String, Number);
+			this.Number = Number;
 			this.string = string;
 			
 			setReadOnly("length", length);
@@ -57,7 +64,7 @@ public class String extends AbstractFunction {
 			
 			if(obj instanceof Number.Instance)
 				try {
-					return Double.valueOf(string) == ((Number.Instance)obj).number;
+					return Double.valueOf(string) == ((Number.Instance)obj).value;
 				} catch(NumberFormatException ex) {}
 			
 			return false;
@@ -65,8 +72,8 @@ public class String extends AbstractFunction {
 		@Override
 		public Instance clone() {
 			if(number != null)
-				return new Instance((Number.Instance)getDirectly("length"), number, String, string);
-			return new Instance(Number, String, string);
+				return new Instance((Number.Instance)getDirectly("length"), number, iterator, String, string);
+			return new Instance((Number.Instance)getDirectly("length"), Number, iterator, String, string);
 		}
 		@Override
 		public java.lang.String toString() {
@@ -74,12 +81,12 @@ public class String extends AbstractFunction {
 		}
 	}
 	
-	private Number Number;
+	private Global global;
 	private final List<WeakReference<Instance>> WRAPS = new ArrayList();
 	public String() {}
 	
 	protected void initPrototypeFunctions(Global global) {
-		Number = global.Number;
+		this.global = global;
 		GenericObject prototype = prototype();
 		prototype.setHidden("match", new AbstractFunction(global) {
 			@Override
@@ -189,7 +196,7 @@ public class String extends AbstractFunction {
 		if(val instanceof Instance)
 			return ((Instance)val).clone();
 		
-		return new Instance(Number, this, val.toString());
+		return new Instance(global, val.toString());
 	}
 	
 	@Override
@@ -212,8 +219,7 @@ public class String extends AbstractFunction {
 					return um;
 			}
 			
-			assert(Number != null);
-			Instance um = new Instance(Number, this, string);
+			Instance um = new Instance(global, string);
 			WRAPS.add(new WeakReference(um));
 			um.seal();
 			return um;

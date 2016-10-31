@@ -15,5 +15,6 @@ public interface BaseFunction extends BaseObject {
 	public java.lang.String arguments();
 	public BaseObject call(BaseObject _this, BaseObject... params);
 	public BaseObject construct(BaseObject... params);
-	public GenericObject prototype();
+	public BaseObject prototype();
+	public BaseObject create();
 }

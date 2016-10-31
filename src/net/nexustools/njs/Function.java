@@ -63,13 +63,34 @@ public class Function extends AbstractFunction {
 			}
 			@Override
 			public java.lang.String name() {
-				return "Function_prototype_apply";
+				return "Function_prototype_bind";
 			}
 		}, false);
 		prototype.setStorage("apply", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				throw new RuntimeException();
+				BaseObject __this;
+				BaseObject[] args;
+				switch(params.length) {
+					case 0:
+						__this = Undefined.INSTANCE;
+						args = new BaseObject[0];
+						break;
+					case 1:
+						__this = params[0];
+						args = new BaseObject[0];
+						break;
+					default:
+						__this = params[0];
+						BaseObject _args = params[1];
+						int length = _args.get("length").toInt();
+						args = new BaseObject[length];
+						for(int i=0; i<length; i++)
+							args[i] = _args.get(i);
+						break;
+				}
+				
+				return ((BaseFunction)_this).call(__this, args);
 			}
 			@Override
 			public java.lang.String name() {

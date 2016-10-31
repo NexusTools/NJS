@@ -6,8 +6,10 @@
 package net.nexustools.njs;
 
 import java.util.AbstractSet;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -164,49 +166,78 @@ public class GenericObject extends NumberObject {
 		}
 	}
 	
+	BaseFunction __proto__;
+	BaseFunction constructor;
 	private ArrayOverride arrayOverride;
 	private java.lang.Object metaObject;
 	private boolean sealed, hasArrayOverride;
 	protected final Map<Symbol.Instance, BaseObject> symbols = new HashMap();
 	protected final Map<java.lang.String, Property> properties = new HashMap();
+	protected Symbol.Instance iterator;
+	protected String String;
 	
 	public GenericObject(Global global) {
-		this(global.Object, global.Number.NaN);
+		this(global.Object.prototype(), global.Object, global, global.Number.NaN);
 	}
-	public GenericObject(Global global, Number.Instance number) {
-		this(global.Object, number);
-	}
-	public GenericObject(Object Object, Number.Instance number) {
-		this(Object.prototype(), Object, number);
-	}
-	public GenericObject(Object Object, Number Number) {
-		this(Object.prototype(), Object, Number);
-	}
-	public GenericObject(BaseObject __proto__, BaseFunction constructor) {
+	public GenericObject(BaseFunction constructor, Global global) {
 		super((Number)null);
-		init(__proto__, constructor);
+		iterator = global.Symbol.iterator;
+		String = global.String;
+		init(constructor.prototype(), constructor);
 	}
-	public GenericObject(BaseObject __proto__, BaseFunction constructor, Number.Instance number) {
+	public GenericObject(Symbol.Instance iterator, String String) {
+		super((Number)null);
+		this.iterator = iterator;
+		this.String = String;
+	}
+	public GenericObject(Symbol.Instance iterator, String String, Number.Instance number) {
 		super(number);
+		this.iterator = iterator;
+		this.String = String;
+	}
+	public GenericObject(BaseFunction constructor, Symbol.Instance iterator, String String, Number.Instance number) {
+		this(constructor.prototype(), constructor, iterator, String, number);
+	}
+	public GenericObject(BaseFunction constructor, Symbol.Instance iterator, String String, Number Number) {
+		this(constructor.prototype(), constructor, iterator, String, Number);
+	}
+	public GenericObject(BaseObject __proto__, BaseFunction constructor, Symbol.Instance iterator, String String, Number.Instance number) {
+		super(number);
+		this.iterator = iterator;
+		this.String = String;
 		init(__proto__, constructor);
 	}
-	public GenericObject(BaseObject __proto__, BaseFunction constructor, Number Number) {
+	public GenericObject(BaseObject __proto__, BaseFunction constructor, Symbol.Instance iterator, String String, Number Number) {
 		super(Number);
+		this.iterator = iterator;
+		this.String = String;
 		init(__proto__, constructor);
+	}
+	public GenericObject(BaseObject __proto__, BaseFunction constructor, Global global, Number.Instance number) {
+		super(number);
+		iterator = global.Symbol.iterator;
+		String = global.String;
+		init(__proto__, constructor);
+	}
+	public GenericObject(BaseFunction constructor, Global global, Number.Instance number) {
+		super(number);
+		iterator = global.Symbol.iterator;
+		String = global.String;
+		init(constructor.prototype(), constructor);
 	}
 	protected GenericObject() {
 		super((Number)null);
 	}
 	
-	protected void init(Global global) {
+	protected final void init(Global global) {
 		init(global.Object);
 	}
-	protected void init(Object Object) {
+	protected final void init(Object Object) {
 		init(Object.prototype(), Object);
 	}
 	protected final void init(BaseObject __proto__, BaseFunction constructor) {
 		assert(!JSHelper.isUndefined(__proto__));
-		setHidden("constructor", constructor);
+		this.constructor = constructor;
 		setHidden("__proto__", __proto__);
 		
 		if(__proto__ instanceof GenericObject) {
@@ -214,6 +245,10 @@ public class GenericObject extends NumberObject {
 			if(ge.hasArrayOverride)
 				setArrayOverride(ge.arrayOverride);
 		}
+	}
+	
+	public java.lang.String typeOf() {
+		return "object";
 	}
 	
 	public final void setArrayOverride(ArrayOverride override) {
@@ -587,7 +622,7 @@ public class GenericObject extends NumberObject {
 
 	@Override
 	public final BaseFunction constructor() {
-		return (BaseFunction)get("constructor", OR_NULL);
+		return constructor;
 	}
 	
 	@Override
@@ -615,7 +650,7 @@ public class GenericObject extends NumberObject {
 	}
 	
 	@Override
-	public boolean hasProperty(java.lang.String name) {
+	public boolean hasOwnProperty(java.lang.String name) {
 		return properties.containsKey(name);
 	}
 
@@ -647,6 +682,38 @@ public class GenericObject extends NumberObject {
 	@Override
 	public java.lang.String toString() {
 		return ((BaseFunction)get("toString")).call(this).toString();
+	}
+
+	@Override
+	public Iterator<BaseObject> iterator() {
+		return new Iterator<BaseObject>() {
+			BaseObject next = GenericObject.this;
+			List<java.lang.String> alreadySeen = new ArrayList();
+			Iterator<java.lang.String> it;
+			java.lang.String _next;
+			@Override
+			public boolean hasNext() {
+				while(true) {
+					if(it != null)
+						while(it.hasNext()) {
+							_next = it.next();
+							if(!alreadySeen.contains(_next)) {
+								alreadySeen.add(_next);
+								return true;
+							}
+						}
+					if(next != null) {
+						it = next.keys().iterator();
+						next = next.__proto__();
+					} else
+						return false;
+				}
+			}
+			@Override
+			public BaseObject next() {
+				return String.wrap(_next);
+			}
+		};
 	}
 	
 }
