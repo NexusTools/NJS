@@ -262,5 +262,15 @@ public final class Undefined implements BaseObject {
 			}
 		};
 	}
+
+	@Override
+	public boolean setProperty(java.lang.String key, Property property) {
+		return false;
+	}
+
+	@Override
+	public Property getProperty(java.lang.String key) {
+		throw new Error.JavaException("TypeError", "Cannot read property \"" + key + "\" from undefined");
+	}
 	
 }

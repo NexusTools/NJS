@@ -310,5 +310,15 @@ public class JavaPackageWrapper implements BaseObject {
 			}
 		};
 	}
+
+	@Override
+	public boolean setProperty(java.lang.String key, Property property) {
+		return false;
+	}
+
+	@Override
+	public Property getProperty(java.lang.String key) {
+		return new BasicProperty(get(key, this, OR_UNDEFINED));
+	}
 	
 }
