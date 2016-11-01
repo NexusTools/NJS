@@ -436,6 +436,7 @@ public class JSHelper {
 	public static Global createGlobal(net.nexustools.njs.compiler.Compiler compiler, java.lang.String... standards) {
 		final Global global = new Global(compiler);
 		global.initStandards();
+		JavaPackageWrapper PackageRoot = null;
 		for(java.lang.String standard : standards) {
 			if(standard.equals("JSON"))
 				global.setHidden("JSON", new JSON(global));
@@ -461,13 +462,19 @@ public class JSHelper {
 				global.setHidden("Float64Array", new Float64Array(global));
 			else if(standard.equals("GeneratorFunction"))
 				global.setHidden("GeneratorFunction", global.GeneratorFunction);
-			else if(standard.equals("PackageRoot"))
-				global.setHidden("PackageRoot", new JavaPackageWrapper(global));
-			else if(standard.equals("java"))
-				global.setHidden("java", new JavaPackageWrapper(global, "java"));
-			else if(standard.equals("javax"))
-				global.setHidden("javax", new JavaPackageWrapper(global, "javax"));
-			else if(standard.equals("isJavaClass"))
+			else if(standard.equals("PackageRoot")) {
+				if(PackageRoot == null)
+					PackageRoot = new JavaPackageWrapper(global);
+				global.setHidden("PackageRoot", PackageRoot);
+			} else if(standard.equals("java")) {
+				if(PackageRoot == null)
+					PackageRoot = new JavaPackageWrapper(global);
+				global.setHidden("java", PackageRoot.getSubPackage("java"));
+			} else if(standard.equals("javax")) {
+				if(PackageRoot == null)
+					PackageRoot = new JavaPackageWrapper(global);
+				global.setHidden("javax", PackageRoot.getSubPackage("javax"));
+			} else if(standard.equals("isJavaClass"))
 				global.setHidden("isJavaClass", new AbstractFunction(global) {
 					@Override
 					public BaseObject call(BaseObject _this, BaseObject... params) {

@@ -5,11 +5,12 @@
  */
 package net.nexustools.njs;
 
+import java.lang.ref.WeakReference;
 import java.util.AbstractSet;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  *
@@ -21,6 +22,7 @@ public class JavaPackageWrapper implements BaseObject {
 	private final java.lang.String pkg;
 	private final BaseFunction valueOf;
 	private final BaseFunction toString;
+	private final ArrayList<WeakReference<JavaPackageWrapper>> cache = new ArrayList();
 	public JavaPackageWrapper(final Global global) {
 		this(global, "");
 	}
@@ -158,12 +160,30 @@ public class JavaPackageWrapper implements BaseObject {
 			try {
 				return global.wrap(Class.forName(pkg + '.' + key));
 			} catch (ClassNotFoundException ex) {}
-			return new JavaPackageWrapper(global, pkg + '.' + key);
+			return getSubPackage(key);
 		}
 		try {
 			return global.wrap(Class.forName(key));
 		} catch (ClassNotFoundException ex) {}
-		return new JavaPackageWrapper(global, key);
+		return getSubPackage(key);
+	}
+	
+	public JavaPackageWrapper getSubPackage(java.lang.String key) {
+		if(!pkg.isEmpty())
+			key = pkg + '.' + key;
+		synchronized(cache) {
+			JavaPackageWrapper wrapper;
+			Iterator<WeakReference<JavaPackageWrapper>> it = cache.iterator();
+			while(it.hasNext()) {
+				wrapper = it.next().get();
+				if(wrapper == null)
+					it.remove();
+				if(wrapper.pkg.equals(key))
+					return wrapper;
+			}
+			cache.add(new WeakReference(wrapper = new JavaPackageWrapper(global, key)));
+			return wrapper;
+		}
 	}
 
 	@Override
@@ -319,6 +339,21 @@ public class JavaPackageWrapper implements BaseObject {
 	@Override
 	public Property getProperty(java.lang.String key) {
 		return new BasicProperty(get(key, this, OR_UNDEFINED));
+	}
+
+	@Override
+	public Iterator<java.lang.String> deepPropertyNameIterator() {
+		return new Iterator<java.lang.String>() {
+			@Override
+			public boolean hasNext() {
+				return false;
+			}
+
+			@Override
+			public java.lang.String next() {
+				throw new UnsupportedOperationException("Not supported");
+			}
+		};
 	}
 	
 }

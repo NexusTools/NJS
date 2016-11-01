@@ -272,5 +272,20 @@ public final class Undefined implements BaseObject {
 	public Property getProperty(java.lang.String key) {
 		throw new Error.JavaException("TypeError", "Cannot read property \"" + key + "\" from undefined");
 	}
+
+	@Override
+	public Iterator<java.lang.String> deepPropertyNameIterator() {
+		return new Iterator<java.lang.String>() {
+			@Override
+			public boolean hasNext() {
+				return false;
+			}
+
+			@Override
+			public java.lang.String next() {
+				throw new UnsupportedOperationException("Not supported");
+			}
+		};
+	}
 	
 }

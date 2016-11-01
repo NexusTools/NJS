@@ -11,3 +11,7 @@ Assert.assertTrue(typeof javax === "package");
 Assert.assertTrue(typeof PackageRoot === "package");
 Assert.assertTrue(typeof PackageRoot.java === "package");
 Assert.assertTrue(typeof PackageRoot.javax === "package");
+
+Assert.assertTrue(java === PackageRoot.java);
+Assert.assertTrue(java.lang === PackageRoot.java.lang);
+Assert.assertTrue(java.lang.Object === PackageRoot.java.lang.Object);

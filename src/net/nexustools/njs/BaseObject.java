@@ -5,6 +5,7 @@
  */
 package net.nexustools.njs;
 
+import java.util.Iterator;
 import java.util.Set;
 
 /**
@@ -196,4 +197,6 @@ public interface BaseObject extends Scopeable, Iterable<BaseObject> {
 	
 	public void setMetaObject(java.lang.Object meta);
 	public java.lang.Object getMetaObject();
+	
+	public Iterator<java.lang.String> deepPropertyNameIterator();
 }

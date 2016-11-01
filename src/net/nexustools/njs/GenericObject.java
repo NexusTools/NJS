@@ -512,8 +512,8 @@ public class GenericObject extends NumberObject {
 	}
 
 	@Override
-	public Iterator<BaseObject> iterator() {
-		return new Iterator<BaseObject>() {
+	public Iterator<java.lang.String> deepPropertyNameIterator() {
+		return new Iterator<java.lang.String>() {
 			BaseObject next = GenericObject.this;
 			List<java.lang.String> alreadySeen = new ArrayList();
 			Iterator<java.lang.String> it;
@@ -537,10 +537,15 @@ public class GenericObject extends NumberObject {
 				}
 			}
 			@Override
-			public BaseObject next() {
-				return String.wrap(_next);
+			public java.lang.String next() {
+				return _next;
 			}
 		};
+	}
+
+	@Override
+	public Iterator<BaseObject> iterator() {
+		throw new UnsupportedOperationException();
 	}
 	
 }
