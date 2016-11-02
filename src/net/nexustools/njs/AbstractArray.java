@@ -5,6 +5,8 @@
  */
 package net.nexustools.njs;
 
+import java.util.Arrays;
+
 /**
  *
  * @author kate
@@ -34,9 +36,9 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 					O newArray = createStorage(nextPowerOf2((int)newLength));
 					copy(arrayStorage, newArray, actualLength);
 					releaseStorage(arrayStorage);
-					actualLength = (int)newLength;
 					arrayStorage = newArray;
 				}
+				actualLength = (int)newLength;
 				return Undefined.INSTANCE;
 			}
 		});

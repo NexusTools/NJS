@@ -171,29 +171,12 @@ public class GenericObject extends NumberObject {
 
 	@Override
 	public final void set(java.lang.String key, BaseObject val, BaseObject _this, Or<Void> or) {
-		if(__proto__ instanceof GenericObject) {
-			Iterator<Map.Entry<java.lang.String, Property>> it = ((GenericObject)__proto__).properties.entrySet().iterator();
-			while(it.hasNext()) {
-				Map.Entry<java.lang.String, Property> entry = it.next();
-				if(entry.getKey().equals(key)) {
-					Property prop = entry.getValue();
-					BaseFunction setter = prop.getGetter();
-					if(setter != null) {
-						setter.call(_this, val);
-						return;
-					}
-				}
-			}
-		} else if(!JSHelper.isUndefined(__proto__)) {
-			throw new UnsupportedOperationException("todo: support non genericobjects");
-		}
-		
 		Iterator<Map.Entry<java.lang.String, Property>> it = properties.entrySet().iterator();
 		while(it.hasNext()) {
 			Map.Entry<java.lang.String, Property> entry = it.next();
 			if(entry.getKey().equals(key)) {
 				Property prop = entry.getValue();
-				BaseFunction setter = prop.getGetter();
+				BaseFunction setter = prop.getSetter();
 				if(setter == null) {
 					if(_this == this)
 						prop.set(val);
@@ -205,7 +188,10 @@ public class GenericObject extends NumberObject {
 			}
 		}
 		
-		or.or(key);
+		if(JSHelper.isUndefined(__proto__))
+			or.or(key);
+		else
+			__proto__.set(key, val, _this, or);
 	}
 	
 	public final void setStorage(java.lang.String key, BaseObject value, boolean enumerable) {
