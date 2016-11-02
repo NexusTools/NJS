@@ -17,7 +17,7 @@ import org.junit.runners.Suite;
 	Blocks.class,
 	Comparisons.class,
 	MathOperations.class,
-	//Standards.class,
+	Standards.class,
 	
 	Function.class,
 	String.class,

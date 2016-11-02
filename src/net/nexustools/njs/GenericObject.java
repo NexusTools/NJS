@@ -129,24 +129,39 @@ public class GenericObject extends NumberObject {
 		setProperty(key, property);
 	}
 	
+	private class OrSet implements Or<Void> {
+
+		final BaseObject val;
+		OrSet(BaseObject val) {
+			this.val = val;
+		}
+		
+		@Override
+		public Void or(java.lang.String key) {
+			properties.put(key, new BasicProperty(val));
+			return null;
+		}
+		
+	}
+	
 	@Override
 	public void set(int i, BaseObject val) {
-		set(i, val, this, OR_VOID);
+		set(i, val, this, sealed ? OR_VOID : new OrSet(val));
 	}
 	
 	@Override
 	public void set(int i, BaseObject val, BaseObject _this) {
-		set(i, val, _this, OR_VOID);
+		set(i, val, _this, sealed ? OR_VOID : new OrSet(val));
 	}
 
 	@Override
 	public void set(java.lang.String key, BaseObject val) {
-		set(key, val, OR_VOID);
+		set(key, val, this, sealed ? OR_VOID : new OrSet(val));
 	}
 
 	@Override
 	public final void set(java.lang.String key, BaseObject val, BaseObject _this) {
-		set(key, val, _this, OR_VOID);
+		set(key, val, _this, sealed ? OR_VOID : new OrSet(val));
 	}
 
 	@Override
@@ -156,17 +171,41 @@ public class GenericObject extends NumberObject {
 
 	@Override
 	public final void set(java.lang.String key, BaseObject val, BaseObject _this, Or<Void> or) {
+		if(__proto__ instanceof GenericObject) {
+			Iterator<Map.Entry<java.lang.String, Property>> it = ((GenericObject)__proto__).properties.entrySet().iterator();
+			while(it.hasNext()) {
+				Map.Entry<java.lang.String, Property> entry = it.next();
+				if(entry.getKey().equals(key)) {
+					Property prop = entry.getValue();
+					BaseFunction setter = prop.getGetter();
+					if(setter != null) {
+						setter.call(_this, val);
+						return;
+					}
+				}
+			}
+		} else if(!JSHelper.isUndefined(__proto__)) {
+			throw new UnsupportedOperationException("todo: support non genericobjects");
+		}
+		
 		Iterator<Map.Entry<java.lang.String, Property>> it = properties.entrySet().iterator();
 		while(it.hasNext()) {
 			Map.Entry<java.lang.String, Property> entry = it.next();
 			if(entry.getKey().equals(key)) {
-				entry.getValue().set(val, _this);
+				Property prop = entry.getValue();
+				BaseFunction setter = prop.getGetter();
+				if(setter == null) {
+					if(_this == this)
+						prop.set(val);
+					else
+						continue;
+				} else
+					setter.call(_this, val);
+				return;
 			}
 		}
-		if(sealed)
-			return;
 		
-		properties.put(key, new BasicProperty(val));
+		or.or(key);
 	}
 	
 	public final void setStorage(java.lang.String key, BaseObject value, boolean enumerable) {
@@ -231,14 +270,19 @@ public class GenericObject extends NumberObject {
 		Iterator<Map.Entry<java.lang.String, Property>> it = properties.entrySet().iterator();
 		while(it.hasNext()) {
 			Map.Entry<java.lang.String, Property> entry = it.next();
-			if(entry.getKey().equals(key))
-				return entry.getValue().get(_this);
+			if(entry.getKey().equals(key)) {
+				Property prop = entry.getValue();
+				BaseFunction getter = prop.getGetter();
+				if(getter == null)
+					return prop.get();
+				return getter.call(_this);
+			}
 		}
 		
-		if(!JSHelper.isUndefined(__proto__))
-			return __proto__.get(key, _this, or);
+		if(JSHelper.isUndefined(__proto__))
+			return or.or(key);
 		
-		return or.or(key);
+		return __proto__.get(key, _this, or);
 	}
 
 	@Override
@@ -310,12 +354,23 @@ public class GenericObject extends NumberObject {
 		return or.or(key);
 	}
 	
+	public final void setDirectly(java.lang.String key, BaseObject val) {
+		setProperty(key, new BasicProperty(val));
+	}
+	
 	public final BaseObject getDirectly(java.lang.String key) {
-		return getDirectly(key, OR_UNDEFINED);
+		return getDirectly(key, OR_NULL);
 	}
 	
 	public final BaseObject getDirectly(java.lang.String key, Or<BaseObject> or) {
-		return properties.get(key).get(this);
+		Property prop = properties.get(key);
+		if(prop == null)
+			return or.or(key);
+		
+		BaseFunction getter = prop.getGetter();
+		if(getter != null)
+			return getter.call(this);
+		return prop.get();
 	}
 	
 	@Override

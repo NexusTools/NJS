@@ -14,11 +14,11 @@ import java.util.Set;
  */
 public interface BaseObject extends Scopeable, Iterable<BaseObject> {
 	public static interface Property {
-		public BaseObject get(BaseObject _this);
+		public BaseObject get();
 		public BaseObject getValue();
 		public BaseFunction getSetter();
 		public BaseFunction getGetter();
-		public void set(BaseObject val, BaseObject _this);
+		public void set(BaseObject val);
 		public boolean configurable();
 		public boolean enumerable();
 	}
@@ -29,7 +29,7 @@ public interface BaseObject extends Scopeable, Iterable<BaseObject> {
 			value = val;
 		}
 		@Override
-		public final BaseObject get(BaseObject _this) {
+		public final BaseObject get() {
 			return value;
 		}
 		@Override
@@ -37,7 +37,7 @@ public interface BaseObject extends Scopeable, Iterable<BaseObject> {
 			return value;
 		}
 		@Override
-		public final void set(BaseObject val, BaseObject _this) {
+		public final void set(BaseObject val) {
 			value = val;
 		}
 		@Override
@@ -78,7 +78,7 @@ public interface BaseObject extends Scopeable, Iterable<BaseObject> {
 		}
 
 		@Override
-		public BaseObject get(BaseObject _this) {
+		public BaseObject get() {
 			return value;
 		}
 
@@ -98,7 +98,7 @@ public interface BaseObject extends Scopeable, Iterable<BaseObject> {
 		}
 
 		@Override
-		public void set(BaseObject val, BaseObject _this) {
+		public void set(BaseObject val) {
 		}
 
 		@Override
@@ -119,9 +119,8 @@ public interface BaseObject extends Scopeable, Iterable<BaseObject> {
 			this.enumerable = enumerable;
 		}
 		@Override
-		public final BaseObject get(BaseObject _this) {
-			if(getter != null)
-				return getter.call(_this);
+		public final BaseObject get() {
+			assert(getter == null);
 			return value;
 		}
 		@Override
@@ -129,11 +128,9 @@ public interface BaseObject extends Scopeable, Iterable<BaseObject> {
 			return value;
 		}
 		@Override
-		public final void set(BaseObject val, BaseObject _this) {
-			if(setter != null)
-				setter.call(_this, val);
-			else
-				value = val;
+		public final void set(BaseObject val) {
+			assert(setter == null);
+			value = val;
 		}
 		@Override
 		public final BaseFunction getSetter() {

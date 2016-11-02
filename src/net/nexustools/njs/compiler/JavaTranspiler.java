@@ -1070,7 +1070,7 @@ public class JavaTranspiler extends AbstractCompiler {
 			sourceBuilder.appendln("{");
 			sourceBuilder.indent();
 			for(Map.Entry<java.lang.String, Parsed> entry : ((OpenGroup)part).entries.entrySet()) {
-				sourceBuilder.append("set(\"");
+				sourceBuilder.append("setDirectly(\"");
 				sourceBuilder.append(convertStringSource(entry.getKey()));
 				sourceBuilder.append("\", ");
 				transpileParsedSource(sourceBuilder, entry.getValue(), methodPrefix, baseScope, fileName);
