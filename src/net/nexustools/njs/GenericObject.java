@@ -499,7 +499,7 @@ public class GenericObject extends NumberObject {
 	
 	@Override
 	public final boolean instanceOf(BaseFunction constructor) {
-		return __proto__ != null && (__proto__ == constructor || __proto__.instanceOf(constructor));
+		return __proto__ != null && (__proto__ == constructor.prototype() || __proto__.instanceOf(constructor));
 	}
 	
 	@Override
