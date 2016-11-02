@@ -1,45 +1,34 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+/* 
+ * Copyright (c) 2016 NexusTools.
+ * 
+ * This program is free software: you can redistribute it and/or modify  
+ * it under the terms of the GNU Lesser General Public License as   
+ * published by the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * Lesser General Lesser Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 package net.nexustools.njs.compiler;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
-import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.io.Writer;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.nio.CharBuffer;
-import java.util.ArrayList;
+
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.StringTokenizer;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javax.tools.Diagnostic;
-import javax.tools.DiagnosticCollector;
-import javax.tools.FileObject;
-import javax.tools.ForwardingJavaFileManager;
-import javax.tools.JavaFileManager;
-import javax.tools.JavaFileObject;
-import javax.tools.JavaFileObject.Kind;
-import javax.tools.SimpleJavaFileObject;
-import javax.tools.StandardJavaFileManager;
-import javax.tools.ToolProvider;
+
 import net.nexustools.njs.Global;
 
 /**
