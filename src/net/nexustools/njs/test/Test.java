@@ -30,9 +30,9 @@ public class Test {
 			}
 		});
 		
-		//eval(new InputStreamReader(Test.class.getResourceAsStream("/net/nexustools/njs/test/test.js")), "test.js", global);
+		eval(new InputStreamReader(Test.class.getResourceAsStream("/net/nexustools/njs/test/test.js")), "test.js", global);
 		//eval("/home/kate/Projects/SnappFu/JNode12/node/node.js", global);
-		eval("/home/kate/Desktop/prime.js", global);
+		//eval("/home/kate/Desktop/prime.js", global);
 	}
 	
 	public static void eval(String fileName, Global global) throws FileNotFoundException {

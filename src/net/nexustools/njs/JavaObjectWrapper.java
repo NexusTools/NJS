@@ -16,5 +16,12 @@ public class JavaObjectWrapper extends GenericObject {
 		super(constructor, global);
 		this.javaObject = javaObject;
 	}
+
+	@Override
+	public boolean instanceOf(BaseFunction constructor) {
+		if(constructor instanceof JavaClassWrapper)
+			return ((JavaClassWrapper)constructor).javaClass.isInstance(javaObject);
+		return super.instanceOf(constructor);
+	}
 	
 }

@@ -6,6 +6,7 @@
 package net.nexustools.njs;
 
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -147,8 +148,22 @@ public class Global extends UniqueObject {
 	}
 
 	private final List<WeakReference<JavaClassWrapper>> CONSTRUCTORS = new ArrayList();
-	public JavaClassWrapper wrap(Class<?> javaClass) {
-		assert(javaClass != null);
+	public JavaClassWrapper wrap(Class<?> originalJavaClass) {
+		assert(originalJavaClass != null);
+		Class<?> javaClass = originalJavaClass;
+		out:
+		while((javaClass.getModifiers() & Modifier.PUBLIC) == 0) {
+			if(javaClass.getSuperclass() == Object.class)
+				for(Class<?> next : javaClass.getInterfaces()) {
+					if((next.getModifiers() & Modifier.PUBLIC) != 0) {
+						javaClass = next;
+						break out;
+					}
+				}
+			javaClass = javaClass.getSuperclass();
+		}
+		if(javaClass != originalJavaClass)
+			System.out.println("Using " + javaClass + " to implement " + originalJavaClass);
 		synchronized(CONSTRUCTORS) {
 			Iterator<WeakReference<JavaClassWrapper>> it = CONSTRUCTORS.iterator();
 			while(it.hasNext()) {

@@ -19,12 +19,14 @@ import org.junit.runners.Suite;
 	MathOperations.class,
 	Standards.class,
 	
+	Object.class,
 	Function.class,
 	String.class,
 	Array.class,
 	JSON.class,
 	
 	Extended.class,
+	JavaClass.class,
 	Eval.class})
 public class Everything {
 }

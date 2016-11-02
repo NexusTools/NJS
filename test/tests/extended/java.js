@@ -15,3 +15,9 @@ Assert.assertTrue(typeof PackageRoot.javax === "package");
 Assert.assertTrue(java === PackageRoot.java);
 Assert.assertTrue(java.lang === PackageRoot.java.lang);
 Assert.assertTrue(java.lang.Object === PackageRoot.java.lang.Object);
+
+Assert.assertTrue(java.lang.NullPointerException instanceof Function);
+var nullException = new java.lang.NullPointerException();
+Assert.assertTrue(nullException instanceof java.lang.Object);
+Assert.assertTrue(nullException instanceof java.lang.Throwable);
+Assert.assertTrue(nullException instanceof java.lang.RuntimeException);

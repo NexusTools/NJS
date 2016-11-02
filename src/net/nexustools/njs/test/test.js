@@ -3,6 +3,10 @@ var methods = (function(global) {
 	var Executor = importClass("java.util.concurrent.Executors").newSingleThreadScheduledExecutor();
 	var TimeUnit = importClass("java.util.concurrent.TimeUnit");
 	
+	for(var key in Executor) {
+		System.out.println(key);
+	}
+	
 	return {
 		print: function(what) {
 			System.out.println(what.toString());
@@ -27,5 +31,7 @@ Object.keys(methods).forEach(function(key) {
 delete methods;
 
 setTimeout(function main() {
-	require("");
+	print("Tuna Fish");
+	print(new Error().stack);
+	exit();
 });
