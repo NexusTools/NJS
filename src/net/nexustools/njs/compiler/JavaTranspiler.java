@@ -47,8 +47,20 @@ import net.nexustools.njs.Global;
  * @author kate
  */
 public class JavaTranspiler extends AbstractCompiler {
-	private static final List<java.lang.String> RESTRICTED_NAMES = Arrays.asList(new java.lang.String[]{"new", "public", "private", "static", "protected", "trasient", "try", "catch", "finally", "if", "do", "while", "for", "switch", "case", "default", "enum", "Arguments", "CompiledScript", "Debuggable", "Optimized", "String", "Number", "RegEx", "Global", "Scope", "exec", "call", "multiply", "plus", "divide", "or", "BaseObject", "BaseFunction", "AbstractFunction", "GenericObject", "GenericArray", "CompiledFunction", "JSHelper"});
-
+	private static final List<java.lang.String> RESTRICTED_NAMES = Arrays.asList(new java.lang.String[]{
+		"abstract",     "assert",        "boolean",      "break",           "byte",
+		"case",         "catch",         "char",         "class",           "const",
+		"continue",     "default",       "do",           "double",          "else",
+		"enum",         "extends",       "false",        "final",           "finally",
+		"float",        "for",           "goto",         "if",              "implements",
+		"import",       "instanceof",    "int",          "interface",       "long",
+		"native",       "new",           "null",         "package",         "private",
+		"protected",    "public",        "return",       "short",           "static",
+		"strictfp",     "super",         "switch",       "synchronized",    "this",
+		"throw",        "throws",        "transient",    "true",            "try",
+		"void",         "volatile",      "while",		 "BaseObject",		"BaseFunction",
+		"AbstractFunction", "GenericObject", "GenericArray", "CompiledFunction", "JSHelper", "Iterator"});
+	
 	private static final Map<java.lang.String, AtomicInteger> GEN_PACKAGE_USED_NAMES = new HashMap();
 	private java.lang.String toClassName(java.lang.String name, boolean genPackage) {
 		java.lang.String output = name.replaceAll("[^_a-zA-Z0-9\\xA0-\\uFFFF]", "_");
@@ -838,16 +850,7 @@ public class JavaTranspiler extends AbstractCompiler {
 				sourceBuilder.appendln("\tthrow ex;");
 				sourceBuilder.appendln("} catch(Throwable t) {");
 				sourceBuilder.indent();
-				java.lang.String newScope;
-				if(baseScope.equals("catchScope")) {
-					int count;
-					if(baseScope.length() > 10)
-						count = java.lang.Integer.valueOf(baseScope.substring(10));
-					else
-						count = 0;
-					newScope = "catchScope" + (count+1);
-				} else
-					newScope = "catchScope";
+				java.lang.String newScope = extendScope(baseScope, "catchScope");
 				sourceBuilder.append("final Scope ");
 				sourceBuilder.append(newScope);
 				sourceBuilder.append(" = ");
@@ -858,7 +861,7 @@ public class JavaTranspiler extends AbstractCompiler {
 				sourceBuilder.appendln("try {");
 				sourceBuilder.indent();
 				sourceBuilder.append(newScope);
-				sourceBuilder.append(".param(\"");
+				sourceBuilder.append(".let(\"");
 				sourceBuilder.append(convertStringSource(((Reference)c.condition).ref));
 				sourceBuilder.appendln("\", global.wrap(t));");
 				generateBlockSource(sourceBuilder, c.impl, methodPrefix, newScope, fileName);
@@ -904,7 +907,7 @@ public class JavaTranspiler extends AbstractCompiler {
 				sourceBuilder.appendln("try {");
 				sourceBuilder.indent();
 				sourceBuilder.append(newScope);
-				sourceBuilder.append(".param(\"");
+				sourceBuilder.append(".let(\"");
 				sourceBuilder.append(convertStringSource(((Reference)c.condition).ref));
 				sourceBuilder.appendln("\", global.wrap(t));");
 				generateBlockSource(sourceBuilder, c.impl, methodPrefix, newScope, fileName);
@@ -977,35 +980,150 @@ public class JavaTranspiler extends AbstractCompiler {
 			return;
 		} else if(part instanceof For) {
 			if(((For)part).simpleimpl != null) {
-				if(((For)part).init != null) {
-					transpileParsedSource(sourceBuilder, ((For)part).init, methodPrefix, baseScope, fileName);
-					sourceBuilder.appendln(";");
+				switch(((For)part).type) {
+					case InLoop:
+						sourceBuilder.appendln("{");
+						sourceBuilder.indent();
+						sourceBuilder.append("Iterator<java.lang.String> it = ");
+						transpileParsedSource(sourceBuilder, ((For)part).loop, methodPrefix, baseScope, fileName);
+						sourceBuilder.appendln(".deepPropertyNameIterator();");
+						sourceBuilder.appendln("while(it.hasNext()) {");
+						sourceBuilder.indent();
+						sourceBuilder.append(baseScope);
+						sourceBuilder.append(".var(\"");
+						sourceBuilder.append(((Var)((For)part).init).sets.get(0).lhs);
+						sourceBuilder.appendln("\", global.String.wrap(it.next()));");
+						transpileParsedSource(sourceBuilder, ((For)part).simpleimpl, methodPrefix, baseScope, fileName);
+						sourceBuilder.appendln(";");
+						sourceBuilder.unindent();
+						sourceBuilder.appendln("}");
+						sourceBuilder.unindent();
+						sourceBuilder.append("}");
+						break;
+						
+					case OfLoop:
+						sourceBuilder.append("for(BaseObject forObject : ");
+						transpileParsedSource(sourceBuilder, ((For)part).loop, methodPrefix, baseScope, fileName);
+						sourceBuilder.appendln(") {");
+						sourceBuilder.indent();
+						sourceBuilder.append(baseScope);
+						sourceBuilder.append(".var(\"");
+						sourceBuilder.append(((Var)((For)part).init).sets.get(0).lhs);
+						sourceBuilder.appendln("\", forObject);");
+						transpileParsedSource(sourceBuilder, ((For)part).simpleimpl, methodPrefix, baseScope, fileName);
+						sourceBuilder.appendln(";");
+						sourceBuilder.unindent();
+						sourceBuilder.append("}");
+						break;
+						
+					case Standard:
+						if(((For)part).init != null) {
+							transpileParsedSource(sourceBuilder, ((For)part).init, methodPrefix, baseScope, fileName);
+							sourceBuilder.appendln(";");
+						}
+						sourceBuilder.append("for(; ");
+						generateBooleanSource(sourceBuilder, ((For)part).condition, methodPrefix, baseScope, fileName);
+						sourceBuilder.append("; ");
+						if(((For)part).loop != null)
+							transpileParsedSource(sourceBuilder, ((For)part).loop, methodPrefix, baseScope, fileName);
+						sourceBuilder.appendln(")");
+						sourceBuilder.append("\t");
+						transpileParsedSource(sourceBuilder, ((For)part).simpleimpl, methodPrefix, baseScope, fileName, true);
 				}
-				sourceBuilder.append("for(; ");
-				generateBooleanSource(sourceBuilder, ((For)part).condition, methodPrefix, baseScope, fileName);
-				sourceBuilder.append("; ");
-				if(((For)part).loop != null)
-					transpileParsedSource(sourceBuilder, ((For)part).loop, methodPrefix, baseScope, fileName);
-				sourceBuilder.appendln(")");
-				sourceBuilder.append("\t");
-				transpileParsedSource(sourceBuilder, ((For)part).simpleimpl, methodPrefix, baseScope, fileName, true);
+					
 				return;
 			}
+			
+			switch(((For)part).type) {
+				case InLoop:
+				{
+					sourceBuilder.appendln("{");
+					sourceBuilder.indent();
+					java.lang.String scope;
+					boolean let = ((For)part).init instanceof Let;
+					if(let) {
+						scope = extendScope(baseScope, "letScope");
+						sourceBuilder.append("final Scope ");
+						sourceBuilder.append(scope);
+						sourceBuilder.append(" = ");
+						sourceBuilder.append(baseScope);
+						sourceBuilder.appendln(".beginBlock();");
+					} else
+						scope = baseScope;
+					sourceBuilder.append("Iterator<java.lang.String> it = ");
+					transpileParsedSource(sourceBuilder, ((For)part).loop, methodPrefix, baseScope, fileName);
+					sourceBuilder.appendln(".deepPropertyNameIterator();");
+					sourceBuilder.appendln("while(it.hasNext()) {");
+					sourceBuilder.indent();
+					sourceBuilder.append(scope);
+					if(let)
+						sourceBuilder.append(".let(\"");
+					else
+						sourceBuilder.append(".var(\"");
+					sourceBuilder.append(((Var)((For)part).init).sets.get(0).lhs);
+					sourceBuilder.appendln("\", global.String.wrap(it.next()));");
+					generateBlockSource(sourceBuilder, ((For)part).impl, methodPrefix, scope, fileName);
+					sourceBuilder.unindent();
+					sourceBuilder.appendln("}");
+					sourceBuilder.unindent();
+					sourceBuilder.append("}");
+					break;
+				}
 
-			if(((For)part).init != null) {
-				transpileParsedSource(sourceBuilder, ((For)part).init, methodPrefix, baseScope, fileName);
-				sourceBuilder.appendln(";");
+				case OfLoop:
+				{
+					java.lang.String scope;
+					boolean let = ((For)part).init instanceof Let;
+					if(let) {
+						sourceBuilder.appendln("{");
+						sourceBuilder.indent();
+						scope = extendScope(baseScope, "letScope");
+						sourceBuilder.append("final Scope ");
+						sourceBuilder.append(scope);
+						sourceBuilder.append(" = ");
+						sourceBuilder.append(baseScope);
+						sourceBuilder.appendln(".beginBlock();");
+					} else
+						scope = baseScope;
+					sourceBuilder.append("for(BaseObject forObject : ");
+					transpileParsedSource(sourceBuilder, ((For)part).loop, methodPrefix, baseScope, fileName);
+					sourceBuilder.appendln(") {");
+					sourceBuilder.indent();
+					sourceBuilder.append(scope);
+					if(let)
+						sourceBuilder.append(".let(\"");
+					else
+						sourceBuilder.append(".var(\"");
+					sourceBuilder.append(((Var)((For)part).init).sets.get(0).lhs);
+					sourceBuilder.appendln("\", forObject);");
+					generateBlockSource(sourceBuilder, ((For)part).impl, methodPrefix, scope, fileName);
+					sourceBuilder.unindent();
+					sourceBuilder.append("}");
+					if(let) {
+						sourceBuilder.appendln();
+						sourceBuilder.unindent();
+						sourceBuilder.append("}");
+					}
+					break;
+				}
+
+				case Standard:
+					if(((For)part).init != null) {
+						transpileParsedSource(sourceBuilder, ((For)part).init, methodPrefix, baseScope, fileName);
+						sourceBuilder.appendln(";");
+					}
+					sourceBuilder.append("for(; ");
+					generateBooleanSource(sourceBuilder, ((For)part).condition, methodPrefix, baseScope, fileName);
+					sourceBuilder.append("; ");
+					if(((For)part).loop != null)
+						transpileParsedSource(sourceBuilder, ((For)part).loop, methodPrefix, baseScope, fileName);
+					sourceBuilder.appendln(") {");
+					sourceBuilder.indent();
+					generateBlockSource(sourceBuilder, ((For)part).impl, methodPrefix, baseScope, fileName);
+					sourceBuilder.unindent();
+					sourceBuilder.append("}");
 			}
-			sourceBuilder.append("for(; ");
-			generateBooleanSource(sourceBuilder, ((For)part).condition, methodPrefix, baseScope, fileName);
-			sourceBuilder.append("; ");
-			if(((For)part).loop != null)
-				transpileParsedSource(sourceBuilder, ((For)part).loop, methodPrefix, baseScope, fileName);
-			sourceBuilder.appendln(") {");
-			sourceBuilder.indent();
-			generateBlockSource(sourceBuilder, ((For)part).impl, methodPrefix, baseScope, fileName);
-			sourceBuilder.unindent();
-			sourceBuilder.appendln("}");
+			
 			return;
 		} else if(part instanceof PlusPlus) {
 			Parsed ref = ((PlusPlus)part).ref;
@@ -1372,6 +1490,9 @@ public class JavaTranspiler extends AbstractCompiler {
 		sourceBuilder.appendln("import net.nexustools.njs.Scope;");
 		sourceBuilder.appendln("import net.nexustools.njs.Null;");
 		sourceBuilder.appendln();
+		sourceBuilder.appendln("import java.util.Iterator;");
+		sourceBuilder.appendln();
+		sourceBuilder.appendln();
 		sourceBuilder.appendln("@SuppressWarnings(\"all\")");
 		sourceBuilder.append("public final class ");
 		sourceBuilder.append(className);
@@ -1402,6 +1523,18 @@ public class JavaTranspiler extends AbstractCompiler {
 		sourceBuilder.appendln("}");
 
 		return sourceBuilder.toString();
+	}
+	
+	private java.lang.String extendScope(java.lang.String baseScope, java.lang.String newScope) {
+		if(baseScope.equals(newScope)) {
+			int count;
+			if(baseScope.length() > 10)
+				count = java.lang.Integer.valueOf(baseScope.substring(10));
+			else
+				count = 0;
+			return newScope + (count+1);
+		} else
+			return newScope;
 	}
 
 	@Override

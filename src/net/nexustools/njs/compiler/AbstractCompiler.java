@@ -992,9 +992,15 @@ public abstract class AbstractCompiler implements Compiler {
 			DuringCondition,
 			DuringLoop
 		}
+		static enum ForType {
+			Standard,
+			InLoop,
+			OfLoop
+		}
 		
 		Parsed init;
 		Parsed loop;
+		ForType type = ForType.Standard;
 		ForConditionState state = ForConditionState.DuringInit;
 		public For() {}
 		@Override
@@ -1030,6 +1036,16 @@ public abstract class AbstractCompiler implements Compiler {
 							if(part instanceof SemiColon) {
 								init = init.finish();
 								state = ForConditionState.DuringCondition;
+								return;
+							} else if(part instanceof In) {
+								type = ForType.InLoop;
+								init = init.finish();
+								state = ForConditionState.DuringLoop;
+								return;
+							} else if(part instanceof Of) {
+								type = ForType.OfLoop;
+								init = init.finish();
+								state = ForConditionState.DuringLoop;
 								return;
 							}
 						}
@@ -2224,6 +2240,18 @@ public abstract class AbstractCompiler implements Compiler {
 			return "<=";
 		}
 	}
+	public static class In extends Helper {
+		@Override
+		public java.lang.String toSource() {
+			return "in";
+		}
+	}
+	public static class Of extends Helper {
+		@Override
+		public java.lang.String toSource() {
+			return "of";
+		}
+	}
 	public static class New extends Referency {
 		boolean closed;
 		Parsed reference;
@@ -2372,7 +2400,9 @@ public abstract class AbstractCompiler implements Compiler {
 		}
 		@Override
 		public java.lang.String toSource() {
-			StringBuilder builder = new StringBuilder("var ");
+			StringBuilder builder = new StringBuilder();
+			builder.append(getClass().getSimpleName().toLowerCase());
+			builder.append(' ');
 			join(sets, ',', builder);
 			if(currentSet != null) {
 				if(!sets.isEmpty())
@@ -2411,6 +2441,9 @@ public abstract class AbstractCompiler implements Compiler {
 			}
 			return this;
 		}
+	}
+	public static class Let extends Var {
+		
 	}
 	public static class String extends PrimitiveReferency implements StringReferency {
 		public final java.lang.String string;
@@ -2779,6 +2812,7 @@ public abstract class AbstractCompiler implements Compiler {
 		public void match(Pattern pattern, Matcher matcher, ParserReader reader) {
 			if(pattern == WHITESPACE || pattern == MULTILINE_COMMENT || pattern == SINGLELINE_COMMENT)
 				return; // Ignored
+			
 			if(pattern == STRING) {
 				java.lang.String string = matcher.group(1);
 				throw new PartExchange(new String(string.substring(1, string.length()-1)), matcher.group().length());
@@ -2796,7 +2830,11 @@ public abstract class AbstractCompiler implements Compiler {
 			}
 			if(pattern == VARIABLE) {
 				java.lang.String ref = matcher.group();
-				if(ref.equals("new"))
+				if(ref.equals("in"))
+					throw new PartExchange(new In(), ref.length());
+				else if(ref.equals("of"))
+					throw new PartExchange(new Of(), ref.length());
+				else if(ref.equals("new"))
 					throw new PartExchange(new New(), ref.length());
 				else if(ref.equals("null"))
 					throw new PartExchange(new Null(), ref.length());
@@ -2840,6 +2878,8 @@ public abstract class AbstractCompiler implements Compiler {
 					ret(matcher);
 				else if(ref.equals("var"))
 					throw new PartExchange(new Var(), ref.length());
+				else if(ref.equals("let"))
+					throw new PartExchange(new Let(), ref.length());
 				else
 					throw new PartExchange(new Reference(ref), ref.length());
 			}
@@ -2986,7 +3026,7 @@ public abstract class AbstractCompiler implements Compiler {
 			if(DEBUG)
 				System.out.println("Compiling " + join(Arrays.asList(script), ';'));
 			return script;
-		/*} catch(net.nexustools.njs.Error.JavaException ex) {
+		} catch(net.nexustools.njs.Error.JavaException ex) {
 			if(ex.type.equals("SyntaxError") && reader != null) {
 				StringBuilder builder = new StringBuilder(ex.getUnderlyingMessage());
 				builder.append(" (");
@@ -3000,7 +3040,7 @@ public abstract class AbstractCompiler implements Compiler {
 				builder.append(')');
 				throw new net.nexustools.njs.Error.JavaException("SyntaxError", builder.toString(), ex);
 			}
-			throw ex;*/
+			throw ex;
 		} catch(IOException ex) {
 			throw new Error.JavaException("EvalError", "IO Exception While Evaluating Script: " + ex.getMessage(), ex);
 		}

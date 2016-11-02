@@ -20,7 +20,7 @@ public class Scope implements Scopeable {
 	private static class BlockScopeable implements Scopeable {
 		private final HashMap<java.lang.String, BaseObject> arguments = new HashMap();
 		
-		public void param(java.lang.String key, BaseObject val) {
+		public void let(java.lang.String key, BaseObject val) {
 			arguments.put(key, val);
 		}
 		
@@ -165,8 +165,8 @@ public class Scope implements Scopeable {
 		this._this = _this;
 	}
 	
-	public final void param(java.lang.String key, BaseObject val) {
-		((BlockScopeable)scopeables[0]).param(key, val);
+	public final void let(java.lang.String key, BaseObject val) {
+		((BlockScopeable)scopeables[0]).let(key, val);
 	}
 	
 	public final void var(java.lang.String key) {

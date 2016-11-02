@@ -1248,7 +1248,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 								if(JSHelper.isTrue(condition.run(global, scope).get())) {
 									BaseObject ret = impl.exec(global, scope);
 									if(ret != null)
-										return new ValueReferenceable(ret);
+										return new Return(ret);
 								}
 							} finally {
 								el.finishCall();
@@ -1347,40 +1347,176 @@ public class RuntimeCompiler extends AbstractCompiler {
 		} else if(object instanceof For) {
 			Parsed _init = ((For)object).init;
 			Parsed _loop = ((For)object).loop;
-			final Impl condition = compile(data, ((For)object).condition);
+			final Impl condition = ((For)object).condition == null ? null : compile(data, ((For)object).condition);
 			if(_init != null && _loop != null) {
 				final Impl init = compile(data, _init);
 				final Impl loop = compile(data, _loop);
 
 				if(((For)object).simpleimpl != null) {
 					final Impl impl = compile(data, ((For)object).simpleimpl);
-					return new Impl() {
-						@Override
-						public Referenceable run(Global global, Scope scope) {
-							for(init.run(global, scope).get(); JSHelper.isTrue(condition.run(global, scope).get()); loop.run(global, scope).get()) {
-								Referenceable ref = impl.run(global, scope);
-								if(ref instanceof Return)
-									return ref;
-								ref.get();
-							}
-
-							return UNDEFINED_REFERENCE;
+					switch(((For)object).type) {
+						case InLoop:
+						{
+							final java.lang.String key = ((Var)((For)object).init).sets.get(0).lhs;
+							if(((For)object).init instanceof Let)
+								return new Impl() {
+									@Override
+									public Referenceable run(Global global, Scope scope) {
+										scope = scope.beginBlock();
+										Iterator<java.lang.String> it = loop.run(global, scope).get().deepPropertyNameIterator();
+										while(it.hasNext()) {
+											scope.let(key, global.String.wrap(it.next()));
+											Referenceable ref = impl.run(global, scope);
+											if(ref instanceof Return)
+												return ref;
+											ref.get();
+										}
+										return UNDEFINED_REFERENCE;
+									}
+								};
+							return new Impl() {
+								@Override
+								public Referenceable run(Global global, Scope scope) {
+									Iterator<java.lang.String> it = loop.run(global, scope).get().deepPropertyNameIterator();
+									while(it.hasNext()) {
+										scope.var(key, global.String.wrap(it.next()));
+										Referenceable ref = impl.run(global, scope);
+										if(ref instanceof Return)
+											return ref;
+										ref.get();
+									}
+									return UNDEFINED_REFERENCE;
+								}
+							};
 						}
-					};
+						case OfLoop:
+						{
+							final java.lang.String key = ((Var)((For)object).init).sets.get(0).lhs;
+							if(((For)object).init instanceof Let)
+								return new Impl() {
+									@Override
+									public Referenceable run(Global global, Scope scope) {
+										scope = scope.beginBlock();
+										for(BaseObject forObject : loop.run(global, scope).get()) {
+											scope.let(key, forObject);
+											Referenceable ref = impl.run(global, scope);
+											if(ref instanceof Return)
+												return ref;
+											ref.get();
+										}
+										return UNDEFINED_REFERENCE;
+									}
+								};
+							return new Impl() {
+								@Override
+								public Referenceable run(Global global, Scope scope) {
+									for(BaseObject forObject : loop.run(global, scope).get()) {
+										scope.var(key, forObject);
+										Referenceable ref = impl.run(global, scope);
+										if(ref instanceof Return)
+											return ref;
+										ref.get();
+									}
+									return UNDEFINED_REFERENCE;
+								}
+							};
+						}
+						case Standard:
+							return new Impl() {
+								@Override
+								public Referenceable run(Global global, Scope scope) {
+									for(init.run(global, scope).get(); JSHelper.isTrue(condition.run(global, scope).get()); loop.run(global, scope).get()) {
+										Referenceable ref = impl.run(global, scope);
+										if(ref instanceof Return)
+											return ref;
+										ref.get();
+									}
+
+									return UNDEFINED_REFERENCE;
+								}
+							};
+					}
+					
+					
 				}
 				final Script impl = compileScript(((For)object).impl, data.fileName, ScriptType.Block);
-				return new Impl() {
-					@Override
-					public Referenceable run(Global global, Scope scope) {
-						for(init.run(global, scope).get(); JSHelper.isTrue(condition.run(global, scope).get()); loop.run(global, scope).get()) {
-							BaseObject ret = impl.exec(global, scope);
-							if(ret != null)
-								return new ValueReferenceable(ret);
+				switch(((For)object).type) {
+						case InLoop:
+						{
+							final java.lang.String key = ((Var)((For)object).init).sets.get(0).lhs;
+							if(((For)object).init instanceof Let)
+								return new Impl() {
+									@Override
+									public Referenceable run(Global global, Scope scope) {
+										scope = scope.beginBlock();
+										Iterator<java.lang.String> it = loop.run(global, scope).get().deepPropertyNameIterator();
+										while(it.hasNext()) {
+											scope.let(key, global.String.wrap(it.next()));
+											BaseObject ret = impl.exec(global, scope);
+											if(ret != null)
+												return new Return(ret);
+										}
+										return UNDEFINED_REFERENCE;
+									}
+								};
+							return new Impl() {
+								@Override
+								public Referenceable run(Global global, Scope scope) {
+									Iterator<java.lang.String> it = loop.run(global, scope).get().deepPropertyNameIterator();
+									while(it.hasNext()) {
+										scope.var(key, global.String.wrap(it.next()));
+										BaseObject ret = impl.exec(global, scope);
+										if(ret != null)
+											return new Return(ret);
+									}
+									return UNDEFINED_REFERENCE;
+								}
+							};
 						}
+						case OfLoop:
+						{
+							final java.lang.String key = ((Var)((For)object).init).sets.get(0).lhs;
+							if(((For)object).init instanceof Let)
+								return new Impl() {
+									@Override
+									public Referenceable run(Global global, Scope scope) {
+										scope = scope.beginBlock();
+										for(BaseObject forObject : loop.run(global, scope).get()) {
+											scope.let(key, forObject);
+											BaseObject ret = impl.exec(global, scope);
+											if(ret != null)
+												return new Return(ret);
+										}
+										return UNDEFINED_REFERENCE;
+									}
+								};
+							return new Impl() {
+								@Override
+								public Referenceable run(Global global, Scope scope) {
+									for(BaseObject forObject : loop.run(global, scope).get()) {
+										scope.var(key, forObject);
+										BaseObject ret = impl.exec(global, scope);
+										if(ret != null)
+											return new Return(ret);
+									}
+									return UNDEFINED_REFERENCE;
+								}
+							};
+						}
+						case Standard:
+							return new Impl() {
+								@Override
+								public Referenceable run(Global global, Scope scope) {
+									for(init.run(global, scope).get(); JSHelper.isTrue(condition.run(global, scope).get()); loop.run(global, scope).get()) {
+										BaseObject ret = impl.exec(global, scope);
+										if(ret != null)
+											return new Return(ret);
+									}
 
-						return UNDEFINED_REFERENCE;
-					}
-				};
+									return UNDEFINED_REFERENCE;
+								}
+							};
+				}
 			} else if(_loop != null) {
 				final Impl loop = compile(data, _loop);
 
@@ -1407,7 +1543,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 						for(; JSHelper.isTrue(condition.run(global, scope).get()); loop.run(global, scope).get()) {
 							BaseObject ret = impl.exec(global, scope);
 							if(ret != null)
-								return new ValueReferenceable(ret);
+								return new Return(ret);
 						}
 
 						return UNDEFINED_REFERENCE;
@@ -1439,7 +1575,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 						for(init.run(global, scope).get(); JSHelper.isTrue(condition.run(global, scope).get()); ) {
 							BaseObject ret = impl.exec(global, scope);
 							if(ret != null)
-								return new ValueReferenceable(ret);
+								return new Return(ret);
 						}
 
 						return UNDEFINED_REFERENCE;
@@ -1470,7 +1606,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 					for(; JSHelper.isTrue(condition.run(global, scope).get()); ) {
 						BaseObject ret = impl.exec(global, scope);
 						if(ret != null)
-							return new ValueReferenceable(ret);
+							return new Return(ret);
 					}
 
 					return UNDEFINED_REFERENCE;
@@ -1497,7 +1633,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 									throw (net.nexustools.njs.Error.InvisibleException)t;
 
 								Scope catchScope = scope.beginBlock();
-								catchScope.param(key, global.wrap(t));
+								catchScope.let(key, global.wrap(t));
 								BaseObject ret = cimpl.exec(global, catchScope);
 								if(ret != null)
 									return new Return(ret);
@@ -1530,7 +1666,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 									throw (net.nexustools.njs.Error.InvisibleException)t;
 
 								Scope catchScope = scope.beginBlock();
-								catchScope.param(key, global.wrap(t));
+								catchScope.let(key, global.wrap(t));
 								BaseObject ret = cimpl.exec(global, catchScope);
 								if(ret != null)
 									return new Return(ret);
@@ -1611,7 +1747,7 @@ public class RuntimeCompiler extends AbstractCompiler {
 							while(JSHelper.isTrue(condition.run(global, scope).get())) {
 								BaseObject ret = impl.exec(global, scope);
 								if(ret != null)
-									return new ValueReferenceable(ret);
+									return new Return(ret);
 							}
 
 							return UNDEFINED_REFERENCE;
