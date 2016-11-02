@@ -29,7 +29,6 @@ public class JavaClassWrapper extends AbstractFunction {
 	JavaClassWrapper(final Global global, final Class<?> javaClass) {
 		super(global);
 		assert(javaClass != null);
-		assert((javaClass.getModifiers() & Modifier.PUBLIC) != 0);
 		this.javaClass = javaClass;
 		javaClassString = javaClass.getName().replace(".", "_");
 		assert(javaClassString != null);

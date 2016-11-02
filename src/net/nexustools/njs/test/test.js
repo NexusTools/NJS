@@ -3,10 +3,6 @@ var methods = (function(global) {
 	var Executor = importClass("java.util.concurrent.Executors").newSingleThreadScheduledExecutor();
 	var TimeUnit = importClass("java.util.concurrent.TimeUnit");
 	
-	for(var key in Executor) {
-		System.out.println(key);
-	}
-	
 	return {
 		print: function(what) {
 			System.out.println(what.toString());

@@ -46,10 +46,10 @@ public class Global extends UniqueObject {
 	
 	public final Compiler compiler;
 	public final Function Function = new Function(this);
+	public final GeneratorFunction GeneratorFunction;
 	public final Object Object = new Object();
 	public final String String = new String();
 	public final Number Number = new Number();
-	public final GeneratorFunction GeneratorFunction;
 	public final Boolean Boolean;
 	public final Symbol Symbol;
 	public final Error Error;
@@ -148,22 +148,7 @@ public class Global extends UniqueObject {
 	}
 
 	private final List<WeakReference<JavaClassWrapper>> CONSTRUCTORS = new ArrayList();
-	public JavaClassWrapper wrap(Class<?> originalJavaClass) {
-		assert(originalJavaClass != null);
-		Class<?> javaClass = originalJavaClass;
-		out:
-		while((javaClass.getModifiers() & Modifier.PUBLIC) == 0) {
-			if(javaClass.getSuperclass() == Object.class)
-				for(Class<?> next : javaClass.getInterfaces()) {
-					if((next.getModifiers() & Modifier.PUBLIC) != 0) {
-						javaClass = next;
-						break out;
-					}
-				}
-			javaClass = javaClass.getSuperclass();
-		}
-		if(javaClass != originalJavaClass)
-			System.out.println("Using " + javaClass + " to implement " + originalJavaClass);
+	public JavaClassWrapper wrap(Class<?> javaClass) {
 		synchronized(CONSTRUCTORS) {
 			Iterator<WeakReference<JavaClassWrapper>> it = CONSTRUCTORS.iterator();
 			while(it.hasNext()) {
