@@ -64,7 +64,7 @@ public class Object extends AbstractFunction {
 		setHidden("getPrototypeOf", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				return params[0].__proto__();
+				return params[0].prototypeOf();
 			}
 			@Override
 			public java.lang.String name() {
@@ -94,6 +94,18 @@ public class Object extends AbstractFunction {
 		final Map<BaseFunction, String.Instance> constructorNameMap = new HashMap();
 		
 		GenericObject prototype = (GenericObject)prototype();
+		prototype.defineProperty("__proto__", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return _this.prototypeOf();
+			}
+		}, new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				_this.setPrototypeOf(params[0]);
+				return Undefined.INSTANCE;
+			}
+		});
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
@@ -117,6 +129,17 @@ public class Object extends AbstractFunction {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				_this.defineGetter(params[0].toString(), (BaseFunction)params[1]);
+				return Undefined.INSTANCE;
+			}
+			@Override
+			public java.lang.String name() {
+				return "Object_prototype_valueOf";
+			}
+		});
+		prototype.setHidden("__defineSetter__", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				_this.defineSetter(params[0].toString(), (BaseFunction)params[1]);
 				return Undefined.INSTANCE;
 			}
 			@Override

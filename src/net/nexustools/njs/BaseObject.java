@@ -153,9 +153,10 @@ public interface BaseObject extends Scopeable, Iterable<BaseObject> {
 		}
 	}
 
+	public BaseObject prototypeOf();
+	public void setPrototypeOf(BaseObject prototype);
 	public boolean instanceOf(BaseFunction constructor);
 	public java.lang.String typeOf();
-	public BaseObject __proto__();
 	
 	public Set<java.lang.String> keys();
 	public Set<java.lang.String> ownPropertyNames();

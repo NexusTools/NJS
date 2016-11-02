@@ -67,8 +67,13 @@ public final class Null implements BaseObject {
 	}
 
 	@Override
-	public BaseObject __proto__() {
-		throw new Error.JavaException("TypeError", "Cannot read property \"__proto__\" from null");
+	public BaseObject prototypeOf() {
+		throw new Error.JavaException("TypeError", "Cannot convert undefined or null to object");
+	}
+
+	@Override
+	public void setPrototypeOf(BaseObject prototype) {
+		throw new Error.JavaException("TypeError", "Cannot convert undefined or null to object");
 	}
 
 	@Override

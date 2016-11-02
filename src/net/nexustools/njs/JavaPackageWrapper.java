@@ -46,10 +46,13 @@ public class JavaPackageWrapper implements BaseObject {
 	}
 
 	@Override
-	public BaseObject __proto__() {
+	public BaseObject prototypeOf() {
 		return Undefined.INSTANCE;
 	}
 
+	@Override
+	public void setPrototypeOf(BaseObject prototype) {}
+	
 	@Override
 	public boolean instanceOf(BaseFunction constructor) {
 		return false;

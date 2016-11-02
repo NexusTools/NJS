@@ -445,9 +445,14 @@ public class GenericObject extends NumberObject {
 	public final void seal() {
 		sealed = true;
 	}
+
+	@Override
+	public void setPrototypeOf(BaseObject prototype) {
+		__proto__ = prototype;
+	}
 	
 	@Override
-	public final BaseObject __proto__() {
+	public final BaseObject prototypeOf() {
 		return __proto__;
 	}
 	
@@ -531,7 +536,7 @@ public class GenericObject extends NumberObject {
 						}
 					if(next != null) {
 						it = next.keys().iterator();
-						next = next.__proto__();
+						next = next.prototypeOf();
 					} else
 						return false;
 				}
