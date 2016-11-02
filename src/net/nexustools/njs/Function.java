@@ -19,7 +19,7 @@ public class Function extends AbstractFunction {
 	}
 
 	public void initPrototypeFunctions(final Global global) {
-		GenericObject prototype = prototype();
+		GenericObject prototype = (GenericObject)prototype();
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {

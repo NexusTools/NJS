@@ -37,7 +37,7 @@ public class Int8Array extends Uint8Array {
 
 	public Int8Array(final Global global) {
 		super(global);
-		GenericObject prototype = prototype();
+		GenericObject prototype = (GenericObject)prototype();
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {

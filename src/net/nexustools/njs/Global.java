@@ -72,23 +72,23 @@ public class Global extends UniqueObject {
 		Symbol.initConstants();
 		GenericObject ObjectPrototype = new GenericObject();
 		ObjectPrototype.setHidden("constructor", Object);
-		Object.setHidden("prototype", ObjectPrototype);
+		Object.setPrototype(ObjectPrototype);
 		GenericObject NumberPrototype = new GenericObject();
 		NumberPrototype.setHidden("constructor", Number);
 		NumberPrototype.__proto__ = ObjectPrototype;
-		Number.setHidden("prototype", NumberPrototype);
+		Number.setPrototype(NumberPrototype);
 		GenericObject FunctionPrototype = new GenericObject();
 		FunctionPrototype.setHidden("constructor", Function);
 		FunctionPrototype.__proto__ = ObjectPrototype;
-		Function.setHidden("prototype", FunctionPrototype);
+		Function.setPrototype(FunctionPrototype);
 		GenericObject StringPrototype = new GenericObject();
 		StringPrototype.setHidden("constructor", String);
 		StringPrototype.__proto__ = ObjectPrototype;
-		String.setHidden("prototype", StringPrototype);
+		String.setPrototype(StringPrototype);
 		GenericObject SymbolPrototype = new GenericObject();
 		SymbolPrototype.setHidden("constructor", Symbol);
 		SymbolPrototype.__proto__ = ObjectPrototype;
-		Symbol.setHidden("prototype", SymbolPrototype);
+		Symbol.setPrototype(SymbolPrototype);
 		Number.initConstants();
 		
 		ObjectPrototype.String = NumberPrototype.String = Object.String = String;

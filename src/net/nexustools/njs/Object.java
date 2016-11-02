@@ -93,7 +93,7 @@ public class Object extends AbstractFunction {
 		final String.Instance _objectObject = global.wrap("[object Object]");
 		final Map<BaseFunction, String.Instance> constructorNameMap = new HashMap();
 		
-		GenericObject prototype = prototype();
+		GenericObject prototype = (GenericObject)prototype();
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {

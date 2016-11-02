@@ -37,7 +37,7 @@ public class Int32Array extends Uint32Array {
 
 	public Int32Array(final Global global) {
 		super(global);
-		GenericObject prototype = prototype();
+		GenericObject prototype = (GenericObject)prototype();
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {

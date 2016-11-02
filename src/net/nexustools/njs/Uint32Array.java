@@ -71,7 +71,7 @@ public class Uint32Array extends AbstractFunction {
 	public Uint32Array(final Global global) {
 		super(global);
 		this.global = global;
-		GenericObject prototype = prototype();
+		GenericObject prototype = (GenericObject)prototype();
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {

@@ -11,30 +11,23 @@ package net.nexustools.njs;
  */
 public abstract class AbstractFunction extends UniqueObject implements BaseFunction {
 	
-	private final Object Object;
+	protected BaseObject prototype;
 	public AbstractFunction(Global global, java.lang.String name) {
 		super(global.Function, global);
-		this.Object = global.Object;
 		
-		BaseObject prototype = create0();
-		setHidden("prototype", prototype);
+		prototype = create0();
 		if(name != null)
 			setHidden("name", String.wrap(name));
 	}
 	public AbstractFunction(Global global) {
 		super(global.Function, global);
-		this.Object = global.Object;
 		
-		setHidden("prototype", create0());
+		prototype = create0();
 		java.lang.String name = name();
 		if(name != null)
 			setHidden("name", String.wrap(name));
 	}
-	protected AbstractFunction(Object Object) {
-		this.Object = Object;
-	}
 	protected AbstractFunction() {
-		this.Object = null;
 	}
 
 	public final GenericObject create0() {
@@ -56,8 +49,13 @@ public abstract class AbstractFunction extends UniqueObject implements BaseFunct
 	}
 
 	@Override
-	public final GenericObject prototype() {
-		return (GenericObject)get("prototype", OR_REFERENCE_ERROR_BO);
+	public void setPrototype(BaseObject prototype) {
+		this.prototype = prototype;
+	}
+
+	@Override
+	public final BaseObject prototype() {
+		return prototype;
 	}
 	
 	@Override

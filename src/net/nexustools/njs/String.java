@@ -74,7 +74,7 @@ public class String extends AbstractFunction {
 	
 	protected void initPrototypeFunctions(Global global) {
 		this.global = global;
-		GenericObject prototype = prototype();
+		GenericObject prototype = (GenericObject)prototype();
 		prototype.setHidden("match", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {

@@ -173,7 +173,7 @@ public class Error extends AbstractFunction implements BaseFunction {
 		super(global);
 		String = global.String;
 		
-		GenericObject prototype = prototype();
+		GenericObject prototype = (GenericObject)prototype();
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {

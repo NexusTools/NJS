@@ -47,7 +47,7 @@ public class JavaClassWrapper extends AbstractFunction {
 			}
 		});
 		
-		GenericObject prototype = prototype();
+		GenericObject prototype = (GenericObject)prototype();
 		if(superClass != null) {
 			JavaClassWrapper superConstructor = global.wrap(superClass);
 			prototype.setHidden("constructor", superConstructor);

@@ -39,7 +39,7 @@ public class Boolean extends AbstractFunction {
 		final String.Instance _true = global.wrap("true");
 		final String.Instance _false = global.wrap("false");
 		
-		GenericObject prototype = prototype();
+		GenericObject prototype = (GenericObject)prototype();
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {

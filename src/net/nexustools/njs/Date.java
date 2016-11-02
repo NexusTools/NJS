@@ -20,7 +20,7 @@ public class Date extends AbstractFunction {
 	
 	public Date(final Global global) {
 		super(global);
-		GenericObject prototype = prototype();
+		GenericObject prototype = (GenericObject)prototype();
 		prototype.setHidden("valueOf", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {

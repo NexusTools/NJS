@@ -39,7 +39,7 @@ public class Int16Array extends Uint16Array {
 
 	public Int16Array(final Global global) {
 		super(global);
-		GenericObject prototype = prototype();
+		GenericObject prototype = (GenericObject)prototype();
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
