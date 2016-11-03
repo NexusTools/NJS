@@ -22,6 +22,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.util.ArrayList;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Arrays;
@@ -493,7 +494,290 @@ public class JavaTranspiler extends RegexCompiler {
 		return false;
 	}
 
+	public static class ScopeOptimizer {
+		public final ArrayList<java.lang.String> volati = new ArrayList();
+		public final HashMap<java.lang.String, java.lang.String> scope = new HashMap();
+		public void var(java.lang.String key, java.lang.String type) {
+			java.lang.String current = scope.get(key);
+			if(current == null || current.equals("any"))
+				scope.put(key, type);
+			else if(!current.equals(type))
+				scope.put(key, "unknown");
+			else
+				scope.put(key, type);
+		}
+		public void let(java.lang.String key, java.lang.String type) {
+			var(key, type);
+		}
+		public void markVolatile(java.lang.String key) {
+			if(scope.containsKey(key) && !volati.contains(key))
+				volati.add(key);
+		}
+		public void update(java.lang.String key, java.lang.String newType) {
+			java.lang.String current = scope.get(key);
+			if(current == null)
+				return;
+			if(current.equals("any"))
+				scope.put(key, newType);
+			else if(!current.equals(newType) && volati.contains(key))
+				throw new CannotOptimize("Volatile key " + key + " was changed to " + newType + " from " + current);
+		}
+
+		public boolean isTyped(java.lang.String key, java.lang.String type) {
+			return type.equals(scope.get(key));
+		}
+
+		public void assertTyped(java.lang.String key, java.lang.String... _types) {
+			java.lang.String current = scope.get(key);
+			List<java.lang.String> types = Arrays.asList(_types);
+			if(current == null)
+				throw new CannotOptimize("Unknown variable " + key + " must be typed as one of " + types + " : " + this);
+			else if(!types.contains(current))
+				throw new CannotOptimize(current + " typed variable " + key + " must be typed as one of " + types + " : " + this);
+		}
+	}
+	public static class FunctionScopeOptimizer extends ScopeOptimizer {
+		final ScopeOptimizer parent;
+		FunctionScopeOptimizer(ScopeOptimizer parent) {
+			this.parent = parent;
+		}
+		
+		@Override
+		public void markVolatile(java.lang.String key) {
+			if(scope.containsKey(key)) {
+				if(!volati.contains(key))
+					volati.add(key);
+			} else
+				parent.markVolatile(key);
+		}
+		
+		@Override
+		public void update(java.lang.String key, java.lang.String newType) {
+			java.lang.String current = scope.get(key);
+			if(current == null)
+				return;
+			if(current.equals("any"))
+				scope.put(key, newType);
+			else if(!current.equals(newType)) {
+				if(volati.contains(key))
+					throw new CannotOptimize("Volatile key " + key + " was changed to " + newType + " from " + current);
+				scope.put(key, "unknown");
+			} else
+				parent.update(key, newType);
+		}
+
+		@Override
+		public boolean isTyped(java.lang.String key, java.lang.String type) {
+			java.lang.String typedAs = scope.get(key);
+			if(typedAs != null)
+				return type.equals(typedAs);
+			return parent.isTyped(key, type);
+		}
+
+		@Override
+		public void assertTyped(java.lang.String key, java.lang.String... _types) {
+			java.lang.String current = scope.get(key);
+			if(current == null) {
+				parent.assertTyped(key, _types);
+				return;
+			}
+			
+			List<java.lang.String> types = Arrays.asList(_types);
+			if(!types.contains(current))
+				throw new CannotOptimize(current + " typed variable " + key + " must be typed as one of " + types);
+		}
+	}
+	public static class BlockScopeOptimizer extends ScopeOptimizer {
+		final ScopeOptimizer parent;
+		BlockScopeOptimizer(ScopeOptimizer parent) {
+			this.parent = parent;
+		}
+
+		@Override
+		public void var(java.lang.String key, java.lang.String type) {
+			parent.var(key, type);
+		}
+		
+		@Override
+		public void markVolatile(java.lang.String key) {
+			if(scope.containsKey(key)) {
+				if(!volati.contains(key))
+					volati.add(key);
+			} else
+				parent.markVolatile(key);
+		}
+		
+		@Override
+		public void update(java.lang.String key, java.lang.String newType) {
+			java.lang.String current = scope.get(key);
+			if(current == null)
+				return;
+			if(current.equals("any"))
+				scope.put(key, newType);
+			else if(!current.equals(newType)) {
+				if(volati.contains(key))
+					throw new CannotOptimize("Volatile key " + key + " was changed to " + newType + " from " + current);
+				scope.put(key, "unknown");
+			} else
+				parent.update(key, newType);
+		}
+
+		@Override
+		public boolean isTyped(java.lang.String key, java.lang.String type) {
+			java.lang.String typedAs = scope.get(key);
+			if(typedAs != null)
+				return type.equals(typedAs);
+			return parent.isTyped(key, type);
+		}
+
+		@Override
+		public void assertTyped(java.lang.String key, java.lang.String... _types) {
+			java.lang.String current = scope.get(key);
+			if(current == null) {
+				parent.assertTyped(key, _types);
+				return;
+			}
+			
+			List<java.lang.String> types = Arrays.asList(_types);
+			if(!types.contains(current))
+				throw new CannotOptimize(current + " typed variable " + key + " must be typed as one of " + types);
+		}
+	}
+	public static final class CannotOptimize extends RuntimeException {
+
+		public CannotOptimize(java.lang.String reason) {
+			super(reason);
+		}
+		
+	}
+	private void scanParsedSource(Parsed parsed, ScopeOptimizer variableScope) {
+		if(parsed instanceof Let) {
+			for(Var.Set set : ((Var)parsed).sets) {
+				if(set.rhs != null)
+					variableScope.let(set.lhs, set.rhs.primaryType());
+				else
+					variableScope.let(set.lhs, "any");
+			}
+		} else if(parsed instanceof Var) {
+			for(Var.Set set : ((Var)parsed).sets) {
+				if(set.rhs != null)
+					variableScope.var(set.lhs, set.rhs.primaryType());
+				else
+					variableScope.var(set.lhs, "any");
+			}
+		} else if(parsed instanceof Call) {
+			for(Parsed argument : ((Call)parsed).arguments) {
+				if(argument.isNumberOrBool())
+					continue;
+				
+				if(argument instanceof Referency) {
+					if(argument instanceof Reference)
+						variableScope.assertTyped(((Reference)argument).ref, "number", "boolean");
+					else if(argument instanceof Call)
+						scanParsedSource(argument, variableScope);
+					else
+						throw new CannotOptimize("Unhandled argument: " + describe(argument));
+				} else if(argument instanceof Equals || argument instanceof NotEquals ||
+						argument instanceof StrictEquals || argument instanceof StrictNotEquals) {
+					// IGNORED
+				} else
+					throw new CannotOptimize("Unhandled argument: " + describe(argument));
+			}
+		} else if(parsed instanceof If) {
+			scanParsedSource(((If)parsed).condition, variableScope);
+			if(((If)parsed).simpleimpl != null)
+				scanParsedSource(((If)parsed).simpleimpl, variableScope);
+			else
+				scanScriptSource(((If)parsed).impl, new BlockScopeOptimizer(variableScope));
+			
+			Else el = ((If)parsed).el;
+			while(el != null) {
+				if(el instanceof ElseIf)
+					scanParsedSource(((ElseIf)el).condition, variableScope);
+				if(el.simpleimpl != null)
+					scanParsedSource(el.simpleimpl, variableScope);
+				else
+					scanScriptSource(el.impl, new BlockScopeOptimizer(variableScope));
+				if(el instanceof ElseIf)
+					el = ((ElseIf)el).el;
+				else
+					break;
+			}
+		} else if(parsed instanceof For) {
+			BlockScopeOptimizer forScope = new BlockScopeOptimizer(variableScope);
+			scanParsedSource(((For)parsed).init, forScope);
+			scanParsedSource(((For)parsed).loop, forScope);
+			if(((For)parsed).type == For.ForType.Standard)
+				scanParsedSource(((For)parsed).condition, forScope);
+			if(((For)parsed).simpleimpl != null)
+				scanParsedSource(((For)parsed).simpleimpl, forScope);
+			else
+				scanScriptSource(((For)parsed).impl, forScope);
+		} else if(parsed instanceof While) {
+			scanParsedSource(((While)parsed).condition, variableScope);
+			if(((While)parsed).simpleimpl != null)
+				scanParsedSource(((While)parsed).simpleimpl, variableScope);
+			else
+				scanScriptSource(((While)parsed).impl, new BlockScopeOptimizer(variableScope));
+		} else if(parsed instanceof Try) {
+			//scanScriptSource(((Try)parsed).impl, variableScope);
+			//scanScriptSource(((Try)parsed).impl, variableScope);
+			throw new CannotOptimize("Try loops are not implemented yet");
+		} else if(parsed instanceof Referency) {
+			if(parsed instanceof PlusPlus) {
+				Parsed ref = ((PlusPlus)parsed).ref;
+				if(ref instanceof Reference) {
+					variableScope.update(((Reference)ref).ref, "number");
+				} else
+					throw new CannotOptimize("No implementation for optimizing " + describe(ref));
+				
+				//variableScope.update(, NUMBER_REG);
+			} else if(parsed instanceof MinusMinus) {
+				Parsed ref = ((MinusMinus)parsed).ref;
+				if(ref instanceof Reference) {
+					variableScope.update(((Reference)ref).ref, "number");
+				} else
+					throw new CannotOptimize("No implementation for optimizing " + describe(ref));
+				
+				//variableScope.update(, NUMBER_REG);
+			} else if(parsed instanceof Set) {
+				Parsed lhs = ((Set)parsed).lhs;
+
+				if(lhs instanceof Reference)
+					variableScope.update(((Reference)lhs).ref, ((Set)parsed).rhs.primaryType());
+				else
+					throw new UnsupportedOperationException("No implementation for optimizing set " + describe(parsed));
+			} else if(parsed instanceof New || parsed instanceof Boolean ||
+					parsed instanceof ReferenceChain || parsed instanceof Reference) {
+				// IGNORED
+			} else
+				throw new UnsupportedOperationException("No implementation for optimizing " + describe(parsed));
+		}
+	}
+	private void scanParsedSource(Parsed[] impl, ScopeOptimizer variableScope) {
+		for(Parsed parsed : impl) {
+			while(parsed instanceof OpenBracket)
+				parsed = ((OpenBracket)parsed).contents;
+			
+			scanParsedSource(parsed, variableScope);
+		}
+	}
+	private void scanScriptSource(ScriptData script, ScopeOptimizer variableScope) {
+		scanParsedSource(script.impl, variableScope);
+		
+		for(Function function : script.functions)
+			scanScriptSource(function.impl, new FunctionScopeOptimizer(variableScope));
+	}
 	private void optimizeScriptSource(ScriptData script) {
+		ScopeOptimizer variableScope = new ScopeOptimizer();
+		try {
+			scanScriptSource(script, variableScope);
+			script.optimizations = variableScope.scope;
+			return;
+		} catch(CannotOptimize ex) {
+			System.out.println("Cannot Optimize... " + ex.getMessage());
+			return;
+		}
 	}
 
 	private static enum SourceState {

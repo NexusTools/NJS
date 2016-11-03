@@ -83,6 +83,7 @@ public abstract class RegexCompiler implements Compiler {
 		final Parsed[] impl;
 		final int rows, columns;
 		final Function[] functions;
+		java.lang.Object optimizations;
 		java.lang.String methodName = null, source;
 		public ScriptData(Parsed[] impl, java.lang.String source, int rows, int columns) {
 			List<Parsed> imp = new ArrayList();
@@ -157,6 +158,12 @@ public abstract class RegexCompiler implements Compiler {
 		}
 		public boolean isNumber() {
 			return this instanceof NumberReferency;
+		}
+		public boolean isNumberOrBool() {
+			return isNumber() || isBoolean();
+		}
+		public boolean isBoolean() {
+			return false;
 		}
 		public boolean isString() {
 			return this instanceof StringReferency;
@@ -679,6 +686,11 @@ public abstract class RegexCompiler implements Compiler {
 		}
 
 		@Override
+		public boolean isBoolean() {
+			return contents.isBoolean(); //To change body of generated methods, choose Tools | Templates.
+		}
+
+		@Override
 		public java.lang.String primaryType() {
 			return contents.primaryType();
 		}
@@ -996,6 +1008,14 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public Referency extend(IntegerReference reference) {
 			throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + reference);
+		}
+		@Override
+		public java.lang.String primaryType() {
+			return "boolean";
+		}
+		@Override
+		public boolean isBoolean() {
+			return true;
 		}
 	}
 	public static class Finally extends Block {
@@ -1433,6 +1453,10 @@ public abstract class RegexCompiler implements Compiler {
 		}
 		public Parsed finish() {
 			return this;
+		}
+		@Override
+		public java.lang.String primaryType() {
+			return "array";
 		}
 	}
 	public static class CloseArray extends Helper {
@@ -1926,7 +1950,7 @@ public abstract class RegexCompiler implements Compiler {
 		}
 		
 	}
-	public static class Set extends RhLh {
+	public static class Set extends RhLhReferency {
 		public Set() {}
 		public Set(Parsed lhs) {
 			super(lhs);
@@ -2076,6 +2100,12 @@ public abstract class RegexCompiler implements Compiler {
 				l = ((Plus)l).lhs;
 			return l instanceof StringReferency;
 		}
+
+		@Override
+		public boolean isNumber() {
+			return lhs.isNumber() || rhs.isNumber();
+		}
+		
 	}
 	public static class Minus extends RhLhReferency implements NumberReferency {
 		public Minus() {
@@ -2493,6 +2523,17 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public java.lang.String toSource() {
 			return '"' + convertStringSource(string) + '"';
+		}
+
+		@Override
+		public boolean isNumber() {
+			try {
+				if(Double.isNaN(Double.valueOf(string)))
+					throw new NumberFormatException();
+				return true;
+			} catch(NumberFormatException ex) {
+				return false;
+			}
 		}
 		
 	}
