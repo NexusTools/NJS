@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -2120,7 +2121,7 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.appendln("try {");
 			sourceBuilder.indent();
 		}
-		Map<java.lang.Integer, FilePosition> sourceMap = new HashMap();
+		Map<java.lang.Integer, FilePosition> sourceMap = new LinkedHashMap();
 		HashMap<java.lang.String, java.lang.String> expectedStack = (HashMap<java.lang.String, java.lang.String>)script.optimizations;
 		if (scope.isFunction()) {
 			boolean hasReturn = false, first = true;
@@ -2201,19 +2202,23 @@ public class JavaTranspiler extends RegexCompiler {
 		}
 		
 		if(addDebugging) {
-			sourceBuilder.appendln("public final Map<Integer, Utilities.FilePosition> SOURCE_MAP = Collections.unmodifiableMap(new HashMap() {");
-			sourceBuilder.appendln("\t{");
-			for(Map.Entry<java.lang.Integer, FilePosition> entry : sourceMap.entrySet()) {
-				sourceBuilder.append("\t\tput(");
-				sourceBuilder.append(""+entry.getKey());
-				sourceBuilder.append(", new Utilities.FilePosition(");
-				sourceBuilder.append(""+entry.getValue().row);
-				sourceBuilder.append(", ");
-				sourceBuilder.append(""+entry.getValue().column);
-				sourceBuilder.appendln("));");
+			sourceBuilder.append("public final Map<Integer, Utilities.FilePosition> SOURCE_MAP = Collections.unmodifiableMap(new LinkedHashMap()");
+			if(!sourceMap.isEmpty()) {
+				sourceBuilder.appendln(" {");
+				sourceBuilder.appendln("\t{");
+				for(Map.Entry<java.lang.Integer, FilePosition> entry : sourceMap.entrySet()) {
+					sourceBuilder.append("\t\tput(");
+					sourceBuilder.append(""+entry.getKey());
+					sourceBuilder.append(", new Utilities.FilePosition(");
+					sourceBuilder.append(""+entry.getValue().row);
+					sourceBuilder.append(", ");
+					sourceBuilder.append(""+entry.getValue().column);
+					sourceBuilder.appendln("));");
+				}
+				sourceBuilder.appendln("\t}");
+				sourceBuilder.append("}");
 			}
-			sourceBuilder.appendln("\t}");
-			sourceBuilder.appendln("});");
+			sourceBuilder.appendln(");");
 		}
 	}
 
@@ -2247,7 +2252,7 @@ public class JavaTranspiler extends RegexCompiler {
 		sourceBuilder.appendln("import java.util.Iterator;");
 		if(addDebugging) {
 			sourceBuilder.appendln("import java.util.Collections;");
-			sourceBuilder.appendln("import java.util.HashMap;");
+			sourceBuilder.appendln("import java.util.LinkedHashMap;");
 			sourceBuilder.appendln("import java.util.Map;");
 		}
 		sourceBuilder.appendln();

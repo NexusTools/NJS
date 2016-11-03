@@ -34,7 +34,7 @@ import net.nexustools.njs.Error;
  * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public abstract class RegexCompiler implements Compiler {
-	public static final boolean DEBUG = System.getProperty("NJSDEBUG", "false").equals("true");
+	public static final boolean DEBUG = true || System.getProperty("NJSDEBUG", "false").equals("true");
 	public static java.lang.String convertStringSource(java.lang.String string) {
 		return string.replace("\\", "\\\\").replace("\n", "\\n").replace("\t", "\\t").replace("\"", "\\\"");
 	}
