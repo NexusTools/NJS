@@ -27,7 +27,7 @@ import java.util.Set;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class GenericObject extends NumberObject {
 
@@ -87,7 +87,7 @@ public class GenericObject extends NumberObject {
 		init(Object.prototype());
 	}
 	protected final void init(BaseObject __proto__) {
-		assert(!JSHelper.isUndefined(__proto__));
+		assert(!Utilities.isUndefined(__proto__));
 		this.__proto__ = __proto__;
 		if(__proto__ instanceof GenericObject) {
 			GenericObject ge = (GenericObject)__proto__;
@@ -201,7 +201,7 @@ public class GenericObject extends NumberObject {
 			}
 		}
 		
-		if(JSHelper.isUndefined(__proto__))
+		if(Utilities.isUndefined(__proto__))
 			or.or(key);
 		else
 			__proto__.set(key, val, _this, or);
@@ -278,7 +278,7 @@ public class GenericObject extends NumberObject {
 			}
 		}
 		
-		if(JSHelper.isUndefined(__proto__))
+		if(Utilities.isUndefined(__proto__))
 			return or.or(key);
 		
 		return __proto__.get(key, _this, or);

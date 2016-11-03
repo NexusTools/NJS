@@ -19,7 +19,7 @@ package net.nexustools.njs;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class Int32Array extends Uint32Array {
 	public static class Instance extends Uint32Array.Instance {

@@ -17,16 +17,11 @@
  */
 package net.nexustools.njs;
 
-import java.lang.ref.WeakReference;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
-public class Number extends AbstractFunction {
+public abstract class Number extends AbstractFunction {
 
 	public static class Instance extends GenericObject {
 		public final double value;
@@ -116,7 +111,6 @@ public class Number extends AbstractFunction {
 		}
 	}
 	
-	private final List<WeakReference<Instance>> INSTANCES = new ArrayList();
 	public Number.Instance NaN;
 	public Number.Instance PositiveInfinity;
 	public Number.Instance NegativeInfinity;
@@ -165,24 +159,7 @@ public class Number extends AbstractFunction {
 		return _this;
 	}
 	
-	public final Instance wrap(double number) {
-		synchronized(INSTANCES) {
-			Iterator<WeakReference<Instance>> it = INSTANCES.iterator();
-			while(it.hasNext()) {
-				WeakReference<Instance> ref = it.next();
-				Instance um = ref.get();
-				if(um == null)
-					it.remove();
-				else if(number == um.value)
-					return um;
-			}
-			
-			Instance um = new Instance(this, iterator, String, number);
-			um.seal();
-			INSTANCES.add(new WeakReference(um));
-			return um;
-		}
-	}
+	public abstract Instance wrap(double number);
 	
 	public static java.lang.String toString(double number) {
 		java.lang.String dlbString = Double.toString(number);
@@ -217,47 +194,12 @@ public class Number extends AbstractFunction {
 		return dlbString;
 	}
 
-	@Override
-	public byte toByte() {
-		return 0;
-	}
-
-	@Override
-	public short toShort() {
-		return 0;
-	}
-
-	@Override
-	public int toInt() {
-		return 0;
-	}
-
-	@Override
-	public long toLong() {
-		return 0;
-	}
-
-	@Override
-	public Number.Instance toNumber() {
-		return NaN;
-	}
-
-	@Override
-	public double toDouble() {
-		return 0;
-	}
-
-	@Override
-	public float toFloat() {
-		return 0;
-	}
-
 	public Instance fromValueOf(BaseObject valueOf) {
 		if(valueOf == Null.INSTANCE)
 			return Zero;
 		if(valueOf == Undefined.INSTANCE)
 			return NaN;
-		return JSHelper.valueOf(valueOf).toNumber();
+		return Utilities.valueOf(valueOf).toNumber();
 	}
 	
 }

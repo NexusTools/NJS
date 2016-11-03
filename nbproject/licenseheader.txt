@@ -14,8 +14,6 @@ ${licensePrefix}Lesser General Public License for more details.
 ${licensePrefix?replace(" +$", "", "r")}
 ${licensePrefix}You should have received a copy of the GNU Lesser General Public License
 ${licensePrefix}along with this program. If not, see <http://www.gnu.org/licenses/>.
-${licensePrefix?replace(" +$", "", "r")}
-${licensePrefix}@author ${user}
 <#if licenseLast??>
 ${licenseLast}
 </#if>

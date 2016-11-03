@@ -19,7 +19,7 @@ package net.nexustools.njs;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public interface BaseFunction extends BaseObject {
 	public java.lang.String name();

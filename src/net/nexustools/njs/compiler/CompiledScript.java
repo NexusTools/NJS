@@ -20,12 +20,12 @@ package net.nexustools.njs.compiler;
 import net.nexustools.njs.BaseFunction;
 import net.nexustools.njs.BaseObject;
 import net.nexustools.njs.Global;
-import net.nexustools.njs.JSHelper;
+import net.nexustools.njs.Utilities;
 import net.nexustools.njs.Scopeable;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public abstract class CompiledScript implements Script {
 	public static abstract class Debuggable extends CompiledScript {
@@ -50,7 +50,7 @@ public abstract class CompiledScript implements Script {
 		public static BaseObject callTopDynamic(String source, BaseObject key, BaseObject _this, BaseObject... params) {
 			BaseFunction function;
 			try {
-				function = (BaseFunction)JSHelper.get(_this, key);
+				function = (BaseFunction)Utilities.get(_this, key);
 			} catch(ClassCastException ex) {
 				throw new net.nexustools.njs.Error.JavaException("ReferenceError", source + " is not a function");
 			}
@@ -86,7 +86,7 @@ public abstract class CompiledScript implements Script {
 	}
 	public static abstract class Optimized extends CompiledScript {
 		public static BaseObject callTopDynamic(BaseObject key, BaseObject _this, BaseObject... params) {
-			return ((BaseFunction)JSHelper.get(_this, key)).call(_this, params);
+			return ((BaseFunction)Utilities.get(_this, key)).call(_this, params);
 		}
 		public static BaseObject callNew(String source, BaseObject _this, BaseObject... params) {
 			return ((BaseFunction)_this).call(_this, params);
@@ -103,7 +103,7 @@ public abstract class CompiledScript implements Script {
 	}
 	
 	public BaseObject exec() {
-		return exec(JSHelper.createExtendedGlobal(), null);
+		return exec(Utilities.createExtendedGlobal(), null);
 	}
 	
 	public BaseObject exec(Global global) {
@@ -118,7 +118,7 @@ public abstract class CompiledScript implements Script {
 	
 	public static net.nexustools.njs.Number.Instance plusPlusRight(Global global, java.lang.String key, Scopeable _this) {
 		net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
-		_this.set(key, global.wrap(current.value + 1));
+		_this.set(key, global.Number.wrap(current.value + 1));
 		return current;
 	}
 	
@@ -130,13 +130,13 @@ public abstract class CompiledScript implements Script {
 	
 	public static net.nexustools.njs.Number.Instance minusMinusRight(Global global, java.lang.String key, Scopeable _this) {
 		net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
-		_this.set(key, global.wrap(current.value - 1));
+		_this.set(key, global.Number.wrap(current.value - 1));
 		return current;
 	}
 	
 	public static BaseObject plus(Global global, BaseObject lhs, BaseObject rhs) {
-		lhs = JSHelper.valueOf(lhs);
-		rhs = JSHelper.valueOf(rhs);
+		lhs = Utilities.valueOf(lhs);
+		rhs = Utilities.valueOf(rhs);
 		
 		net.nexustools.njs.Number.Instance _lhs = lhs.toNumber();
 		net.nexustools.njs.Number.Instance _rhs = rhs.toNumber();
@@ -164,7 +164,7 @@ public abstract class CompiledScript implements Script {
 	}
 	
 	public static BaseObject callSet(BaseObject _this, BaseObject key, BaseObject val) {
-		JSHelper.set(_this, key, val);
+		Utilities.set(_this, key, val);
 		return val;
 	}
 	
@@ -174,41 +174,41 @@ public abstract class CompiledScript implements Script {
 	}
 	
 	public static boolean moreThan(BaseObject _lhs, BaseObject _rhs) {
-		BaseObject lhs = JSHelper.valueOf(_lhs);
-		BaseObject rhs = JSHelper.valueOf(_rhs);
+		BaseObject lhs = Utilities.valueOf(_lhs);
+		BaseObject rhs = Utilities.valueOf(_rhs);
 		
 		if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
-			return JSHelper.stringMoreThan(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string);
+			return Utilities.stringMoreThan(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string);
 		
 		return lhs.toDouble() > rhs.toDouble();
 	}
 	
 	public static boolean lessThan(BaseObject _lhs, BaseObject _rhs) {
-		BaseObject lhs = JSHelper.valueOf(_lhs);
-		BaseObject rhs = JSHelper.valueOf(_rhs);
+		BaseObject lhs = Utilities.valueOf(_lhs);
+		BaseObject rhs = Utilities.valueOf(_rhs);
 		
 		if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
-			return JSHelper.stringLessThan(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string);
+			return Utilities.stringLessThan(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string);
 		
 		return lhs.toDouble() < rhs.toDouble();
 	}
 	
 	public static boolean moreEqual(BaseObject _lhs, BaseObject _rhs) {
-		BaseObject lhs = JSHelper.valueOf(_lhs);
-		BaseObject rhs = JSHelper.valueOf(_rhs);
+		BaseObject lhs = Utilities.valueOf(_lhs);
+		BaseObject rhs = Utilities.valueOf(_rhs);
 		
 		if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
-			return JSHelper.stringMoreEqual(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string);
+			return Utilities.stringMoreEqual(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string);
 		
 		return lhs.toDouble() >= rhs.toDouble();
 	}
 	
 	public static boolean lessEqual(BaseObject _lhs, BaseObject _rhs) {
-		BaseObject lhs = JSHelper.valueOf(_lhs);
-		BaseObject rhs = JSHelper.valueOf(_rhs);
+		BaseObject lhs = Utilities.valueOf(_lhs);
+		BaseObject rhs = Utilities.valueOf(_rhs);
 		
 		if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
-			return JSHelper.stringLessEqual(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string);
+			return Utilities.stringLessEqual(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string);
 		
 		return lhs.toDouble() <= rhs.toDouble();
 	}

@@ -29,7 +29,7 @@ import java.util.Map;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class JavaClassWrapper extends AbstractFunction {
 	public static final boolean DEBUG = System.getProperties().containsKey("NJSWRAPDEBUG");
@@ -162,7 +162,7 @@ public class JavaClassWrapper extends AbstractFunction {
 				@Override
 				public BaseObject call(BaseObject _this, BaseObject... params) {
 					try {
-						field.set(null, JSHelper.jsToJava(params[0], field.getType()));
+						field.set(null, Utilities.jsToJava(params[0], field.getType()));
 						return Undefined.INSTANCE;
 					} catch (IllegalArgumentException ex) {
 						throw new Error.JavaException("JavaError", ex.toString(), ex);
@@ -182,7 +182,7 @@ public class JavaClassWrapper extends AbstractFunction {
 		
 		if(params.length > 0) {
 			double bestAccuracy = 0;
-			JSHelper.ConversionAccuracy convertAccuracy = new JSHelper.ConversionAccuracy();
+			Utilities.ConversionAccuracy convertAccuracy = new Utilities.ConversionAccuracy();
 			java.lang.Object[] converted = new java.lang.Object[params.length];
 			for(Constructor constructor : constructors.get(params.length)) {
 				again:
@@ -192,7 +192,7 @@ public class JavaClassWrapper extends AbstractFunction {
 					Class[] types = constructor.getParameterTypes();
 					for(int i=0; i<params.length; i++)
 						try {
-							converted[i] = JSHelper.jsToJava(params[i], types[i], convertAccuracy);
+							converted[i] = Utilities.jsToJava(params[i], types[i], convertAccuracy);
 							conversionAccuracy += convertAccuracy.accuracy;
 						} catch(UnsupportedOperationException ex) {
 							if(DEBUG) System.out.println(ex);
@@ -220,7 +220,7 @@ public class JavaClassWrapper extends AbstractFunction {
 
 		if(bestConstructor != null)
 			try {
-				return JSHelper.javaToJS(global, bestConstructor.newInstance(bestConversion));
+				return Utilities.javaToJS(global, bestConstructor.newInstance(bestConversion));
 			} catch (IllegalAccessException ex) {
 				throw new Error.JavaException("JavaError", "Illegal access", ex);
 			} catch (InstantiationException ex) {
@@ -245,7 +245,7 @@ public class JavaClassWrapper extends AbstractFunction {
 		java.lang.Object[] bestConversion = null;
 		if(params.length > 0) {
 			double bestAccuracy = 0;
-			JSHelper.ConversionAccuracy convertAccuracy = new JSHelper.ConversionAccuracy();
+			Utilities.ConversionAccuracy convertAccuracy = new Utilities.ConversionAccuracy();
 			java.lang.Object[] converted = new java.lang.Object[params.length];
 			for(Method method : byLength.get(params.length)) {
 				again:
@@ -255,7 +255,7 @@ public class JavaClassWrapper extends AbstractFunction {
 					Class[] types = method.getParameterTypes();
 					for(int i=0; i<params.length; i++)
 						try {
-							converted[i] = JSHelper.jsToJava(params[i], types[i], convertAccuracy);
+							converted[i] = Utilities.jsToJava(params[i], types[i], convertAccuracy);
 							conversionAccuracy += convertAccuracy.accuracy;
 						} catch(UnsupportedOperationException ex) {
 							if(DEBUG) System.out.println(ex);
@@ -283,7 +283,7 @@ public class JavaClassWrapper extends AbstractFunction {
 
 		if(bestMethod != null)
 			try {
-				return JSHelper.javaToJS(global, bestMethod.invoke(__this, bestConversion));
+				return Utilities.javaToJS(global, bestMethod.invoke(__this, bestConversion));
 			} catch (IllegalAccessException ex) {
 				throw new Error.JavaException("JavaError", "Illegal access", ex);
 			} catch (IllegalArgumentException ex) {

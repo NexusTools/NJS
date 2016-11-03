@@ -1,5 +1,4 @@
 var Assert = importClass("org.junit.Assert");
-var System = importClass("java.lang.System");
 
 var start = +new Date;
 function getPrimes(x){
@@ -16,6 +15,5 @@ function getPrimes(x){
 }
 
 var primes = getPrimes(100);
-System.out.println(primes.length);
 Assert.assertTrue(primes.length === 27);
-System.out.println((+new Date) - start + "ms");
+importClass("java.lang.System").out.println("Generated " + primes.length + " primes in " + ((+new Date) - start) + "ms");

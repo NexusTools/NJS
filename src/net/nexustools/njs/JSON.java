@@ -33,7 +33,7 @@ import java.util.Set;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class JSON extends GenericObject {
 	
@@ -47,7 +47,7 @@ public class JSON extends GenericObject {
 				return builder.toString();
 			}
 			public void stringify(BaseObject object, StringBuilder builder) {
-				if(JSHelper.isUndefined(object)) {
+				if(Utilities.isUndefined(object)) {
 					builder.append("null");
 					return;
 				}

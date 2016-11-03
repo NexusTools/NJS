@@ -17,7 +17,7 @@
  */
 package tests;
 
-import net.nexustools.njs.JSHelper;
+import net.nexustools.njs.Utilities;
 import net.nexustools.njs.compiler.Compiler;
 import net.nexustools.njs.compiler.JavaTranspiler;
 import net.nexustools.njs.compiler.RuntimeCompiler;
@@ -30,7 +30,7 @@ import org.junit.Test;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class Array {
 	
@@ -107,12 +107,12 @@ public class Array {
 	public void test(java.lang.String name) {
 		for(Compiler compiler : compilers) {
 			try {
-				compiler.compile(new InputStreamReader(Array.class.getResourceAsStream("/tests/array/" + name + ".js")), name + ".js", false).exec(JSHelper.createExtendedGlobal(), null);
+				compiler.compile(new InputStreamReader(Array.class.getResourceAsStream("/tests/array/" + name + ".js")), name + ".js", false).exec(Utilities.createExtendedGlobal(), null);
 			} catch(java.lang.RuntimeException re) {
-				System.err.println(JSHelper.extractStack(re.toString(), re));
+				System.err.println(Utilities.extractStack(re.toString(), re));
 				throw re;
 			} catch(java.lang.Error e) {
-				System.err.println(JSHelper.extractStack(e.toString(), e));
+				System.err.println(Utilities.extractStack(e.toString(), e));
 				throw e;
 			}
 		}

@@ -19,7 +19,7 @@ package net.nexustools.njs;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public abstract class AbstractArray<O> extends GenericObject implements ArrayStorage<O> {
 	
@@ -97,7 +97,7 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 				actualLength = java.lang.Math.max(actualLength, i+1);
 			} catch(ArrayIndexOutOfBoundsException ex) {
 				int newLength = java.lang.Math.max(actualLength, i+1);
-				O newArray = createStorage(nextPowerOf2(newLength));
+				O newArray = createStorage(Utilities.nextPowerOf2(newLength));
 				copy(arrayStorage, newArray, actualLength);
 				actualLength = newLength;
 				releaseStorage(arrayStorage);
@@ -127,9 +127,16 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 		final Number Number0 = global.Number;
 		defineProperty("length", new AbstractFunction(global) {
 			Number.Instance cached;
+			int cachedLength;
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				return Number0.wrap(actualLength);
+				if(cachedLength == actualLength && cached != null)
+					return cached;
+				try {
+					return cached = Number0.wrap(actualLength);
+				} finally {
+					cachedLength = actualLength;
+				}
 			}
 		}, autoResize ? new AbstractFunction(global) {
 			@Override
@@ -138,7 +145,7 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 				if(newLength < 0)
 					throw new Error.JavaException("RangeError", "Invalid array length");
 				if(newLength > storageSize()) {
-					O newArray = createStorage(nextPowerOf2((int)newLength));
+					O newArray = createStorage(Utilities.nextPowerOf2((int)newLength));
 					copy(arrayStorage, newArray, actualLength);
 					releaseStorage(arrayStorage);
 					arrayStorage = newArray;
@@ -154,13 +161,6 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 	public O getArrayStorage() {
 		return arrayStorage;
 	}
-	
-	public static int nextPowerOf2(final int a) {
-        int b = 1;
-        while (b < a)
-            b = b << 1;
-        return b;
-    }
 	
 	protected abstract BaseObject get0(int index) throws ArrayIndexOutOfBoundsException;
 	protected abstract void put0(int index, BaseObject obj) throws ArrayIndexOutOfBoundsException;

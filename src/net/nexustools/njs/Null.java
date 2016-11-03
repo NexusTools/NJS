@@ -22,7 +22,7 @@ import java.util.Set;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public final class Null implements BaseObject {
 	public static final Null INSTANCE = new Null();

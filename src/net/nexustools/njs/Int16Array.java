@@ -19,7 +19,7 @@ package net.nexustools.njs;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class Int16Array extends Uint16Array {
 	public static class Instance extends Uint16Array.Instance {

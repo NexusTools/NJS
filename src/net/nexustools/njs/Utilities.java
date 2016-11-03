@@ -22,9 +22,9 @@ import java.util.List;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
-public class JSHelper {
+public class Utilities {
 
 	public static boolean stringMoreThan(java.lang.String s1, java.lang.String s2) {
 		int l1 = s1.length();
@@ -885,9 +885,16 @@ public class JSHelper {
 	public static BaseObject[] convertArray(Global global, java.lang.Object[] array) {
 		BaseObject[] converted = new BaseObject[array.length];
 		for (int i = 0; i < converted.length; i++) {
-			converted[i] = JSHelper.javaToJS(global, array[i]);
+			converted[i] = Utilities.javaToJS(global, array[i]);
 		}
 		return converted;
 	}
+	
+	public static int nextPowerOf2(final int a) {
+        int b = 1;
+        while (b < a)
+            b = b << 1;
+        return b;
+    }
 
 }

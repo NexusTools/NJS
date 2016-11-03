@@ -21,7 +21,7 @@ import java.io.Reader;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class NullCompiler implements Compiler {
 

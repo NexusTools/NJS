@@ -17,12 +17,12 @@
  */
 package net.nexustools.njs;
 
-import net.nexustools.njs.JSHelper.ReplacementStackTraceElement;
+import net.nexustools.njs.Utilities.ReplacementStackTraceElement;
 import net.nexustools.njs.compiler.Script;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class Function extends AbstractFunction {
 	private final Global global;
@@ -53,7 +53,7 @@ public class Function extends AbstractFunction {
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				ReplacementStackTraceElement el = JSHelper.renameMethodCall("toString");
+				ReplacementStackTraceElement el = Utilities.renameMethodCall("toString");
 				try {
 					if(_this instanceof BaseFunction) {
 						StringBuilder builder = new StringBuilder("function");
@@ -130,7 +130,7 @@ public class Function extends AbstractFunction {
 		prototype.setStorage("call", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				ReplacementStackTraceElement el = JSHelper.renameMethodCall("Function.prototype.call");
+				ReplacementStackTraceElement el = Utilities.renameMethodCall("Function.prototype.call");
 				try {
 					switch(params.length) {
 						case 0:

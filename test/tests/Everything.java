@@ -22,7 +22,7 @@ import org.junit.runners.Suite;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 @RunWith(Suite.class)
 @Suite.SuiteClasses({

@@ -19,7 +19,7 @@ package net.nexustools.njs;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class Uint8Array extends AbstractFunction {
 	public static class Instance extends AbstractArray<byte[]> {

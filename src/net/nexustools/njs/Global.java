@@ -29,7 +29,7 @@ import net.nexustools.njs.compiler.RuntimeCompiler;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class Global extends GenericObject {
 	private static boolean SHOW_UNAVAILABLE_MESSAGE = true;
@@ -61,7 +61,7 @@ public class Global extends GenericObject {
 	public final GeneratorFunction GeneratorFunction;
 	public final Object Object = new Object();
 	public final String String = new String();
-	public final Number Number = new Number();
+	public final Number Number;
 	public final Boolean Boolean;
 	public final Symbol Symbol;
 	public final Error Error;
@@ -80,7 +80,12 @@ public class Global extends GenericObject {
 	public Global(Compiler compiler) {
 		this.compiler = compiler;
 		
-		super.Number = Number;
+		try {
+			super.Number = new StrongNumber();
+		} catch(Throwable ex) {
+			super.Number = new WeakNumber();
+		}
+		Number = super.Number;
 		super.String = String;
 		
 		Symbol = new Symbol(this);
@@ -191,8 +196,8 @@ public class Global extends GenericObject {
 		if(t instanceof Error.Thrown)
 			return ((Error.Thrown)t).what;
 		if(t instanceof Error.JavaException)
-			return new Error.Instance(String, Error, Symbol.iterator, Number, ((Error.JavaException)t).type, ((Error.JavaException) t).getUnderlyingMessage(), JSHelper.extractStack(t.getMessage(), t));
-		return new Error.Instance(String, Error, Symbol.iterator, Number, "JavaError", t.toString(), JSHelper.extractStack("JavaError: " + t.toString(), t));
+			return new Error.Instance(String, Error, Symbol.iterator, Number, ((Error.JavaException)t).type, ((Error.JavaException) t).getUnderlyingMessage(), Utilities.extractStack(t.getMessage(), t));
+		return new Error.Instance(String, Error, Symbol.iterator, Number, "JavaError", t.toString(), Utilities.extractStack("JavaError: " + t.toString(), t));
 	}
 
 	private final List<WeakReference<JavaObjectWrapper>> WRAPS = new ArrayList();
@@ -218,7 +223,7 @@ public class Global extends GenericObject {
 	}
 	
 	public BaseObject javaToJS(java.lang.Object javaObject) {
-		return JSHelper.javaToJS(this, javaObject);
+		return Utilities.javaToJS(this, javaObject);
 	}
 	
 }

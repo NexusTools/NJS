@@ -26,7 +26,7 @@ import java.util.Set;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class Error extends AbstractFunction implements BaseFunction {
 	public static class ConvertedException extends RuntimeException {
@@ -52,7 +52,7 @@ public class Error extends AbstractFunction implements BaseFunction {
 				a.append("\t[CIRCULAR REFERENCE:" + t + "]\n");
 			} else {
 				dejaVu.add(t);
-				StackTraceElement[] trace = JSHelper.convertStackTrace(t.getStackTrace());
+				StackTraceElement[] trace = Utilities.convertStackTrace(t.getStackTrace());
 				int m = trace.length - 1;
 				int n = enclosingTrace.length - 1;
 				while (m >= 0 && n >=0 && trace[m].equals(enclosingTrace[n])) {
@@ -104,7 +104,7 @@ public class Error extends AbstractFunction implements BaseFunction {
 			dejaVu.add(this);
 					
 			try {
-				StackTraceElement[] enclosing = JSHelper.convertStackTrace(getStackTrace());
+				StackTraceElement[] enclosing = Utilities.convertStackTrace(getStackTrace());
 				a.append(toString());
 				for (int i = 0; i < enclosing.length; i++)
 					a.append("\n\tat " + toString(enclosing[i]));
@@ -200,8 +200,8 @@ public class Error extends AbstractFunction implements BaseFunction {
 	@Override
 	public BaseObject construct(BaseObject... params) {
 		if(params.length > 0)
-			return new Instance(String, this, iterator, Number, "Error", params[0].toString(), JSHelper.extractStack("Error: " + params[0].toString(), new Throwable()));
-		return new Instance(String, this, iterator, Number, "Error", null, JSHelper.extractStack("Error", new Throwable()));
+			return new Instance(String, this, iterator, Number, "Error", params[0].toString(), Utilities.extractStack("Error: " + params[0].toString(), new Throwable()));
+		return new Instance(String, this, iterator, Number, "Error", null, Utilities.extractStack("Error", new Throwable()));
 	}
 	
 	@Override

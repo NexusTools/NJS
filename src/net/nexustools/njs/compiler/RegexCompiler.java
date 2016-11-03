@@ -33,7 +33,7 @@ import net.nexustools.njs.Error;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public abstract class RegexCompiler implements Compiler {
 	public static final boolean DEBUG = System.getProperty("NJSDEBUG", "false").equals("true");
@@ -156,6 +156,19 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public java.lang.String toString() {
 			return toSimpleSource();
+		}
+		public boolean isNumber() {
+			return this instanceof NumberReferency;
+		}
+		public boolean isString() {
+			return this instanceof StringReferency;
+		}
+		public java.lang.String primaryType() {
+			if(isNumber())
+				return "number";
+			if(isString())
+				return "string";
+			return "unknown";
 		}
 		public abstract boolean isStandalone();
 		public abstract boolean isIncomplete();
@@ -655,6 +668,21 @@ public abstract class RegexCompiler implements Compiler {
 			if((contents instanceof Reference || contents instanceof ReferenceChain) && chain.isEmpty())
 				return contents;
 			return this;
+		}
+
+		@Override
+		public boolean isNumber() {
+			return contents.isNumber();
+		}
+
+		@Override
+		public boolean isString() {
+			return contents.isString();
+		}
+
+		@Override
+		public java.lang.String primaryType() {
+			return contents.primaryType();
 		}
 
 	}

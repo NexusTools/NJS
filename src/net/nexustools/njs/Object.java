@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class Object extends AbstractFunction {
 	public static final Pattern BUILT_IN = Pattern.compile("^net\\.nexustools\\.njs\\.([a-zA-Z])$");
@@ -151,16 +151,6 @@ public class Object extends AbstractFunction {
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				_this.defineSetter(params[0].toString(), (BaseFunction)params[1]);
 				return Undefined.INSTANCE;
-			}
-			@Override
-			public java.lang.String name() {
-				return "Object_prototype_valueOf";
-			}
-		});
-		prototype.setHidden("valueOf", new AbstractFunction(global) {
-			@Override
-			public BaseObject call(BaseObject _this, BaseObject... params) {
-				return _this;
 			}
 			@Override
 			public java.lang.String name() {

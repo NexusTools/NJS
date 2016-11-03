@@ -19,7 +19,7 @@ package net.nexustools.njs;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class Int8Array extends Uint8Array {
 	public static class Instance extends Uint8Array.Instance {

@@ -19,7 +19,7 @@ package net.nexustools.njs;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class Symbol extends AbstractFunction {
 	public static class Instance extends GenericObject {
@@ -59,7 +59,7 @@ public class Symbol extends AbstractFunction {
 		prototype.setHidden("valueOf", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				JSHelper.ReplacementStackTraceElement el = JSHelper.renameMethodCall("Symbol.prototype.valueOf");
+				Utilities.ReplacementStackTraceElement el = Utilities.renameMethodCall("Symbol.prototype.valueOf");
 				try {
 					throw new Error.JavaException("TypeError", "Cannot convert a Symbol value to a number");
 				} finally {

@@ -23,7 +23,7 @@ import net.nexustools.njs.Scope;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public interface Script {
 	public BaseObject exec(Global global, Scope scope);

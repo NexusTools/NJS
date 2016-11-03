@@ -35,7 +35,7 @@ import net.nexustools.njs.Global;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class JavaTranspiler extends RegexCompiler {
 	private static final List<java.lang.String> RESTRICTED_NAMES = Arrays.asList(new java.lang.String[]{
@@ -50,7 +50,7 @@ public class JavaTranspiler extends RegexCompiler {
 		"strictfp",     "super",         "switch",       "synchronized",    "this",
 		"throw",        "throws",        "transient",    "true",            "try",
 		"void",         "volatile",      "while",		 "BaseObject",		"BaseFunction",
-		"AbstractFunction", "GenericObject", "GenericArray", "CompiledFunction", "JSHelper", "Iterator"});
+		"AbstractFunction", "GenericObject", "GenericArray", "CompiledFunction", "Utilities", "Iterator"});
 	
 	private static final Map<java.lang.String, AtomicInteger> GEN_PACKAGE_USED_NAMES = new HashMap();
 	private java.lang.String toClassName(java.lang.String name, boolean genPackage) {
@@ -154,6 +154,11 @@ public class JavaTranspiler extends RegexCompiler {
 			Parsed lhs = ((Minus)part).lhs;
 			Parsed rhs = ((Minus)part).rhs;
 			generateMath(sourceBuilder, lhs, rhs, '-', methodPrefix, baseScope, fileName, false);
+		} else if(part instanceof OpenBracket) {
+			generateNumberSource(sourceBuilder, ((OpenBracket)part).contents, methodPrefix, baseScope, fileName);
+		} else if(part.isNumber()) {
+			transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(".value");
 		} else {
 			sourceBuilder.append("global.Number.fromValueOf(");
 			transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName);
@@ -284,25 +289,25 @@ public class JavaTranspiler extends RegexCompiler {
 		while(els != null) {
 			if(els.simpleimpl != null) {
 				if(els instanceof ElseIf) {
-					sourceBuilder.append("else if(");
+					sourceBuilder.append(" else if(");
 					generateBooleanSource(sourceBuilder, els.condition, methodPrefix, baseScope, fileName);
 					sourceBuilder.appendln(")");
 				} else
-					sourceBuilder.appendln("else");
+					sourceBuilder.appendln(" else");
 				sourceBuilder.indent();
 				transpileParsedSource(sourceBuilder, els.simpleimpl, methodPrefix, baseScope, fileName, true);
 				sourceBuilder.unindent();
 			} else{
 				if(els instanceof ElseIf) {
-					sourceBuilder.append("else if(");
+					sourceBuilder.append(" else if(");
 					generateBooleanSource(sourceBuilder, els.condition, methodPrefix, baseScope, fileName);
 					sourceBuilder.appendln(") {");
 				} else
-					sourceBuilder.appendln("else {");
+					sourceBuilder.appendln(" else {");
 				sourceBuilder.indent();
 				generateBlockSource(sourceBuilder, els.impl, methodPrefix, baseScope, fileName);
 				sourceBuilder.unindent();
-				sourceBuilder.appendln("}");
+				sourceBuilder.append("}");
 			}
 
 			if(els instanceof ElseIf)
@@ -329,11 +334,6 @@ public class JavaTranspiler extends RegexCompiler {
 		} else if(part instanceof Not) {
 			sourceBuilder.append("!");
 			generateBooleanSource(sourceBuilder, ((Not) part).rhs, methodPrefix, baseScope, fileName);
-		} else if(part instanceof Equals) {
-			transpileParsedSource(sourceBuilder, ((Equals) part).lhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(".equals(");
-			transpileParsedSource(sourceBuilder, ((Equals) part).rhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(")");
 		} else if(part instanceof OrOr) {
 			transpileParsedSource(sourceBuilder, ((OrOr) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(" || ");
@@ -342,20 +342,46 @@ public class JavaTranspiler extends RegexCompiler {
 			generateBooleanSource(sourceBuilder, ((AndAnd) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(" && ");
 			generateBooleanSource(sourceBuilder, ((AndAnd) part).rhs, methodPrefix, baseScope, fileName);
+		} else if(part instanceof Equals) {
+			java.lang.String ltype = ((Equals)part).lhs.primaryType();
+			java.lang.String rtype = ((Equals)part).rhs.primaryType();
+			if(ltype.equals(rtype) && generateCommonComparison(sourceBuilder, ltype, false, ((Equals)part).lhs, ((Equals)part).rhs, methodPrefix, baseScope, fileName))
+				return;
+			
+			transpileParsedSource(sourceBuilder, ((Equals) part).lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(".equals(");
+			transpileParsedSource(sourceBuilder, ((Equals) part).rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(")");
 		} else if(part instanceof NotEquals) {
-			sourceBuilder.append("(!");
+			java.lang.String ltype = ((NotEquals)part).lhs.primaryType();
+			java.lang.String rtype = ((NotEquals)part).rhs.primaryType();
+			if(ltype.equals(rtype) && generateCommonComparison(sourceBuilder, ltype, true, ((NotEquals)part).lhs, ((NotEquals)part).rhs, methodPrefix, baseScope, fileName))
+				return;
+			
+			sourceBuilder.append("!");
 			transpileParsedSource(sourceBuilder, ((NotEquals) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(".equals(");
 			transpileParsedSource(sourceBuilder, ((NotEquals) part).rhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append("))");
+			sourceBuilder.append(")");
 		} else if(part instanceof StrictEquals) {
+			java.lang.String ltype = ((StrictEquals)part).lhs.primaryType();
+			java.lang.String rtype = ((StrictEquals)part).rhs.primaryType();
+			if(ltype.equals(rtype) && generateCommonComparison(sourceBuilder, ltype, false, ((StrictEquals)part).lhs, ((StrictEquals)part).rhs, methodPrefix, baseScope, fileName))
+				return;
+			
 			sourceBuilder.append("(BaseObject)");
 			transpileParsedSource(sourceBuilder, ((StrictEquals) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(" == (BaseObject)");
 			transpileParsedSource(sourceBuilder, ((StrictEquals) part).rhs, methodPrefix, baseScope, fileName);
 		} else if(part instanceof StrictNotEquals) {
+			java.lang.String ltype = ((StrictNotEquals)part).lhs.primaryType();
+			java.lang.String rtype = ((StrictNotEquals)part).rhs.primaryType();
+			if(ltype.equals(rtype) && generateCommonComparison(sourceBuilder, ltype, true, ((StrictNotEquals)part).lhs, ((StrictNotEquals)part).rhs, methodPrefix, baseScope, fileName))
+				return;
+			
+			sourceBuilder.append("(BaseObject)");
 			transpileParsedSource(sourceBuilder, ((StrictNotEquals) part).lhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(" != ");
+			sourceBuilder.append(" != (BaseObject)");
 			transpileParsedSource(sourceBuilder, ((StrictNotEquals) part).rhs, methodPrefix, baseScope, fileName);
 		} else if(part instanceof MoreThan) {
 			sourceBuilder.append("moreThan(");
@@ -442,6 +468,31 @@ public class JavaTranspiler extends RegexCompiler {
 		if(System.getProperties().containsKey("NJSNOCOMPILING"))
 			throw new RuntimeException("NJSNOCOMPILING");
 		assert ((new JavaTranspiler().compile("(function munchkin(){\n\tfunction yellow(){\n\t\treturn 55;\n\t}\n\treturn yellow()\n\t})()", "JavaCompilerStaticTest", false)).exec(new Global(), null).toString().equals("55"));
+	}
+
+	private boolean generateCommonComparison(SourceBuilder sourceBuilder, java.lang.String ltype, boolean not, Parsed lhs, Parsed rhs, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName) {
+		if(ltype.equals("string")) {
+			if(not)
+				sourceBuilder.append("!");
+			generateStringSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(".equals(");
+			generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(")");
+			return true;
+		}
+		if(ltype.equals("number")) {
+			generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(not ? " != " : " == ");
+			generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
+			return true;
+		}
+		if(ltype.equals("boolean")) {
+			generateBooleanSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(not ? " != " : " == ");
+			generateBooleanSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
+			return true;
+		}
+		return false;
 	}
 
 	private static enum SourceState {
@@ -777,6 +828,15 @@ public class JavaTranspiler extends RegexCompiler {
 			return;
 		} else if(part instanceof Equals) {
 			sourceBuilder.append("(");
+			java.lang.String ltype = ((Equals)part).lhs.primaryType();
+			java.lang.String rtype = ((Equals)part).rhs.primaryType();
+			if(ltype.equals(rtype)) {
+				if(generateCommonComparison(sourceBuilder, ltype, false, ((Equals)part).lhs, ((Equals)part).rhs, methodPrefix, baseScope, fileName)) {
+					sourceBuilder.append(" ? global.Boolean.TRUE : global.Boolean.FALSE)");
+					return;
+				}
+			}
+			
 			transpileParsedSource(sourceBuilder, ((Equals) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(".equals(");
 			transpileParsedSource(sourceBuilder, ((Equals) part).rhs, methodPrefix, baseScope, fileName);
@@ -784,20 +844,49 @@ public class JavaTranspiler extends RegexCompiler {
 			return;
 		} else if(part instanceof NotEquals) {
 			sourceBuilder.append("(");
+			java.lang.String ltype = ((NotEquals)part).lhs.primaryType();
+			java.lang.String rtype = ((NotEquals)part).rhs.primaryType();
+			if(ltype.equals(rtype)) {
+				if(generateCommonComparison(sourceBuilder, ltype, true, ((NotEquals)part).lhs, ((NotEquals)part).rhs, methodPrefix, baseScope, fileName)) {
+					sourceBuilder.append(" ? global.Boolean.TRUE : global.Boolean.FALSE)");
+					return;
+				}
+			}
+			
 			transpileParsedSource(sourceBuilder, ((NotEquals) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(".equals(");
 			transpileParsedSource(sourceBuilder, ((NotEquals) part).rhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(") ? global.Boolean.FALSE : global.Boolean.TRUE)");
 			return;
 		} else if(part instanceof StrictEquals) {
-			sourceBuilder.append("(((BaseObject)");
+			sourceBuilder.append("(");
+			java.lang.String ltype = ((StrictEquals)part).lhs.primaryType();
+			java.lang.String rtype = ((StrictEquals)part).rhs.primaryType();
+			if(ltype.equals(rtype)) {
+				if(generateCommonComparison(sourceBuilder, ltype, false, ((StrictEquals)part).lhs, ((StrictEquals)part).rhs, methodPrefix, baseScope, fileName)) {
+					sourceBuilder.append(" ? global.Boolean.TRUE : global.Boolean.FALSE)");
+					return;
+				}
+			}
+			
+			sourceBuilder.append("((BaseObject)");
 			transpileParsedSource(sourceBuilder, ((StrictEquals) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(" == (BaseObject)");
 			transpileParsedSource(sourceBuilder, ((StrictEquals) part).rhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
 			return;
 		} else if(part instanceof StrictNotEquals) {
-			sourceBuilder.append("(((BaseObject)");
+			sourceBuilder.append("(");
+			java.lang.String ltype = ((StrictNotEquals)part).lhs.primaryType();
+			java.lang.String rtype = ((StrictNotEquals)part).rhs.primaryType();
+			if(ltype.equals(rtype)) {
+				if(generateCommonComparison(sourceBuilder, ltype, true, ((StrictNotEquals)part).lhs, ((StrictNotEquals)part).rhs, methodPrefix, baseScope, fileName)) {
+					sourceBuilder.append(" ? global.Boolean.TRUE : global.Boolean.FALSE)");
+					return;
+				}
+			}
+			
+			sourceBuilder.append("((BaseObject)");
 			transpileParsedSource(sourceBuilder, ((StrictNotEquals) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(" == (BaseObject)");
 			transpileParsedSource(sourceBuilder, ((StrictNotEquals) part).rhs, methodPrefix, baseScope, fileName);
@@ -870,7 +959,7 @@ public class JavaTranspiler extends RegexCompiler {
 				sourceBuilder.append(")");
 				return;
 			} else if(lhs instanceof VariableReference) {
-				sourceBuilder.append("JSHelper.set(");
+				sourceBuilder.append("Utilities.set(");
 				transpileParsedSource(sourceBuilder, ((VariableReference)lhs).lhs, methodPrefix, baseScope, fileName);
 				sourceBuilder.append(", ");
 				transpileParsedSource(sourceBuilder, ((VariableReference)lhs).ref, methodPrefix, baseScope, fileName);
@@ -1017,8 +1106,6 @@ public class JavaTranspiler extends RegexCompiler {
 				transpileParsedSource(sourceBuilder, ((If)part).simpleimpl, methodPrefix, baseScope, fileName, true);
 				if(((If)part).el != null)
 					sourceBuilder.appendln(";");
-				else
-					sourceBuilder.appendln();
 				sourceBuilder.unindent();
 				
 				generateIfBlockSource(sourceBuilder, ((If)part).el, methodPrefix, baseScope, fileName);
@@ -1031,7 +1118,7 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.indent();
 			generateBlockSource(sourceBuilder, ((If)part).impl, methodPrefix, baseScope, fileName);
 			sourceBuilder.unindent();
-			sourceBuilder.appendln("}");
+			sourceBuilder.append("}");
 
 			generateIfBlockSource(sourceBuilder, ((If)part).el, methodPrefix, baseScope, fileName);
 			return;
@@ -1332,7 +1419,7 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
 			return;
 		} else if(part instanceof VariableReference) {
-			sourceBuilder.append("JSHelper.get(");
+			sourceBuilder.append("Utilities.get(");
 			transpileParsedSource(sourceBuilder, ((VariableReference)part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(", ");
 			transpileParsedSource(sourceBuilder, ((VariableReference)part).ref, methodPrefix, baseScope, fileName);
@@ -1443,7 +1530,7 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.appendln("(global, baseScope));");
 		}
 		if (addDebugging) {
-			sourceBuilder.append("final JSHelper.ReplacementStackTraceElement stackElement = JSHelper.renameCall(\"");
+			sourceBuilder.append("final Utilities.ReplacementStackTraceElement stackElement = Utilities.renameCall(\"");
 			if (methodPrefix != null)
 				sourceBuilder.append(methodPrefix);
 			sourceBuilder.append("\", \"");
@@ -1569,7 +1656,7 @@ public class JavaTranspiler extends RegexCompiler {
 		sourceBuilder.appendln("import net.nexustools.njs.Arguments;");
 		sourceBuilder.appendln("import net.nexustools.njs.BaseFunction;");
 		sourceBuilder.appendln("import net.nexustools.njs.Undefined;");
-		sourceBuilder.appendln("import net.nexustools.njs.JSHelper;");
+		sourceBuilder.appendln("import net.nexustools.njs.Utilities;");
 		sourceBuilder.appendln("import net.nexustools.njs.Global;");
 		sourceBuilder.appendln("import net.nexustools.njs.Scope;");
 		sourceBuilder.appendln("import net.nexustools.njs.Null;");
@@ -1594,9 +1681,9 @@ public class JavaTranspiler extends RegexCompiler {
 		
 		if(generateMain) {
 			sourceBuilder.appendln("public static void main(String[] args) {");
-			sourceBuilder.appendln("\tGlobal global = JSHelper.createExtendedGlobal();");
+			sourceBuilder.appendln("\tGlobal global = Utilities.createExtendedGlobal();");
 			sourceBuilder.appendln("\tScope scope = new Scope(global);");
-			sourceBuilder.appendln("\tscope.var(\"arguments\", JSHelper.convertArguments(global, args));");
+			sourceBuilder.appendln("\tscope.var(\"arguments\", Utilities.convertArguments(global, args));");
 			sourceBuilder.append("\tnew ");
 			sourceBuilder.append(className);
 			sourceBuilder.appendln("().exec(global, scope);");

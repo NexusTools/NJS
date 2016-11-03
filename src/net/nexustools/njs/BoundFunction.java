@@ -19,7 +19,7 @@ package net.nexustools.njs;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class BoundFunction extends AbstractFunction {
 	
@@ -33,7 +33,7 @@ public class BoundFunction extends AbstractFunction {
 
 	@Override
 	public BaseObject call(BaseObject _this, BaseObject... params) {
-		JSHelper.renameMethodCall(targetFunction.name() + " [bound]");
+		Utilities.renameMethodCall(targetFunction.name() + " [bound]");
 		return targetFunction.call(targetThis, params);
 	}
 

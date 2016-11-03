@@ -21,7 +21,7 @@ import org.apache.commons.math3.util.FastMath;
 
 /**
  *
- * @author kate
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class Math extends GenericObject {
 	
