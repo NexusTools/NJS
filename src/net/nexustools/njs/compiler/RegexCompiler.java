@@ -33,7 +33,7 @@ import net.nexustools.njs.Error;
  *
  * @author kate
  */
-public abstract class AbstractCompiler implements Compiler {
+public abstract class RegexCompiler implements Compiler {
 	public static final boolean DEBUG = System.getProperty("NJSDEBUG", "false").equals("true");
 	public static java.lang.String convertStringSource(java.lang.String string) {
 		return string.replace("\\", "\\\\").replace("\n", "\\n").replace("\t", "\\t").replace("\"", "\\\"");
@@ -902,7 +902,7 @@ public abstract class AbstractCompiler implements Compiler {
 			
 			switch(caseState) {
 				case NeedCase:
-					if(part instanceof AbstractCompiler.Case) {
+					if(part instanceof RegexCompiler.Case) {
 						caseState = CaseState.InCase;
 						return this;
 					}
@@ -2396,7 +2396,7 @@ public abstract class AbstractCompiler implements Compiler {
 				
 				currentSet.rhs = currentSet.rhs.transform(part);
 				return this;
-			} else if(part instanceof AbstractCompiler.Set) {
+			} else if(part instanceof RegexCompiler.Set) {
 				currentSet.rhs = new SetPlaceholder();
 				return this;
 			} else if(part instanceof Comma) {

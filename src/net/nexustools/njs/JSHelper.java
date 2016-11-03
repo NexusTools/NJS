@@ -468,8 +468,8 @@ public class JSHelper {
 				global.setHidden("Uint32Array", new Uint32Array(global));
 			else if(standard.equals("Int32Array"))
 				global.setHidden("Int32Array", new Int32Array(global));
-			//else if(standard.equals("Float64Array"))
-			//	global.setHidden("Float64Array", new Float64Array(global));
+			else if(standard.equals("Float64Array"))
+				global.setHidden("Float64Array", new Float64Array(global));
 			else if(standard.equals("GeneratorFunction"))
 				global.setHidden("GeneratorFunction", global.GeneratorFunction);
 			else if(standard.equals("PackageRoot")) {

@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
  *
  * @author kate
  */
-public class RuntimeCompiler extends AbstractCompiler {
+public class RuntimeCompiler extends RegexCompiler {
 	static {
 		if(System.getProperties().containsKey("NJSNOCOMPILING"))
 			throw new RuntimeException("NJSNOCOMPILING");
@@ -889,8 +889,8 @@ public class RuntimeCompiler extends AbstractCompiler {
 					}
 				}
 			};
-		} else if(object instanceof AbstractCompiler.Return) {
-			final Impl ret = compile(data, ((AbstractCompiler.Return)object).rhs);
+		} else if(object instanceof RegexCompiler.Return) {
+			final Impl ret = compile(data, ((RegexCompiler.Return)object).rhs);
 			return new Impl() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
