@@ -640,6 +640,14 @@ public class Utilities {
 		return object == null || object == Undefined.INSTANCE || object == Null.INSTANCE;
 	}
 
+	public static BaseObject get(BaseObject _this, double key) {
+		if (key >= 0 && key <= Integer.MAX_VALUE && key == (int)key) {
+			return _this.get((int)key);
+		} else {
+			return _this.get(Number.toString(key));
+		}
+	}
+
 	public static BaseObject get(BaseObject _this, BaseObject key) {
 		if (key instanceof String.Instance) {
 			return _this.get(((String.Instance) key).string);
