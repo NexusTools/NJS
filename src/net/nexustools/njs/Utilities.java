@@ -17,6 +17,7 @@ package net.nexustools.njs;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  *
@@ -719,12 +720,22 @@ public class Utilities {
 		public int rows, columns;
 		private int maxLineNumber = Integer.MAX_VALUE;
 		private final java.lang.String methodName, fileName;
+		private final Map<Integer, FilePosition> sourceMap;
 
 		private ReplacementStackTraceElement(java.lang.String methodName, java.lang.String fileName, int rows, int columns) {
 			this.methodName = methodName;
 			this.fileName = fileName;
 			this.rows = rows;
 			this.columns = columns;
+			sourceMap = null;
+		}
+
+		private ReplacementStackTraceElement(java.lang.String methodName, java.lang.String fileName, Map<Integer, FilePosition> SOURCE_MAP) {
+			this.methodName = methodName;
+			this.fileName = fileName;
+			rows = 0;
+			columns = 0;
+			sourceMap = SOURCE_MAP;
 		}
 
 		private StackTraceElement toStackTraceElement() {
@@ -841,7 +852,15 @@ public class Utilities {
 		}
 		return builder.toString();
 	}
-
+	
+	
+	public static class FilePosition {
+		public final int row, column;
+		public FilePosition(int row, int column) {
+			this.column = column;
+			this.row = row;
+		}
+	}
 	public static ReplacementStackTraceElement renameMethodCall(java.lang.String methodName) {
 		ReplacementStackTraceElement replacement;
 		StackTraceElement[] stack = new Throwable().getStackTrace();
@@ -858,7 +877,22 @@ public class Utilities {
 		STACK_POSITION.set(leftPad);
 		return replacement;
 	}
-
+	public static ReplacementStackTraceElement mapCall(java.lang.String methodName, java.lang.String fileName, Map<Integer, FilePosition> SOURCE_MAP) {
+		ReplacementStackTraceElement replacement;
+		StackTraceElement[] stack = new Throwable().getStackTrace();
+		List<StackElementReplace> list = STACK_REPLACEMENTS.get();
+		int leftPad = stack.length - 2;
+		if (list.size() <= leftPad) {
+			while (list.size() < leftPad) {
+				list.add(null);
+			}
+			list.add(new StackElementReplace(stack[1], replacement = new ReplacementStackTraceElement(methodName, fileName, SOURCE_MAP)));
+		} else {
+			list.set(leftPad, new StackElementReplace(stack[1], replacement = new ReplacementStackTraceElement(methodName, fileName, SOURCE_MAP)));
+		}
+		STACK_POSITION.set(leftPad);
+		return replacement;
+	}
 	public static ReplacementStackTraceElement renameCall(java.lang.String methodName, java.lang.String fileName, int rows, int columns) {
 		ReplacementStackTraceElement replacement;
 		StackTraceElement[] stack = new Throwable().getStackTrace();

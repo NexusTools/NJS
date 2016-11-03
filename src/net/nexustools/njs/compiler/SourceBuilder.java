@@ -23,6 +23,11 @@ public class SourceBuilder {
 
         java.lang.String indent = "";
         StringBuilder builder = new StringBuilder();
+		int row = 1;
+		
+		public int row() {
+			return row;
+		}
 
         public void append(java.lang.String source) {
                 assert (source.indexOf('\n') == -1);
@@ -33,11 +38,13 @@ public class SourceBuilder {
                 append(source);
                 builder.append('\n');
                 builder.append(indent);
+				row++;
         }
 
         public void appendln() {
                 builder.append('\n');
                 builder.append(indent);
+				row++;
         }
 
         public void indent() {
