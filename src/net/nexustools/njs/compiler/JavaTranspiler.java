@@ -166,9 +166,9 @@ public class JavaTranspiler extends RegexCompiler {
 	}
 	
 	private void generateMath(SourceBuilder sourceBuilder, Parsed lhs, Parsed rhs, char op, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, boolean wrapAsBaseObject) {
-		if(op == '+') {
+		if(op == '+' && wrapAsBaseObject) {
 			if((lhs instanceof StringReferency && !isNumber(lhs)) || (rhs instanceof StringReferency && !isNumber(rhs))) {
-				if(wrapAsBaseObject) 
+				if(wrapAsBaseObject)
 					sourceBuilder.append("global.wrap(");
 				else
 					sourceBuilder.append("(");

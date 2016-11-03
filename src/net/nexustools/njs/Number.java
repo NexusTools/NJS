@@ -112,7 +112,7 @@ public class Number extends AbstractFunction {
 		}
 		@Override
 		public boolean toBool() {
-			return value == 1;
+			return value != 0 && !Double.isNaN(value);
 		}
 	}
 	

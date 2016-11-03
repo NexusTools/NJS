@@ -46,7 +46,11 @@ var items = [
 ];
 // sort by value
 items.sort(function (a, b) {
-  return a.value - b.value;
+	java.lang.System.out.println(""+a.value);
+	java.lang.System.out.println(""+b.value);
+	var ret = a.value - b.value;
+	java.lang.System.out.println(""+ret);
+	return ret;
 });
 Assert.assertTrue(items.toString() === "The:-12,Edward:21,Sharpe:37,And:45,Magnetic,Zeros:37");
 

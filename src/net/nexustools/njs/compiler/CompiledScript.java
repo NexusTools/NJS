@@ -173,28 +173,40 @@ public abstract class CompiledScript implements Script {
 		return val;
 	}
 	
-	public static boolean moreThan(BaseObject lhs, BaseObject rhs) {
+	public static boolean moreThan(BaseObject _lhs, BaseObject _rhs) {
+		BaseObject lhs = JSHelper.valueOf(_lhs);
+		BaseObject rhs = JSHelper.valueOf(_rhs);
+		
 		if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
 			return JSHelper.stringMoreThan(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string);
 		
 		return lhs.toDouble() > rhs.toDouble();
 	}
 	
-	public static boolean lessThan(BaseObject lhs, BaseObject rhs) {
+	public static boolean lessThan(BaseObject _lhs, BaseObject _rhs) {
+		BaseObject lhs = JSHelper.valueOf(_lhs);
+		BaseObject rhs = JSHelper.valueOf(_rhs);
+		
 		if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
 			return JSHelper.stringLessThan(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string);
 		
 		return lhs.toDouble() < rhs.toDouble();
 	}
 	
-	public static boolean moreEqual(BaseObject lhs, BaseObject rhs) {
+	public static boolean moreEqual(BaseObject _lhs, BaseObject _rhs) {
+		BaseObject lhs = JSHelper.valueOf(_lhs);
+		BaseObject rhs = JSHelper.valueOf(_rhs);
+		
 		if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
 			return JSHelper.stringMoreEqual(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string);
 		
 		return lhs.toDouble() >= rhs.toDouble();
 	}
 	
-	public static boolean lessEqual(BaseObject lhs, BaseObject rhs) {
+	public static boolean lessEqual(BaseObject _lhs, BaseObject _rhs) {
+		BaseObject lhs = JSHelper.valueOf(_lhs);
+		BaseObject rhs = JSHelper.valueOf(_rhs);
+		
 		if(lhs instanceof net.nexustools.njs.String.Instance && rhs instanceof net.nexustools.njs.String.Instance)
 			return JSHelper.stringLessEqual(((net.nexustools.njs.String.Instance)lhs).string, ((net.nexustools.njs.String.Instance)rhs).string);
 		
