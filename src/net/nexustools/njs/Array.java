@@ -255,7 +255,7 @@ public class Array extends AbstractFunction {
 				BaseFunction filter = (BaseFunction)params[0];
 				for(int i=0; i<length; i++) {
 					BaseObject value = _this.get(i);
-					if(JSHelper.isTrue(filter.call(Undefined.INSTANCE, value)))
+					if(filter.call(Undefined.INSTANCE, value).toBool())
 						copy.add(value);
 				}
 				return new GenericArray(global, copy.toArray(new BaseObject[copy.size()]));

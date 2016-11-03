@@ -284,9 +284,8 @@ public class JavaTranspiler extends RegexCompiler {
 
 			throw new UnsupportedOperationException("Cannot compile delete : " + describe(rhs));
 		} else {
-			sourceBuilder.append("JSHelper.isTrue(");
 			transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(")");
+			sourceBuilder.append(".toBool()");
 		}
 	}
 
@@ -310,7 +309,7 @@ public class JavaTranspiler extends RegexCompiler {
 				Double.valueOf(((String)lhs).string);
 				return true;
 			} catch(NumberFormatException ex) {}
-		return lhs instanceof Number || lhs instanceof Integer;
+		return lhs instanceof NumberReferency;
 	}
 
 	static {

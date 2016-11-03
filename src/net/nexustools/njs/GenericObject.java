@@ -34,7 +34,7 @@ public class GenericObject extends NumberObject {
 	public static interface ArrayOverride {
 		public BaseObject get(int i, BaseObject _this, Or<BaseObject> or);
 		public boolean delete(int i, BaseObject _this, Or<java.lang.Boolean> or);
-		public void set(int i, BaseObject _this, BaseObject val);
+		public void set(int i, BaseObject _this, BaseObject val, Or<Void> or);
 		public boolean has(int i, BaseObject _this);
 		public int length(BaseObject _this);
 	}
@@ -96,6 +96,7 @@ public class GenericObject extends NumberObject {
 		}
 	}
 	
+	@Override
 	public java.lang.String typeOf() {
 		return "object";
 	}
@@ -248,9 +249,9 @@ public class GenericObject extends NumberObject {
 		assert(val != null);
 		
 		if(hasArrayOverride)
-			arrayOverride.set(i, val, _this);
-		
-		set(java.lang.String.valueOf(i), val, _this, or);
+			arrayOverride.set(i, val, _this, or);
+		else
+			set(java.lang.String.valueOf(i), val, _this, or);
 	}
 
 	@Override
@@ -297,7 +298,6 @@ public class GenericObject extends NumberObject {
 	public final BaseObject get(int i, BaseObject _this) {
 		if(hasArrayOverride)
 			return arrayOverride.get(i, _this, OR_UNDEFINED);
-		
 		return get(java.lang.String.valueOf(i), _this, OR_UNDEFINED);
 	}
 
@@ -525,12 +525,13 @@ public class GenericObject extends NumberObject {
 	}
 	
 	@Override
-	public boolean hasProperty(java.lang.String name, BaseObject _this) {
-		return properties.containsKey(name);
-	}
-	
-	@Override
 	public boolean hasOwnProperty(java.lang.String name) {
+		if(hasArrayOverride)
+			try {
+				int value = Integer.valueOf(name);
+				if(value >= 0)
+					return arrayOverride.has(value, this);
+			} catch(NumberFormatException ex) {}
 		return properties.containsKey(name);
 	}
 
@@ -604,6 +605,11 @@ public class GenericObject extends NumberObject {
 	@Override
 	public Iterator<BaseObject> iterator() {
 		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public boolean toBool() {
+		return true;
 	}
 	
 }

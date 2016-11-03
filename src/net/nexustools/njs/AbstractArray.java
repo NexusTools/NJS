@@ -17,17 +17,110 @@
  */
 package net.nexustools.njs;
 
-import java.util.Arrays;
-
 /**
  *
  * @author kate
  */
 public abstract class AbstractArray<O> extends GenericObject implements ArrayStorage<O> {
 	
+	private abstract class BaseOverride implements ArrayOverride {
+		@Override
+		public int length(BaseObject _this) {
+			return actualLength;
+		}
+		@Override
+		public boolean has(int i, BaseObject _this) {
+			assert(i >= 0);
+			try {
+				return get0(i) != null;
+			} catch(ArrayIndexOutOfBoundsException ex) {
+				return false;
+			}
+		}
+		@Override
+		public int hashCode() {
+			return arrayStorage.hashCode();
+		}
+	}
+	private class FixedOverride extends BaseOverride {
+		@Override
+		public BaseObject get(int i, BaseObject _this, Or<BaseObject> or) {
+			assert(i >= 0);
+			try {
+				BaseObject val = get0(i);
+				if(val == null)
+					return Null.INSTANCE;
+				return val;
+			} catch(ArrayIndexOutOfBoundsException ex) {
+				return or.or(java.lang.String.valueOf(i));
+			}
+		}
+		@Override
+		public void set(int i, BaseObject val, BaseObject _this, Or<Void> or) {
+			assert(i >= 0);
+			try {
+				put0(i, val);
+				actualLength = java.lang.Math.max(actualLength, i+1);
+			} catch(ArrayIndexOutOfBoundsException ex) {
+				or.or(java.lang.String.valueOf(i));
+			}
+		}
+		@Override
+		public boolean delete(int i, BaseObject _this, Or<java.lang.Boolean> or) {
+			assert(i >= 0);
+			if(i > actualLength)
+				return or.or(java.lang.String.valueOf(i));
+
+			return false;
+		}
+	};
+	private class SizeableOverride extends BaseOverride {
+		@Override
+		public BaseObject get(int i, BaseObject _this, Or<BaseObject> or) {
+			assert(i >= 0);
+			try {
+				if(i >= actualLength)
+					throw new ArrayIndexOutOfBoundsException();
+				BaseObject val = get0(i);
+				if(val == null)
+					return Null.INSTANCE;
+				return val;
+			} catch(ArrayIndexOutOfBoundsException ex) {
+				return or.or(java.lang.String.valueOf(i));
+			}
+		}
+		@Override
+		public void set(int i, BaseObject val, BaseObject _this, Or<Void> or) {
+			assert(i >= 0);
+			try {
+				put0(i, val);
+				actualLength = java.lang.Math.max(actualLength, i+1);
+			} catch(ArrayIndexOutOfBoundsException ex) {
+				int newLength = java.lang.Math.max(actualLength, i+1);
+				O newArray = createStorage(nextPowerOf2(newLength));
+				copy(arrayStorage, newArray, actualLength);
+				actualLength = newLength;
+				releaseStorage(arrayStorage);
+				arrayStorage = newArray;
+				put0(i, val);
+			}
+		}
+		@Override
+		public boolean delete(int i, BaseObject _this, Or<java.lang.Boolean> or) {
+			assert(i >= 0);
+			try {
+				put0(i, null);
+				return true;
+			} catch(ArrayIndexOutOfBoundsException ex) {
+				return or.or(java.lang.String.valueOf(i));
+			}
+		}
+	};
+	
+	
 	protected O arrayStorage;
 	protected int actualLength;
-	protected AbstractArray(final Global global, BaseFunction constructor, O storage) {
+	protected AbstractArray(final Global global, BaseFunction constructor, boolean autoResize, O storage) {
 		super(constructor, global);
 		this.arrayStorage = storage;
 		this.actualLength = storageSize();
@@ -38,7 +131,7 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				return Number0.wrap(actualLength);
 			}
-		}, new AbstractFunction(global) {
+		}, autoResize ? new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
 				double newLength = params[0].toInt();
@@ -53,74 +146,8 @@ public abstract class AbstractArray<O> extends GenericObject implements ArraySto
 				actualLength = (int)newLength;
 				return Undefined.INSTANCE;
 			}
-		});
-		setArrayOverride(new ArrayOverride() {
-			@Override
-			public BaseObject get(int i, BaseObject _this, Or<BaseObject> or) {
-				if(i >=  actualLength)
-					return or.or(java.lang.String.valueOf(i));
-				try {
-					return get0(i);
-				} catch(ArrayIndexOutOfBoundsException ex) {
-					return or.or(java.lang.String.valueOf(i));
-				}
-			}
-			@Override
-			public void set(int i, BaseObject val, BaseObject _this) {
-				assert(val != AbstractArray.this);
-				try {
-					put0(i, val);
-					actualLength = java.lang.Math.max(actualLength, i+1);
-				} catch(ArrayIndexOutOfBoundsException ex) {
-					if(!autoResize())
-						return;
-					
-					int newLength = java.lang.Math.max(actualLength, i+1);
-					O newArray = createStorage(nextPowerOf2(newLength));
-					copy(arrayStorage, newArray, actualLength);
-					actualLength = newLength;
-					releaseStorage(arrayStorage);
-					arrayStorage = newArray;
-					put0(i, val);
-				}
-			}
-			@Override
-			public boolean delete(int i, BaseObject _this, Or<java.lang.Boolean> or) {
-				if(i > actualLength)
-					return true;
-				
-				if(!autoResize())
-					return false;
-				
-				put0(i, null);
-				if(i == actualLength)
-					actualLength --;
-				return or.or(java.lang.String.valueOf(i));
-			}
-			@Override
-			public int length(BaseObject _this) {
-				return actualLength;
-			}
-
-			@Override
-			public boolean has(int i, BaseObject _this) {
-				try {
-					return get0(i) != null;
-				} catch(ArrayIndexOutOfBoundsException ex) {
-					return false;
-				}
-			}
-
-			@Override
-			public int hashCode() {
-				return arrayStorage.hashCode();
-			}
-			
-		});
-	}
-	
-	protected boolean autoResize() {
-		return false;
+		} : global.NOOP);
+		setArrayOverride(autoResize ? new SizeableOverride() : new FixedOverride());
 	}
 	
 	@Override

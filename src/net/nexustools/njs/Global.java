@@ -67,6 +67,8 @@ public class Global extends GenericObject {
 	public final Error Error;
 	public final Array Array;
 	
+	public final BaseFunction NOOP;
+	
 	public final Number.Instance NaN;
 	public final Number.Instance PositiveOne;
 	public final Number.Instance NegativeOne;
@@ -124,6 +126,13 @@ public class Global extends GenericObject {
 		Boolean = new Boolean(this);
 		Error = new Error(this);
 		Array = new Array(this);
+		
+		NOOP = new AbstractFunction() {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return Undefined.INSTANCE;
+			}
+		};
 	}
 	
 	public void initStandards() {

@@ -131,6 +131,10 @@ public class Number extends AbstractFunction {
 			
 			return false;
 		}
+		@Override
+		public boolean toBool() {
+			return value == 1;
+		}
 	}
 	
 	private final List<WeakReference<Instance>> INSTANCES = new ArrayList();

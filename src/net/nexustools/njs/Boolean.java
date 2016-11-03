@@ -38,6 +38,10 @@ public class Boolean extends AbstractFunction {
 			
 			return ((Number.Instance)obj).value == 1;
 		}
+		@Override
+		public boolean toBool() {
+			return value;
+		}
 	}
 
 	public final Instance FALSE, TRUE;
@@ -55,7 +59,7 @@ public class Boolean extends AbstractFunction {
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				return JSHelper.isTrue(_this) ? _true : _false;
+				return _this.toBool() ? _true : _false;
 			}
 		});
 	}

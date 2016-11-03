@@ -38,12 +38,12 @@ public class JavaClass extends AbstractFunction {
 						}
 					case 3:
 						try {
-							return global.wrap(Class.forName(params[0].toString(), JSHelper.isTrue(params[1]), (ClassLoader)JSHelper.jsToJava(params[2], ClassLoader.class)));
+							return global.wrap(Class.forName(params[0].toString(), params[1].toBool(), (ClassLoader)JSHelper.jsToJava(params[2], ClassLoader.class)));
 						} catch (ClassNotFoundException ex) {
 							throw new Error.JavaException("JavaError", ex.toString(), ex);
 						}
 				}
-				
+				throw new Error.JavaException("JavaError", "Invalid arguments");
             }
             @Override
             public java.lang.String name() {

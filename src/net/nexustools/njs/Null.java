@@ -214,11 +214,6 @@ public final class Null implements BaseObject {
 	}
 
 	@Override
-	public boolean hasProperty(java.lang.String name, BaseObject _this) {
-		throw new Error.JavaException("TypeError", "Cannot read property \"" + name + "\" from null");
-	}
-
-	@Override
 	public byte toByte() {
 		return 0;
 	}
@@ -304,6 +299,11 @@ public final class Null implements BaseObject {
 				throw new UnsupportedOperationException("Not supported");
 			}
 		};
+	}
+
+	@Override
+	public boolean toBool() {
+		return false;
 	}
 	
 	

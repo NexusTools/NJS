@@ -256,9 +256,24 @@ public class Scope implements Scopeable {
 	public final BaseObject resolve(Iterable<java.lang.String> chain) {
 		Iterator<java.lang.String> it = chain.iterator();
 		if(it.hasNext()) {
+			int index = 0;
+			boolean useNumberIndex;
 			Scopeable obj = this;
 			do {
-				obj = obj.get(it.next());
+				java.lang.String ref = it.next();
+				try {
+					if(ref.endsWith(".0"))
+						ref = ref.substring(0, ref.length()-2);
+					if((index = java.lang.Integer.valueOf(ref)) < 0)
+						throw new NumberFormatException();
+					useNumberIndex = obj instanceof BaseObject;
+				} catch(NumberFormatException ex) {
+					useNumberIndex = false;
+				}
+				if(useNumberIndex)
+					obj = ((BaseObject)obj).get(index);
+				else
+					obj = obj.get(ref);
 			} while(it.hasNext());
 			return (BaseObject)obj;
 		}

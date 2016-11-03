@@ -146,18 +146,6 @@ public abstract class CompiledScript implements Script {
 		return global.Number.fromValueOf(lhs).or(global.Number.fromValueOf(rhs));
 	}
 	
-	public static BaseObject plus(Global global, BaseObject lhs, BaseObject rhs) {
-		lhs = JSHelper.valueOf(lhs);
-		rhs = JSHelper.valueOf(rhs);
-		
-		net.nexustools.njs.Number.Instance _lhs = lhs.toNumber();
-		net.nexustools.njs.Number.Instance _rhs = rhs.toNumber();
-		if((!_lhs.isNaN() && !_rhs.isNaN()) || (lhs instanceof net.nexustools.njs.Number.Instance && rhs instanceof net.nexustools.njs.Number.Instance))
-			return _lhs.plus(_rhs);
-		
-		return global.wrap(lhs.toString() + rhs.toString());
-	}
-	
 	public static net.nexustools.njs.Number.Instance minus(Global global, BaseObject lhs, BaseObject rhs) {
 		return global.Number.fromValueOf(lhs).minus(global.Number.fromValueOf(rhs));
 	}
@@ -170,14 +158,26 @@ public abstract class CompiledScript implements Script {
 		return global.Number.fromValueOf(lhs).multiply(global.Number.fromValueOf(rhs));
 	}
 	
+	public static BaseObject plus(Global global, BaseObject lhs, BaseObject rhs) {
+		lhs = JSHelper.valueOf(lhs);
+		rhs = JSHelper.valueOf(rhs);
+		
+		net.nexustools.njs.Number.Instance _lhs = lhs.toNumber();
+		net.nexustools.njs.Number.Instance _rhs = rhs.toNumber();
+		if((!_lhs.isNaN() && !_rhs.isNaN()) || (lhs instanceof net.nexustools.njs.Number.Instance && rhs instanceof net.nexustools.njs.Number.Instance))
+			return _lhs.plus(_rhs);
+		
+		return global.wrap(lhs.toString() + rhs.toString());
+	}
+	
 	public static BaseObject orOr(BaseObject lhs, BaseObject rhs) {
-		if(JSHelper.isTrue(lhs))
+		if(lhs.toBool())
 			return lhs;
 		return rhs;
 	}
 	
 	public static BaseObject andAnd(BaseObject lhs, BaseObject rhs) {
-		if(JSHelper.isTrue(lhs))
+		if(lhs.toBool())
 			return rhs;
 		return lhs;
 	}

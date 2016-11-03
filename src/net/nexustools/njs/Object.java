@@ -39,8 +39,8 @@ public class Object extends AbstractFunction {
 				java.lang.String key = params[1].toString();
 				BaseObject config = params[2];
 				
-				ExtendedProperty property = new ExtendedProperty(JSHelper.isTrue(config.get("enumerable")));
-				property.configurable = JSHelper.isTrue(config.get("configurable"));
+				ExtendedProperty property = new ExtendedProperty(config.get("enumerable").toBool());
+				property.configurable = config.get("configurable").toBool();
 				property.getter = (BaseFunction)config.get("get", OR_NULL);
 				property.setter = (BaseFunction)config.get("set", OR_NULL);
 				property.value = config.get("value");

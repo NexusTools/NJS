@@ -7,14 +7,15 @@ function getPrimes(x){
   for (var counter = 0; counter <= x; counter++) {
       var notPrime = false;
       for (var i = 2; (i <= ar.length) && !notPrime; i++) {
-          if (counter%ar[i]===0) {
+          if (counter%ar[i]===0)
               notPrime = true;
-          }
       }
       if (notPrime === false) ar.push(counter);
   }
   return ar;
 }
 
-Assert.assertTrue(getPrimes(100).length === 27);
+var primes = getPrimes(100);
+System.out.println(primes.length);
+Assert.assertTrue(primes.length === 27);
 System.out.println((+new Date) - start + "ms");

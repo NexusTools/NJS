@@ -76,6 +76,10 @@ public class String extends AbstractFunction {
 		public java.lang.String toString() {
 			return string;
 		}
+		@Override
+		public boolean toBool() {
+			return string.length() > 0;
+		}
 	}
 	
 	private Global global;
@@ -163,23 +167,28 @@ public class String extends AbstractFunction {
 		prototype.setArrayOverride(new ArrayOverride() {
 			@Override
 			public BaseObject get(int i, BaseObject _this, Or<BaseObject> or) {
-				if(i < 0 || i >= ((Instance)_this).string.length())
-					return Undefined.INSTANCE;
+				assert(i >= 0);
+				if(i >= ((Instance)_this).string.length())
+					return or.or(java.lang.String.valueOf(i));
 
 				return wrap(((Instance)_this).string.substring(i, i+1));
 			}
 
 			@Override
 			public boolean delete(int i, BaseObject _this, Or<java.lang.Boolean> or) {
+				assert(i >= 0);
+				if(i >= ((Instance)_this).string.length())
+					return or.or(java.lang.String.valueOf(i));
 				return false;
 			}
 
 			@Override
-			public void set(int i, BaseObject val, BaseObject _this) {}
+			public void set(int i, BaseObject val, BaseObject _this, Or<Void> or) {}
 
 			@Override
 			public boolean has(int i, BaseObject _this) {
-				return i >= 0 && i < ((Instance)_this).string.length();
+				assert(i >= 0);
+				return i < ((Instance)_this).string.length();
 			}
 
 			@Override

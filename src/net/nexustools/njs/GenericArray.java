@@ -35,15 +35,10 @@ public class GenericArray extends AbstractArray<BaseObject[]> {
 		this(global, Array, 0);
 	}
 	public GenericArray(Global global, Array Array, int len) {
-		super(global, Array, new BaseObject[len]);
+		super(global, Array, true, new BaseObject[len]);
 	}
 	public GenericArray(Global global, Array Array, BaseObject[] storage) {
-		super(global, Array, storage);
-	}
-
-	@Override
-	protected boolean autoResize() {
-		return true;
+		super(global, Array, true, storage);
 	}
 
 	@Override

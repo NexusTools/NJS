@@ -159,6 +159,7 @@ public class RuntimeCompiler extends RegexCompiler {
 		public final BaseObject parent;
 		public final java.lang.String source;
 		public IntegerKeyReferenceable(java.lang.String source, int key, BaseObject parent) {
+			assert(key >= 0);
 			this.parent = parent;
 			this.source = source;
 			this.key = key;
@@ -351,6 +352,31 @@ public class RuntimeCompiler extends RegexCompiler {
 			final java.lang.String full = join(chain, '.');
 			final java.lang.String key = ((ReferenceChain)object).chain.remove(((ReferenceChain)object).chain.size()-1);
 			final java.lang.String base = join(chain, '.');
+			try {
+				java.lang.String k = key;
+				if(k.endsWith(".0"))
+					k = k.substring(0, k.length()-2);
+				final int index = java.lang.Integer.valueOf(k);
+				return new Impl() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
+						try {
+							return new IntegerKeyReferenceable(full, index, scope.resolve(chain));
+						} catch(net.nexustools.njs.Error.JavaException err) {
+							if(err.type.equals("TypeError")) {
+								if(err.getUnderlyingMessage().endsWith("from null"))
+									throw new net.nexustools.njs.Error.JavaException("TypeError", "Cannot read property \"" + key + "\" from \"" + base + "\" which is null");
+								if(err.getUnderlyingMessage().endsWith("from undefined"))
+									throw new net.nexustools.njs.Error.JavaException("TypeError", "Cannot read property \"" + key + "\" from \"" + base + "\" which is undefined");
+							}
+							throw err;
+						} finally {
+							el.finishCall();
+						}
+					}
+				};
+			} catch(NumberFormatException ex) {}
 			return new Impl() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -659,7 +685,7 @@ public class RuntimeCompiler extends RegexCompiler {
 			return new Impl() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					return new ValueReferenceable(global.wrap(!JSHelper.isTrue(rhs.run(global, scope).get())));
+					return new ValueReferenceable(global.wrap(!rhs.run(global, scope).get().toBool()));
 				}
 			};
 		} else if(object instanceof Or) {
@@ -1010,6 +1036,27 @@ public class RuntimeCompiler extends RegexCompiler {
 			final Impl ref = compile(data, ((RightReference)object).ref);
 			final Iterable<java.lang.String> keys = ((RightReference)object).chain;
 			final java.lang.String key = ((List<java.lang.String>)keys).remove(((List)keys).size()-1);
+			try {
+				java.lang.String k = key;
+				if(k.endsWith(".0"))
+					k = k.substring(0, k.length()-2);
+				final int index = java.lang.Integer.valueOf(k);
+				return new Impl() {
+					@Override
+					public Referenceable run(Global global, Scope scope) {
+						JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
+						try {
+							BaseObject lhs = ref.run(global, scope).get();
+							Iterator<java.lang.String> it = keys.iterator();
+							while(it.hasNext())
+								lhs = lhs.get(it.next());
+							return new IntegerKeyReferenceable(source, index, lhs);
+						} finally {
+							el.finishCall();
+						}
+					}
+				};
+			} catch(NumberFormatException ex){}
 			return new Impl() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
@@ -1052,7 +1099,7 @@ public class RuntimeCompiler extends RegexCompiler {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						BaseObject l = lhs.run(global, scope).get();
-						if(JSHelper.isTrue(l))
+						if(l.toBool())
 							return new ValueReferenceable(l);
 						return rhs.run(global, scope);
 					} finally {
@@ -1069,7 +1116,7 @@ public class RuntimeCompiler extends RegexCompiler {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
 						BaseObject l = lhs.run(global, scope).get();
-						if(JSHelper.isTrue(l))
+						if(l.toBool())
 							return rhs.run(global, scope);
 						return new ValueReferenceable(l);
 					} finally {
@@ -1179,7 +1226,7 @@ public class RuntimeCompiler extends RegexCompiler {
 								public Referenceable run(Global global, Scope scope) {
 									JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 									try {
-										if(JSHelper.isTrue(condition.run(global, scope).get())) {
+										if(condition.run(global, scope).get().toBool()) {
 											Referenceable ref = impl.run(global, scope);
 											if(ref instanceof Return)
 												return ref;
@@ -1205,7 +1252,7 @@ public class RuntimeCompiler extends RegexCompiler {
 						public Referenceable run(Global global, Scope scope) {
 							JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 							try {
-								if(JSHelper.isTrue(condition.run(global, scope).get())) {
+								if(condition.run(global, scope).get().toBool()) {
 									Referenceable ref = impl.run(global, scope);
 									if(ref instanceof Return)
 										return ref;
@@ -1232,7 +1279,7 @@ public class RuntimeCompiler extends RegexCompiler {
 								public Referenceable run(Global global, Scope scope) {
 									JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 									try {
-										if(JSHelper.isTrue(condition.run(global, scope).get())) {
+										if(condition.run(global, scope).get().toBool()) {
 											BaseObject ret = impl.exec(global, scope);
 											if(ret != null)
 												return new Return(ret);
@@ -1257,7 +1304,7 @@ public class RuntimeCompiler extends RegexCompiler {
 						public Referenceable run(Global global, Scope scope) {
 							JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 							try {
-								if(JSHelper.isTrue(condition.run(global, scope).get())) {
+								if(condition.run(global, scope).get().toBool()) {
 									BaseObject ret = impl.exec(global, scope);
 									if(ret != null)
 										return new Return(ret);
@@ -1437,7 +1484,7 @@ public class RuntimeCompiler extends RegexCompiler {
 							return new Impl() {
 								@Override
 								public Referenceable run(Global global, Scope scope) {
-									for(init.run(global, scope).get(); JSHelper.isTrue(condition.run(global, scope).get()); loop.run(global, scope).get()) {
+									for(init.run(global, scope).get(); condition.run(global, scope).get().toBool(); loop.run(global, scope).get()) {
 										Referenceable ref = impl.run(global, scope);
 										if(ref instanceof Return)
 											return ref;
@@ -1519,7 +1566,7 @@ public class RuntimeCompiler extends RegexCompiler {
 							return new Impl() {
 								@Override
 								public Referenceable run(Global global, Scope scope) {
-									for(init.run(global, scope).get(); JSHelper.isTrue(condition.run(global, scope).get()); loop.run(global, scope).get()) {
+									for(init.run(global, scope).get(); condition.run(global, scope).get().toBool(); loop.run(global, scope).get()) {
 										BaseObject ret = impl.exec(global, scope);
 										if(ret != null)
 											return new Return(ret);
@@ -1537,7 +1584,7 @@ public class RuntimeCompiler extends RegexCompiler {
 					return new Impl() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							for(; JSHelper.isTrue(condition.run(global, scope).get()); loop.run(global, scope).get()) {
+							for(; condition.run(global, scope).get().toBool(); loop.run(global, scope).get()) {
 								Referenceable ref = impl.run(global, scope);
 								if(ref instanceof Return)
 									return ref;
@@ -1552,7 +1599,7 @@ public class RuntimeCompiler extends RegexCompiler {
 				return new Impl() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						for(; JSHelper.isTrue(condition.run(global, scope).get()); loop.run(global, scope).get()) {
+						for(; condition.run(global, scope).get().toBool(); loop.run(global, scope).get()) {
 							BaseObject ret = impl.exec(global, scope);
 							if(ret != null)
 								return new Return(ret);
@@ -1569,7 +1616,7 @@ public class RuntimeCompiler extends RegexCompiler {
 					return new Impl() {
 						@Override
 						public Referenceable run(Global global, Scope scope) {
-							for(init.run(global, scope).get(); JSHelper.isTrue(condition.run(global, scope).get()); ) {
+							for(init.run(global, scope).get(); condition.run(global, scope).get().toBool(); ) {
 								Referenceable ref = impl.run(global, scope);
 								if(ref instanceof Return)
 									return ref;
@@ -1584,7 +1631,7 @@ public class RuntimeCompiler extends RegexCompiler {
 				return new Impl() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						for(init.run(global, scope).get(); JSHelper.isTrue(condition.run(global, scope).get()); ) {
+						for(init.run(global, scope).get(); condition.run(global, scope).get().toBool(); ) {
 							BaseObject ret = impl.exec(global, scope);
 							if(ret != null)
 								return new Return(ret);
@@ -1600,7 +1647,7 @@ public class RuntimeCompiler extends RegexCompiler {
 				return new Impl() {
 					@Override
 					public Referenceable run(Global global, Scope scope) {
-						for(; JSHelper.isTrue(condition.run(global, scope).get()); ) {
+						for(; condition.run(global, scope).get().toBool(); ) {
 							Referenceable ref = impl.run(global, scope);
 							if(ref instanceof Return)
 								return ref;
@@ -1615,7 +1662,7 @@ public class RuntimeCompiler extends RegexCompiler {
 			return new Impl() {
 				@Override
 				public Referenceable run(Global global, Scope scope) {
-					for(; JSHelper.isTrue(condition.run(global, scope).get()); ) {
+					for(; condition.run(global, scope).get().toBool(); ) {
 						BaseObject ret = impl.exec(global, scope);
 						if(ret != null)
 							return new Return(ret);
@@ -1736,7 +1783,7 @@ public class RuntimeCompiler extends RegexCompiler {
 					public Referenceable run(Global global, Scope scope) {
 						JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 						try {
-							while(JSHelper.isTrue(condition.run(global, scope).get())) {
+							while(condition.run(global, scope).get().toBool()) {
 								Referenceable ret = impl.run(global, scope);
 								if(ret instanceof Return)
 									return ret;
@@ -1756,7 +1803,7 @@ public class RuntimeCompiler extends RegexCompiler {
 					public Referenceable run(Global global, Scope scope) {
 						JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 						try {
-							while(JSHelper.isTrue(condition.run(global, scope).get())) {
+							while(condition.run(global, scope).get().toBool()) {
 								BaseObject ret = impl.exec(global, scope);
 								if(ret != null)
 									return new Return(ret);

@@ -40,7 +40,7 @@ public class Uint16Array extends AbstractFunction {
 			this(global, Uint16Array, ArrayStorage.BufferStorage.SHORT.createOrReuse(len));
 		}
 		protected Instance(Global global, Uint16Array Uint16Array, short[] storage) {
-			super(global, Uint16Array, storage);
+			super(global, Uint16Array, false, storage);
 			this.Number = global.Number;
 		}
 

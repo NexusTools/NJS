@@ -212,10 +212,6 @@ public final class Undefined implements BaseObject {
 	public BaseObject get(java.lang.String key, BaseObject _this, Or<BaseObject> or) {
 		throw new Error.JavaException("TypeError", "Cannot get property \"" + key + "\" from undefined");
 	}
-	@Override
-	public boolean hasProperty(java.lang.String name, BaseObject _this) {
-		throw new Error.JavaException("TypeError", "Cannot read property \"" + name + "\" from undefined");
-	}
 
 	@Override
 	public byte toByte() {
@@ -303,6 +299,11 @@ public final class Undefined implements BaseObject {
 				throw new UnsupportedOperationException("Not supported");
 			}
 		};
+	}
+
+	@Override
+	public boolean toBool() {
+		return false;
 	}
 	
 }

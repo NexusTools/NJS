@@ -295,7 +295,7 @@ public class JSHelper {
 			} else {
 				accuracy.accuracy = 0.5;
 			}
-			return (java.lang.Boolean) isTrue(jsObject);
+			return (java.lang.Boolean)jsObject.toBool();
 		}
 		if (desiredClass == java.lang.Boolean.TYPE) {
 			if (jsObject instanceof Boolean.Instance) {
@@ -305,7 +305,7 @@ public class JSHelper {
 			} else {
 				accuracy.accuracy = 0.5;
 			}
-			return isTrue(jsObject);
+			return jsObject.toBool();
 		}
 
 		if (jsObject instanceof Number.Instance) {
@@ -685,22 +685,6 @@ public class JSHelper {
 			return ((BaseFunction) val.get("valueOf", Scopeable.OR_NULL)).call(val);
 		}
 		return val;
-	}
-
-	public static boolean isTrue(BaseObject value) {
-		if (isUndefined(value)) {
-			return false;
-		}
-		if (value instanceof Boolean.Instance) {
-			return ((Boolean.Instance) value).value;
-		}
-		if (value instanceof Number.Instance) {
-			return ((Number.Instance) value).value != 0;
-		}
-		if (value instanceof String.Instance) {
-			return !((String.Instance) value).string.isEmpty();
-		}
-		return true;
 	}
 
 	public static StackTraceElement[] convertStackTrace(StackTraceElement[] stack) {

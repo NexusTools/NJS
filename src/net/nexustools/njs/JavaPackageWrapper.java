@@ -103,11 +103,6 @@ public class JavaPackageWrapper implements BaseObject {
 	}
 
 	@Override
-	public boolean hasProperty(java.lang.String name, BaseObject _this) {
-		return false;
-	}
-
-	@Override
 	public void defineGetter(java.lang.String key, BaseFunction impl) {
 	}
 
@@ -368,6 +363,11 @@ public class JavaPackageWrapper implements BaseObject {
 				throw new UnsupportedOperationException("Not supported");
 			}
 		};
+	}
+
+	@Override
+	public boolean toBool() {
+		return true;
 	}
 	
 }

@@ -170,7 +170,6 @@ public interface BaseObject extends Scopeable, Iterable<BaseObject> {
 	public Set<java.lang.String> keys();
 	public Set<java.lang.String> ownPropertyNames();
 	public boolean hasOwnProperty(java.lang.String name);
-	public boolean hasProperty(java.lang.String name, BaseObject _this);
 	public void defineGetter(java.lang.String key, BaseFunction impl);
 	public void defineSetter(java.lang.String key, BaseFunction impl);
 	public void set(int i, BaseObject val);
@@ -199,6 +198,7 @@ public interface BaseObject extends Scopeable, Iterable<BaseObject> {
 	public Number.Instance toNumber();
 	public double toDouble();
 	public float toFloat();
+	public boolean toBool();
 	
 	public Set<Symbol.Instance> ownSymbols();
 	public void set(Symbol.Instance symbol, BaseObject val);

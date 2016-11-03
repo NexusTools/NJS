@@ -40,7 +40,7 @@ public class Uint32Array extends AbstractFunction {
 			this(global, Uint32Array, ArrayStorage.BufferStorage.INT.createOrReuse(len));
 		}
 		protected Instance(Global global, Uint32Array Uint32Array, int[] storage) {
-			super(global, Uint32Array, storage);
+			super(global, Uint32Array, false, storage);
 			this.Number = global.Number;
 		}
 
