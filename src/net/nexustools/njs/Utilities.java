@@ -703,8 +703,9 @@ public class Utilities {
 			if (stackRemaining < target) {
 				StackElementReplace el0 = list.get(stackRemaining);
 				if (el0 != null && el0.original.getClassName().equals(el.getClassName())
-					&& el0.original.getFileName().equals(el.getFileName()) && el0.original.getMethodName().equals(el.getMethodName())
-					&& el.getLineNumber() >= el0.original.getLineNumber() && (el0.replacement == null || el.getLineNumber() <= el0.replacement.maxLineNumber)) {
+						&& el0.original.getFileName().equals(el.getFileName()) && el0.original.getMethodName().equals(el.getMethodName())
+						&& el.getLineNumber() >= el0.original.getLineNumber() && (el0.replacement == null || el.getLineNumber() <= el0.replacement.maxLineNumber)) {
+					el0.update(el.getLineNumber());
 					el = el0.replacement.toStackTraceElement();
 				}
 			}
@@ -757,6 +758,21 @@ public class Utilities {
 			this.original = original;
 			this.replacement = replacement;
 		}
+
+		private void update(int lineNumber) {
+			if(replacement.sourceMap != null) {
+				FilePosition pos = null;
+				for(Map.Entry<java.lang.Integer, FilePosition> entry : replacement.sourceMap.entrySet()) {
+					if(lineNumber < entry.getKey())
+						break;
+					pos = entry.getValue();
+				}
+				if(pos != null) {
+					replacement.columns = pos.column;
+					replacement.rows = pos.row;
+				}
+			}
+		}
 	}
 	private static final ThreadLocal<Integer> STACK_POSITION = new ThreadLocal<Integer>() {
 		@Override
@@ -789,9 +805,10 @@ public class Utilities {
 			if (stackRemaining < target) {
 				StackElementReplace el0 = list.get(stackRemaining);
 				if (el0 != null && el0.original.getClassName().equals(el.getClassName()) && el0.original.getFileName().equals(el.getFileName())
-					&& el0.original.getMethodName().equals(el.getMethodName()) && el.getLineNumber() >= el0.original.getLineNumber()
-					&& (el0.replacement == null || el.getLineNumber() <= el0.replacement.maxLineNumber)) {
+						&& el0.original.getMethodName().equals(el.getMethodName()) && el.getLineNumber() >= el0.original.getLineNumber()
+						&& (el0.replacement == null || el.getLineNumber() <= el0.replacement.maxLineNumber)) {
 
+					el0.update(el.getLineNumber());
 					ReplacementStackTraceElement rel = el0.replacement;
 
 					java.lang.String method = rel.methodName;
