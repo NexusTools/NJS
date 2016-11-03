@@ -432,28 +432,68 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.append(" != (BaseObject)");
 			transpileParsedSource(sourceBuilder, ((StrictNotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
 		} else if(part instanceof MoreThan) {
-			sourceBuilder.append("moreThan(");
-			transpileParsedSource(sourceBuilder, ((MoreThan) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+			Parsed lhs = ((MoreThan)part).lhs;
+			Parsed rhs = ((MoreThan)part).rhs;
+			
+			if(isNumber(lhs, localStack) || isNumber(rhs, localStack)) {
+				generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+				sourceBuilder.append(" > ");
+				generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+				return;
+			}
+			
+			sourceBuilder.append("lessThan(");
+			transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
 			sourceBuilder.append(", ");
-			transpileParsedSource(sourceBuilder, ((MoreThan) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+			transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
 			sourceBuilder.append(")");
 		} else if(part instanceof LessThan) {
+			Parsed lhs = ((LessThan)part).lhs;
+			Parsed rhs = ((LessThan)part).rhs;
+			
+			if(isNumber(lhs, localStack) || isNumber(rhs, localStack)) {
+				generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+				sourceBuilder.append(" < ");
+				generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+				return;
+			}
+			
 			sourceBuilder.append("lessThan(");
-			transpileParsedSource(sourceBuilder, ((LessThan) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+			transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
 			sourceBuilder.append(", ");
-			transpileParsedSource(sourceBuilder, ((LessThan) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+			transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
 			sourceBuilder.append(")");
 		} else if(part instanceof MoreEqual) {
+			Parsed lhs = ((MoreEqual)part).lhs;
+			Parsed rhs = ((MoreEqual)part).rhs;
+			
+			if(isNumber(lhs, localStack) || isNumber(rhs, localStack)) {
+				generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+				sourceBuilder.append(" >= ");
+				generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+				return;
+			}
+			
 			sourceBuilder.append("moreEqual(");
-			transpileParsedSource(sourceBuilder, ((MoreEqual) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+			transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
 			sourceBuilder.append(", ");
-			transpileParsedSource(sourceBuilder, ((MoreEqual) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+			transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
 			sourceBuilder.append(")");
 		} else if(part instanceof LessEqual) {
+			Parsed lhs = ((LessEqual)part).lhs;
+			Parsed rhs = ((LessEqual)part).rhs;
+			
+			if(isNumber(lhs, localStack) || isNumber(rhs, localStack)) {
+				generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+				sourceBuilder.append(" <= ");
+				generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+				return;
+			}
+			
 			sourceBuilder.append("lessEqual(");
-			transpileParsedSource(sourceBuilder, ((LessEqual) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+			transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
 			sourceBuilder.append(", ");
-			transpileParsedSource(sourceBuilder, ((LessEqual) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+			transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
 			sourceBuilder.append(")");
 		} else if(part instanceof Delete) {
 			Parsed rhs = ((Delete)part).rhs;
@@ -595,6 +635,17 @@ public class JavaTranspiler extends RegexCompiler {
 			return;
 		
 		sourceMap.put(row, new FilePosition(part.rows, part.columns));
+	}
+
+	private boolean isNumber(Parsed part, LocalStack localStack) {
+		if(part.isNumber())
+			return true;
+		
+		if(localStack != null && part instanceof Reference) {
+			java.lang.String type = localStack.get(((Reference)part).ref);
+			return type != null && type.equals("number");
+		}
+		return false;
 	}
 
 	public static class ScopeOptimizer {
