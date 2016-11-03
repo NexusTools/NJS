@@ -110,15 +110,24 @@ public class JavaTranspiler extends RegexCompiler {
 			generateStringSource(sourceBuilder, ((Plus)part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack);
 		} else {
 			if(localStack != null) {
-				if(part instanceof BaseReferency) {
-					if(part instanceof Reference) {
-						java.lang.String type = localStack.get(((Reference)part).ref);
-						if(type != null && type.equals("string")) {
+				if(part instanceof Reference) {
+					java.lang.String type = localStack.get(((Reference)part).ref);
+					if(type != null) {
+						if(type.equals("string")) {
 							sourceBuilder.append(((Reference)part).ref);
 							return;
+						} else if(type.equals("number")) {
+							sourceBuilder.append("net.nexustools.njs.Number.toString(");
+							sourceBuilder.append(((Reference)part).ref);
+							sourceBuilder.append(")");
+							return;
+						} else if(type.equals("boolean")) {
+							sourceBuilder.append("(");
+							sourceBuilder.append(((Reference)part).ref);
+							sourceBuilder.append(" ? \"true\" : \"false\")");
+							return;
 						}
-					} else
-						throw new UnsupportedOperationException("Cannot compile optimized string : " + describe(part));
+					}
 				}
 			}
 			transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack);
@@ -173,17 +182,14 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.append(".value");
 		} else {
 			if(localStack != null) {
-				if(part instanceof BaseReferency) {
-					if(part instanceof Reference) {
-						java.lang.String type = localStack.get(((Reference)part).ref);
-						if(type != null && type.equals("number")) {
+				if(part instanceof Reference) {
+					java.lang.String type = localStack.get(((Reference)part).ref);
+					if(type != null) {
+						if(type.equals("number")) {
 							sourceBuilder.append(((Reference)part).ref);
 							return;
 						}
-					} else if(part instanceof VariableReference) {
-						// IGNORED
-					} else
-						throw new UnsupportedOperationException("Cannot compile optimized number : " + describe(part));
+					}
 				}
 			}
 			sourceBuilder.append("global.Number.fromValueOf(");
@@ -477,15 +483,24 @@ public class JavaTranspiler extends RegexCompiler {
 			throw new UnsupportedOperationException("Cannot compile delete : " + describe(rhs));
 		} else {
 			if(localStack != null) {
-				if(part instanceof BaseReferency) {
-					if(part instanceof Reference) {
-						java.lang.String type = localStack.get(((Reference)part).ref);
-						if(type != null && type.equals("boolean")) {
+				if(part instanceof Reference) {
+					java.lang.String type = localStack.get(((Reference)part).ref);
+					if(type != null) {
+						if(type.equals("boolean")) {
 							sourceBuilder.append(((Reference)part).ref);
 							return;
+						} else if(type.equals("string")) {
+							sourceBuilder.append("!");
+							sourceBuilder.append(((Reference)part).ref);
+							sourceBuilder.append(".isEmpty()");
+							return;
+						} else if(type.equals("number")) {
+							sourceBuilder.append("(");
+							sourceBuilder.append(((Reference)part).ref);
+							sourceBuilder.append(" != 0)");
+							return;
 						}
-					} else
-						throw new UnsupportedOperationException("Cannot compile optimized boolean : " + describe(part));
+					}
 				}
 			}
 			transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack);
@@ -781,7 +796,7 @@ public class JavaTranspiler extends RegexCompiler {
 						scanParsedSource(argument, variableScope);
 					else
 						throw new CannotOptimize("Unhandled argument: " + describe(argument));
-				} else if(argument instanceof Equals || argument instanceof NotEquals ||
+				} else if(argument instanceof Equals || argument instanceof NotEquals || argument instanceof InstanceOf ||
 						argument instanceof StrictEquals || argument instanceof StrictNotEquals) {
 					// IGNORED
 				} else
@@ -858,6 +873,8 @@ public class JavaTranspiler extends RegexCompiler {
 						scanScriptSource(((Function)rhs).impl, new FunctionScopeOptimizer(variableScope));
 					} else
 						throw new CannotOptimize("No implementation for optimizing set " + describe(rhs));
+				} else if(lhs instanceof ReferenceChain) {
+					// IGNORED
 				} else
 					throw new CannotOptimize("No implementation for optimizing set " + describe(lhs));
 			} else if(parsed instanceof New || parsed instanceof Boolean || parsed instanceof String || parsed instanceof Integer ||
@@ -1218,7 +1235,7 @@ public class JavaTranspiler extends RegexCompiler {
 					
 					if(type.equals("string")) {
 						if(set.rhs == null)
-							sourceBuilder.append("null");
+							sourceBuilder.append("\"undefined\"");
 						else
 							generateStringSource(sourceBuilder, set.rhs, methodPrefix, baseScope, fileName, localStack, expectedStack);
 					} else if(type.equals("boolean")) {
@@ -1990,7 +2007,8 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.appendln("@Override");
 			sourceBuilder.appendln("@SuppressWarnings(\"all\")");
 			sourceBuilder.appendln("public BaseObject call(BaseObject _this, BaseObject... params) {");
-			sourceBuilder.appendln("\tfinal Scope baseScope = extendScope(_this);");
+			if(script.optimizations == null)
+				sourceBuilder.appendln("\tfinal Scope baseScope = extendScope(_this);");
 			if(script.callee != null) {
 				methodPrefix = extendMethodChain(methodPrefix, script.callee.name);
 				List<java.lang.String> arguments = script.callee.arguments;
