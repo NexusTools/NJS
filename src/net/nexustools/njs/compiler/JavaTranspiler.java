@@ -112,45 +112,107 @@ public class JavaTranspiler extends RegexCompiler {
 		} else
 			transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName);
 	}
-
-	private void generateMath(SourceBuilder sourceBuilder, Parsed lhs, Parsed rhs, java.lang.String op, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName) {
-		if((lhs instanceof StringReferency && !isNumber(lhs)) || (rhs instanceof StringReferency && !isNumber(rhs)) && op.equals("plus")) {
-			sourceBuilder.append("global.wrap(");
-			generateStringSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(" + ");
-			generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(")");
-			return;
-		} else if(((lhs instanceof Plus && ((Plus)lhs).isStringReferenceChain()) || (rhs instanceof Plus && ((Plus)rhs).isStringReferenceChain())) && op.equals("plus")) {
-			sourceBuilder.append("global.wrap(");
-			generateStringSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(" + ");
-			generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(")");
-			return;
-		} else if(lhs instanceof NumberReferency) {
-			transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
-			sourceBuilder.append(".");
-			sourceBuilder.append(op);
-			sourceBuilder.append("(");
-
-			if(rhs instanceof NumberReferency)
-				transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
-			else {
-				sourceBuilder.append("global.Number.fromValueOf(");
-				transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
-				sourceBuilder.append(")");
+	
+	private void generateNumberSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName) {
+		if(part instanceof Number) {
+			sourceBuilder.append(java.lang.String.valueOf(((Number)part).value));
+		} else if(part instanceof Integer) {
+			sourceBuilder.append(java.lang.String.valueOf(((Integer)part).value));
+		} else if(part instanceof String) {
+			try {
+				java.lang.Double.valueOf(((String)part).string);
+				sourceBuilder.append(java.lang.String.valueOf(((String)part).string));
+			} catch(NumberFormatException ex) {
+				sourceBuilder.append("Double.NaN");
 			}
+		} else if (part instanceof Plus) {
+			Parsed lhs = ((Plus)part).lhs;
+			Parsed rhs = ((Plus)part).rhs;
+			generateMath(sourceBuilder, lhs, rhs, '+', methodPrefix, baseScope, fileName, false);
+		} else if (part instanceof Multiply) {
+			Parsed lhs = ((Multiply)part).lhs;
+			Parsed rhs = ((Multiply)part).rhs;
+			generateMath(sourceBuilder, lhs, rhs, '*', methodPrefix, baseScope, fileName, false);
+		} else if (part instanceof Divide) {
+			Parsed lhs = ((Divide)part).lhs;
+			Parsed rhs = ((Divide)part).rhs;
+			generateMath(sourceBuilder, lhs, rhs, '/', methodPrefix, baseScope, fileName, false);
+		} else if (part instanceof And) {
+			Parsed lhs = ((And)part).lhs;
+			Parsed rhs = ((And)part).rhs;
+			generateMath(sourceBuilder, lhs, rhs, '&', methodPrefix, baseScope, fileName, false);
+		} else if (part instanceof Or) {
+			Parsed lhs = ((Or)part).lhs;
+			Parsed rhs = ((Or)part).rhs;
+			generateMath(sourceBuilder, lhs, rhs, '|', methodPrefix, baseScope, fileName, false);
+		} else if (part instanceof Percent) {
+			Parsed lhs = ((Percent)part).lhs;
+			Parsed rhs = ((Percent)part).rhs;
+			generateMath(sourceBuilder, lhs, rhs, '%', methodPrefix, baseScope, fileName, false);
+		} else if (part instanceof Minus) {
+			Parsed lhs = ((Minus)part).lhs;
+			Parsed rhs = ((Minus)part).rhs;
+			generateMath(sourceBuilder, lhs, rhs, '-', methodPrefix, baseScope, fileName, false);
+		} else {
+			sourceBuilder.append("global.Number.fromValueOf(");
+			transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName);
+			sourceBuilder.append(").value");
+		}
+	}
 
-			sourceBuilder.append(")");
-			return;
+	
+	private void generateMath(SourceBuilder sourceBuilder, Parsed lhs, Parsed rhs, char op, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName) {
+		generateMath(sourceBuilder, lhs, rhs, op, methodPrefix, baseScope, fileName, true);
+	}
+	
+	private void generateMath(SourceBuilder sourceBuilder, Parsed lhs, Parsed rhs, char op, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, boolean wrapAsBaseObject) {
+		if(op == '+') {
+			if((lhs instanceof StringReferency && !isNumber(lhs)) || (rhs instanceof StringReferency && !isNumber(rhs))) {
+				if(wrapAsBaseObject) 
+					sourceBuilder.append("global.wrap(");
+				else
+					sourceBuilder.append("(");
+				generateStringSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
+				sourceBuilder.append(" + ");
+				generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
+				sourceBuilder.append(")");
+				return;
+			} else if(((lhs instanceof Plus && ((Plus)lhs).isStringReferenceChain()) || (rhs instanceof Plus && ((Plus)rhs).isStringReferenceChain()))) {
+				if(wrapAsBaseObject) 
+					sourceBuilder.append("global.wrap(");
+				else
+					sourceBuilder.append("(");
+				generateStringSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
+				sourceBuilder.append(" + ");
+				generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
+				sourceBuilder.append(")");
+				return;
+			} else if((!(lhs instanceof NumberReferency) || !(rhs instanceof NumberReferency))) {
+				if(!wrapAsBaseObject)
+					sourceBuilder.append("global.Number.fromValueOf(");
+				sourceBuilder.append("plus(global, ");
+				transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
+				sourceBuilder.append(", ");
+				transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
+				sourceBuilder.append(")");
+				if(!wrapAsBaseObject)
+					sourceBuilder.append(").value");
+				return;
+			}
 		}
 		
-		sourceBuilder.append(op);
-		sourceBuilder.append("(global, ");
-		transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
-		sourceBuilder.append(", ");
-		transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
+		if(wrapAsBaseObject)
+			sourceBuilder.append("global.wrap(");
+		else
+			sourceBuilder.append("(");
+		boolean andOrOr = op == '|' || op == '&';
+		if(andOrOr)
+			sourceBuilder.append("(long)");
+		generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
+		sourceBuilder.append(" " + op + " ");
+		if(andOrOr)
+			sourceBuilder.append("(long)");
+		generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
 		sourceBuilder.append(")");
 	}
 
@@ -232,25 +294,25 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.append(" != ");
 			transpileParsedSource(sourceBuilder, ((StrictNotEquals) part).rhs, methodPrefix, baseScope, fileName);
 		} else if(part instanceof MoreThan) {
-			sourceBuilder.append("moreThan(global, ");
+			sourceBuilder.append("moreThan(");
 			transpileParsedSource(sourceBuilder, ((MoreThan) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(", ");
 			transpileParsedSource(sourceBuilder, ((MoreThan) part).rhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(")");
 		} else if(part instanceof LessThan) {
-			sourceBuilder.append("lessThan(global, ");
+			sourceBuilder.append("lessThan(");
 			transpileParsedSource(sourceBuilder, ((LessThan) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(", ");
 			transpileParsedSource(sourceBuilder, ((LessThan) part).rhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(")");
 		} else if(part instanceof MoreEqual) {
-			sourceBuilder.append("moreEqual(global, ");
+			sourceBuilder.append("moreEqual(");
 			transpileParsedSource(sourceBuilder, ((MoreEqual) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(", ");
 			transpileParsedSource(sourceBuilder, ((MoreEqual) part).rhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(")");
 		} else if(part instanceof LessEqual) {
-			sourceBuilder.append("lessEqual(global, ");
+			sourceBuilder.append("lessEqual(");
 			transpileParsedSource(sourceBuilder, ((LessEqual) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(", ");
 			transpileParsedSource(sourceBuilder, ((LessEqual) part).rhs, methodPrefix, baseScope, fileName);
@@ -520,37 +582,37 @@ public class JavaTranspiler extends RegexCompiler {
 		} else if (part instanceof Plus) {
 			Parsed lhs = ((Plus)part).lhs;
 			Parsed rhs = ((Plus)part).rhs;
-			generateMath(sourceBuilder, lhs, rhs, "plus", methodPrefix, baseScope, fileName);
+			generateMath(sourceBuilder, lhs, rhs, '+', methodPrefix, baseScope, fileName);
 			return;
 		} else if (part instanceof Multiply) {
 			Parsed lhs = ((Multiply)part).lhs;
 			Parsed rhs = ((Multiply)part).rhs;
-			generateMath(sourceBuilder, lhs, rhs, "multiply", methodPrefix, baseScope, fileName);
+			generateMath(sourceBuilder, lhs, rhs, '*', methodPrefix, baseScope, fileName);
 			return;
 		} else if (part instanceof Divide) {
 			Parsed lhs = ((Divide)part).lhs;
 			Parsed rhs = ((Divide)part).rhs;
-			generateMath(sourceBuilder, lhs, rhs, "divide", methodPrefix, baseScope, fileName);
+			generateMath(sourceBuilder, lhs, rhs, '/', methodPrefix, baseScope, fileName);
 			return;
 		} else if (part instanceof And) {
 			Parsed lhs = ((And)part).lhs;
 			Parsed rhs = ((And)part).rhs;
-			generateMath(sourceBuilder, lhs, rhs, "and", methodPrefix, baseScope, fileName);
+			generateMath(sourceBuilder, lhs, rhs, '&', methodPrefix, baseScope, fileName);
 			return;
 		} else if (part instanceof Or) {
 			Parsed lhs = ((Or)part).lhs;
 			Parsed rhs = ((Or)part).rhs;
-			generateMath(sourceBuilder, lhs, rhs, "or", methodPrefix, baseScope, fileName);
+			generateMath(sourceBuilder, lhs, rhs, '|', methodPrefix, baseScope, fileName);
 			return;
 		} else if (part instanceof Percent) {
 			Parsed lhs = ((Percent)part).lhs;
 			Parsed rhs = ((Percent)part).rhs;
-			generateMath(sourceBuilder, lhs, rhs, "percent", methodPrefix, baseScope, fileName);
+			generateMath(sourceBuilder, lhs, rhs, '%', methodPrefix, baseScope, fileName);
 			return;
 		} else if (part instanceof Minus) {
 			Parsed lhs = ((Minus)part).lhs;
 			Parsed rhs = ((Minus)part).rhs;
-			generateMath(sourceBuilder, lhs, rhs, "minus", methodPrefix, baseScope, fileName);
+			generateMath(sourceBuilder, lhs, rhs, '-', methodPrefix, baseScope, fileName);
 			return;
 		} else if (part instanceof New) {
 			boolean addComma;
@@ -1178,28 +1240,28 @@ public class JavaTranspiler extends RegexCompiler {
 
 			throw new UnsupportedOperationException("Cannot compile delete : " + describe(rhs));
 		} else if(part instanceof MoreThan) {
-			sourceBuilder.append("(moreThan(global, ");
+			sourceBuilder.append("(moreThan(");
 			transpileParsedSource(sourceBuilder, ((MoreThan) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(", ");
 			transpileParsedSource(sourceBuilder, ((MoreThan) part).rhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
 			return;
 		} else if(part instanceof LessThan) {
-			sourceBuilder.append("(lessThan(global, ");
+			sourceBuilder.append("(lessThan(");
 			transpileParsedSource(sourceBuilder, ((LessThan) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(", ");
 			transpileParsedSource(sourceBuilder, ((LessThan) part).rhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
 			return;
 		} else if(part instanceof MoreEqual) {
-			sourceBuilder.append("(moreEqual(global, ");
+			sourceBuilder.append("(moreEqual(");
 			transpileParsedSource(sourceBuilder, ((MoreEqual) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(", ");
 			transpileParsedSource(sourceBuilder, ((MoreEqual) part).rhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
 			return;
 		} else if(part instanceof LessEqual) {
-			sourceBuilder.append("(lessEqual(global, ");
+			sourceBuilder.append("(lessEqual(");
 			transpileParsedSource(sourceBuilder, ((LessEqual) part).lhs, methodPrefix, baseScope, fileName);
 			sourceBuilder.append(", ");
 			transpileParsedSource(sourceBuilder, ((LessEqual) part).rhs, methodPrefix, baseScope, fileName);

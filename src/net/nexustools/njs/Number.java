@@ -44,27 +44,6 @@ public class Number extends AbstractFunction {
 		Instance(Global global, double number) {
 			this(global.Number, global, number);
 		}
-		public Instance percent(Instance rhs) {
-			return Number.wrap(value % rhs.value);
-		}
-		public Instance and(Instance rhs) {
-			return Number.wrap((long)value & (long)rhs.value);
-		}
-		public Instance or(Instance rhs) {
-			return Number.wrap((long)value | (long)rhs.value);
-		}
-		public Instance plus(Instance rhs) {
-			return Number.wrap(value + rhs.value);
-		}
-		public Instance minus(Instance rhs) {
-			return Number.wrap(value - rhs.value);
-		}
-		public Instance multiply(Instance rhs) {
-			return Number.wrap(value * rhs.value);
-		}
-		public Instance divide(Instance rhs) {
-			return Number.wrap(value / rhs.value);
-		}
 		public boolean isNaN() {
 			return Double.isNaN(value);
 		}

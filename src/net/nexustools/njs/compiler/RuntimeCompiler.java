@@ -618,7 +618,7 @@ public class RuntimeCompiler extends RegexCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
-						return new ValueReferenceable(global.Number.fromValueOf(lhs.run(global, scope).get()).multiply(global.Number.fromValueOf(rhs.run(global, scope).get())));
+						return new ValueReferenceable(global.wrap(global.Number.fromValueOf(lhs.run(global, scope).get()).value * global.Number.fromValueOf(rhs.run(global, scope).get()).value));
 					} finally {
 						el.finishCall();
 					}
@@ -632,7 +632,7 @@ public class RuntimeCompiler extends RegexCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
-						return new ValueReferenceable(global.Number.fromValueOf(lhs.run(global, scope).get()).divide(global.Number.fromValueOf(rhs.run(global, scope).get())));
+						return new ValueReferenceable(global.wrap(global.Number.fromValueOf(lhs.run(global, scope).get()).value / global.Number.fromValueOf(rhs.run(global, scope).get()).value));
 					} finally {
 						el.finishCall();
 					}
@@ -646,7 +646,7 @@ public class RuntimeCompiler extends RegexCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
-						return new ValueReferenceable(global.Number.fromValueOf(lhs.run(global, scope).get()).minus(global.Number.fromValueOf(rhs.run(global, scope).get())));
+						return new ValueReferenceable(global.wrap(global.Number.fromValueOf(lhs.run(global, scope).get()).value - global.Number.fromValueOf(rhs.run(global, scope).get()).value));
 					} finally {
 						el.finishCall();
 					}
@@ -660,7 +660,7 @@ public class RuntimeCompiler extends RegexCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
-						return new ValueReferenceable(global.Number.fromValueOf(lhs.run(global, scope).get()).percent(global.Number.fromValueOf(rhs.run(global, scope).get())));
+						return new ValueReferenceable(global.wrap(global.Number.fromValueOf(lhs.run(global, scope).get()).value % global.Number.fromValueOf(rhs.run(global, scope).get()).value));
 					} finally {
 						el.finishCall();
 					}
@@ -674,7 +674,7 @@ public class RuntimeCompiler extends RegexCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
-						return new ValueReferenceable(global.Number.fromValueOf(lhs.run(global, scope).get()).and(global.Number.fromValueOf(rhs.run(global, scope).get())));
+						return new ValueReferenceable(global.wrap((long)global.Number.fromValueOf(lhs.run(global, scope).get()).value & (long)global.Number.fromValueOf(rhs.run(global, scope).get()).value));
 					} finally {
 						el.finishCall();
 					}
@@ -696,7 +696,7 @@ public class RuntimeCompiler extends RegexCompiler {
 				public Referenceable run(Global global, Scope scope) {
 					JSHelper.ReplacementStackTraceElement el = JSHelper.renameCall(data.methodName, data.fileName, rows, columns);
 					try {
-						return new ValueReferenceable(global.Number.fromValueOf(lhs.run(global, scope).get()).or(global.Number.fromValueOf(rhs.run(global, scope).get())));
+						return new ValueReferenceable(global.wrap((long)global.Number.fromValueOf(lhs.run(global, scope).get()).value | (long)global.Number.fromValueOf(rhs.run(global, scope).get()).value));
 					} finally {
 						el.finishCall();
 					}
@@ -848,7 +848,7 @@ public class RuntimeCompiler extends RegexCompiler {
 					try {
 						Referenceable ref = lhs.run(global, scope);
 
-						net.nexustools.njs.Number.Instance number = global.Number.fromValueOf(ref.get()).multiply(global.Number.fromValueOf(rhs.run(global, scope).get()));
+						net.nexustools.njs.Number.Instance number = global.wrap(global.Number.fromValueOf(ref.get()).value * global.Number.fromValueOf(rhs.run(global, scope).get()).value);
 						ref.set(number);
 						return new ValueReferenceable(number);
 					} finally {
@@ -870,7 +870,7 @@ public class RuntimeCompiler extends RegexCompiler {
 						net.nexustools.njs.Number.Instance _lhs = l.toNumber();
 						net.nexustools.njs.Number.Instance _rhs = r.toNumber();
 						if((!_lhs.isNaN() && !_rhs.isNaN()) || (lhs instanceof net.nexustools.njs.Number.Instance && rhs instanceof net.nexustools.njs.Number.Instance))
-							return new ValueReferenceable(_lhs.plus(_rhs));
+							return new ValueReferenceable(global.wrap(_lhs.value + _rhs.value));
 
 						return new ValueReferenceable(global.wrap(l.toString() + r.toString()));
 					} finally {
