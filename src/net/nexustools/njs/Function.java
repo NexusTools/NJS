@@ -32,6 +32,12 @@ public class Function extends AbstractFunction {
 
 	public void initPrototypeFunctions(final Global global) {
 		GenericObject prototype = (GenericObject)prototype();
+		prototype.defineProperty("name", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return String.wrap(((BaseFunction)_this).name());
+			}
+		}, global.NOOP);
 		prototype.defineProperty("prototype", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {

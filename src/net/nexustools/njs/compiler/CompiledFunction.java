@@ -36,7 +36,7 @@ public abstract class CompiledFunction extends AbstractFunction {
 
 	@Override
 	public BaseObject construct(BaseObject... params) {
-		BaseObject _this = create();
+		BaseObject _this = createPrototype();
 		call(_this, params);
 		return _this;
 	}

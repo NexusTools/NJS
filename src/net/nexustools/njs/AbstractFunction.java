@@ -27,14 +27,14 @@ public abstract class AbstractFunction extends GenericObject implements BaseFunc
 	public AbstractFunction(Global global, java.lang.String name) {
 		super(global.Function, global);
 		
-		prototype = create0();
+		prototype = createPrototype0();
 		if(name != null)
 			setHidden("name", String.wrap(name));
 	}
 	public AbstractFunction(Global global) {
 		super(global.Function, global);
 		
-		prototype = create0();
+		prototype = createPrototype0();
 		java.lang.String name = name();
 		if(name != null)
 			setHidden("name", String.wrap(name));
@@ -42,15 +42,23 @@ public abstract class AbstractFunction extends GenericObject implements BaseFunc
 	protected AbstractFunction() {
 	}
 
-	public final GenericObject create0() {
-		GenericObject prototype = new GenericObject(((BaseFunction)get("constructor")).prototype(), iterator, String, Number);
+	public final BaseObject createPrototype0() {
+		GenericObject prototype;
+		if(__proto__ instanceof GenericObject)
+			prototype = new GenericObject(((BaseFunction)((GenericObject)__proto__).getDirectly("constructor")).prototype(), iterator, String, Number);
+		else
+			prototype = new GenericObject(((BaseFunction)__proto__.get("constructor")).prototype(), iterator, String, Number);
 		prototype.setHidden("constructor", this);
 		return prototype;
 	}
 
 	@Override
-	public BaseObject create() {
-		GenericObject prototype = create0();
+	public final BaseObject createPrototype() {
+		GenericObject prototype;
+		if(__proto__ instanceof GenericObject)
+			prototype = new GenericObject(((BaseFunction)((GenericObject)__proto__).getDirectly("constructor")).prototype(), iterator, String, Number);
+		else
+			prototype = new GenericObject(((BaseFunction)__proto__.get("constructor")).prototype(), iterator, String, Number);
 		prototype.__proto__ = prototype();
 		return prototype;
 	}
@@ -77,7 +85,7 @@ public abstract class AbstractFunction extends GenericObject implements BaseFunc
 	
 	@Override
 	public java.lang.String name() {
-		java.lang.String className = getClass().getName().replaceAll("[^a-zA-Z0-9]", "_");
+		java.lang.String className = getClass().getName().replaceAll("[^_a-zA-Z0-9\\xA0-\\uFFFF]", "_");
 		if(className.startsWith("net_nexustools_njs_"))
 			className = className.substring(19);
 		return className;

@@ -86,8 +86,6 @@ public class Object extends AbstractFunction {
 		setHidden("create", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				if(params[0] instanceof BaseFunction)
-					return ((BaseFunction)params[0]).create();
 				GenericObject genericObject = new GenericObject(global);
 				genericObject.__proto__ = params[0];
 				return genericObject;

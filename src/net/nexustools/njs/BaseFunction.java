@@ -28,6 +28,6 @@ public interface BaseFunction extends BaseObject {
 	public BaseObject call(BaseObject _this, BaseObject... params);
 	public BaseObject construct(BaseObject... params);
 	public void setPrototype(BaseObject prototype);
+	public BaseObject createPrototype();
 	public BaseObject prototype();
-	public BaseObject create();
 }
