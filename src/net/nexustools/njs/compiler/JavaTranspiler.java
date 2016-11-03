@@ -99,7 +99,7 @@ public class JavaTranspiler extends RegexCompiler {
 			return "<anonymous>";
 	}
 	
-	private void generateStringSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, HashMap<java.lang.String, java.lang.String> localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
+	private void generateStringSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
 		if(part instanceof String) {
 			sourceBuilder.append("\"");
 			sourceBuilder.append(convertStringSource(((String)part).string));
@@ -134,7 +134,7 @@ public class JavaTranspiler extends RegexCompiler {
 		}
 	}
 	
-	private void generateNumberSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, HashMap<java.lang.String, java.lang.String> localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
+	private void generateNumberSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
 		if(part instanceof Number) {
 			sourceBuilder.append(java.lang.String.valueOf(((Number)part).value));
 		} else if(part instanceof Integer) {
@@ -198,7 +198,7 @@ public class JavaTranspiler extends RegexCompiler {
 		}
 	}
 	
-	private void generateLongSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, HashMap<java.lang.String, java.lang.String> localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
+	private void generateLongSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
 		if(part instanceof Number) {
 			java.lang.String out = java.lang.String.valueOf(((Number)part).value);
 			sourceBuilder.append(out.substring(0, out.indexOf('.')));
@@ -274,11 +274,11 @@ public class JavaTranspiler extends RegexCompiler {
 	}
 
 	
-	private void generateMath(SourceBuilder sourceBuilder, Parsed lhs, Parsed rhs, char op, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, HashMap<java.lang.String, java.lang.String> localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
+	private void generateMath(SourceBuilder sourceBuilder, Parsed lhs, Parsed rhs, char op, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
 		generateMath(sourceBuilder, lhs, rhs, op, methodPrefix, baseScope, fileName, localStack, expectedStack, true);
 	}
 	
-	private void generateMath(SourceBuilder sourceBuilder, Parsed lhs, Parsed rhs, char op, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, HashMap<java.lang.String, java.lang.String> localStack, HashMap<java.lang.String, java.lang.String> expectedStack, boolean wrapAsBaseObject) {
+	private void generateMath(SourceBuilder sourceBuilder, Parsed lhs, Parsed rhs, char op, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, HashMap<java.lang.String, java.lang.String> expectedStack, boolean wrapAsBaseObject) {
 		if(op == '+' && wrapAsBaseObject) {
 			if((lhs instanceof StringReferency && !isNumber(lhs)) || (rhs instanceof StringReferency && !isNumber(rhs))) {
 				if(wrapAsBaseObject)
@@ -331,7 +331,7 @@ public class JavaTranspiler extends RegexCompiler {
 		sourceBuilder.append(")");
 	}
 
-	private void generateIfBlockSource(SourceBuilder sourceBuilder, Else els, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, HashMap<java.lang.String, java.lang.String> localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
+	private void generateIfBlockSource(SourceBuilder sourceBuilder, Else els, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
 		while(els != null) {
 			if(els.simpleimpl != null) {
 				if(els instanceof ElseIf) {
@@ -363,7 +363,7 @@ public class JavaTranspiler extends RegexCompiler {
 		}
 	}
 
-	private void generateBooleanSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, HashMap<java.lang.String, java.lang.String> localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
+	private void generateBooleanSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
 		while(part instanceof OpenBracket)
 			part = ((OpenBracket)part).contents;
 		
@@ -537,7 +537,7 @@ public class JavaTranspiler extends RegexCompiler {
 		//assert ((new JavaTranspiler().compile("(function munchkin(){\n\tfunction yellow(){\n\t\treturn 55;\n\t}\n\treturn yellow()\n\t})()", "JavaCompilerStaticTest", false)).exec(new Global(), null).toString().equals("55"));
 	}
 
-	private boolean generateCommonComparison(SourceBuilder sourceBuilder, java.lang.String ltype, boolean not, Parsed lhs, Parsed rhs, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, HashMap<java.lang.String, java.lang.String> localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
+	private boolean generateCommonComparison(SourceBuilder sourceBuilder, java.lang.String ltype, boolean not, Parsed lhs, Parsed rhs, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
 		if(ltype.equals("string")) {
 			if(not)
 				sourceBuilder.append("!");
@@ -562,7 +562,7 @@ public class JavaTranspiler extends RegexCompiler {
 		return false;
 	}
 
-	private void generateLocalStackAccess(SourceBuilder sourceBuilder, java.lang.String ref, java.lang.String baseScope, HashMap<java.lang.String, java.lang.String> localStack) {
+	private void generateLocalStackAccess(SourceBuilder sourceBuilder, java.lang.String ref, java.lang.String baseScope, LocalStack localStack) {
 		java.lang.String type;
 		if(localStack != null && (type = localStack.get(ref)) != null) {
 			if(type.equals("number")) {
@@ -909,9 +909,7 @@ public class JavaTranspiler extends RegexCompiler {
 		try {
 			scanScriptSource(script, variableScope);
 			script.optimizations = variableScope.scope;
-		} catch(CannotOptimize ex) {
-			System.out.println("Cannot Optimize... " + ex.getMessage());
-		}
+		} catch(CannotOptimize ex) {}
 	}
 
 	private static enum SourceState {
@@ -927,7 +925,17 @@ public class JavaTranspiler extends RegexCompiler {
 		this.addDebugging = addDebugging;
 	}
 	
-	protected void generateBlockSource(SourceBuilder sourceBuilder, ScriptData blockDat, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, HashMap<java.lang.String, java.lang.String> localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
+	protected static class LocalStack {
+		private static final HashMap<java.lang.String, java.lang.String> stack = new HashMap();
+		public void put(java.lang.String key, java.lang.String val) {
+			stack.put(key, val);
+		}
+		public java.lang.String get(java.lang.String key) {
+			return stack.get(key);
+		}
+	}
+	
+	protected void generateBlockSource(SourceBuilder sourceBuilder, ScriptData blockDat, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
 		for(Parsed part : blockDat.impl) {
 			if (addDebugging && (part.rows > 1 || part.columns > 1)) {
 				sourceBuilder.append("stackElement.rows = ");
@@ -942,10 +950,10 @@ public class JavaTranspiler extends RegexCompiler {
 		}
 	}
 		
-	protected void transpileParsedSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, HashMap<java.lang.String, java.lang.String> localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
+	protected void transpileParsedSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, HashMap<java.lang.String, java.lang.String> expectedStack) {
 		transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, false);
 	}
-	protected void transpileParsedSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, HashMap<java.lang.String, java.lang.String> localStack, HashMap<java.lang.String, java.lang.String> expectedStack, boolean atTop) {
+	protected void transpileParsedSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, HashMap<java.lang.String, java.lang.String> expectedStack, boolean atTop) {
 		while(part instanceof OpenBracket)
 			part = ((OpenBracket)part).contents;
 		
@@ -1190,9 +1198,7 @@ public class JavaTranspiler extends RegexCompiler {
 			try {
 				scanScriptSource(((Function)part).impl, variableScope);
 				((Function)part).impl.optimizations = variableScope.scope;
-			} catch(CannotOptimize ex) {
-				System.out.println("Cannot Optimize... " + ex.getMessage());
-			}
+			} catch(CannotOptimize ex) {}
 			if(((Function)part).impl.optimizations == null) {
 				sourceBuilder.appendln("Scope extendScope(BaseObject _this) {");
 				sourceBuilder.append("\treturn ");
@@ -2092,7 +2098,7 @@ public class JavaTranspiler extends RegexCompiler {
 		sourceBuilder.appendln("try {");
 		sourceBuilder.indent();
 		HashMap<java.lang.String, java.lang.String> expectedStack = (HashMap<java.lang.String, java.lang.String>)script.optimizations;
-		HashMap<java.lang.String, java.lang.String> localStack = expectedStack == null ? null : new HashMap();
+		LocalStack localStack = expectedStack == null ? null : new LocalStack();
 		if (scope.isFunction()) {
 			boolean hasReturn = false, first = true;
 			for (Parsed part : script.impl) {
@@ -2164,10 +2170,7 @@ public class JavaTranspiler extends RegexCompiler {
 			try {
 				scanScriptSource(function.impl, variableScope);
 				function.impl.optimizations = variableScope.scope;
-			} catch(CannotOptimize ex) {
-				System.out.println("Cannot Optimize... " + ex.getMessage());
-			}
-			System.out.println(function.name + " : " + function.impl.optimizations);
+			} catch(CannotOptimize ex) {}
 			if(script.optimizations == null) {
 				sourceBuilder.appendln("Scope extendScope(BaseObject _this) {");
 				sourceBuilder.appendln("\treturn baseScope.extend(_this);");
