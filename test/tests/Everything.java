@@ -36,7 +36,6 @@ import org.junit.runners.Suite;
 	JSON.class,
 	
 	Extended.class,
-	JavaClass.class,
 	Eval.class})
 public class Everything {
 }

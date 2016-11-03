@@ -1838,18 +1838,7 @@ public class RuntimeCompiler extends RegexCompiler {
 	protected Script compileScript(ScriptData script, java.lang.String fileName, boolean inFunction) {
 		return compileScript(script, fileName, inFunction ? ScriptType.Function : ScriptType.Global);
 	}
-	private final HashMap<java.lang.String, WeakReference<Script>> scriptCache = new HashMap();
-	protected Script compileScript(ScriptData script, java.lang.String fileName, ScriptType scriptType) {
-		Script compiled;
-		java.lang.String id = script.toString() + ':' + scriptType;
-		synchronized(scriptCache) {
-			WeakReference<Script> ref = scriptCache.get(id);
-			if(ref == null || (compiled = ref.get()) == null)
-				scriptCache.put(id, new WeakReference(compiled = compileScript0(script, fileName, scriptType)));
-			return compiled;
-		}
-	}
-	private Script compileScript0(final ScriptData script, java.lang.String fileName, final ScriptType scriptType) {
+	private Script compileScript(final ScriptData script, java.lang.String fileName, final ScriptType scriptType) {
 		if(script.impl.length == 0)
 			return new Script() {
 				@Override

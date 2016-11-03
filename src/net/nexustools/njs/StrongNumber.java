@@ -39,7 +39,7 @@ public class StrongNumber extends Number {
 					break;
 				}
 			}
-			Instance um = new Instance(this, iterator, String, number);
+			Instance um = new Instance(this, iterator, String, number, true);
 			um.seal();
 			try {
 				array[pos] = um;

@@ -493,6 +493,9 @@ public class JavaTranspiler extends RegexCompiler {
 		return false;
 	}
 
+	private void optimizeScriptSource(ScriptData script) {
+	}
+
 	private static enum SourceState {
 		GlobalScript,
 		FunctionScript,
@@ -774,7 +777,7 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.appendln(".extend(_this);");
 			sourceBuilder.appendln("}");
 			((Function)part).impl.callee = ((Function)part);
-			generateScriptSource(sourceBuilder, ((Function)part).impl, methodPrefix, fileName, SourceScope.Function);
+			transpileScriptSource(sourceBuilder, ((Function)part).impl, methodPrefix, fileName, SourceScope.Function);
 			sourceBuilder.unindent();
 			sourceBuilder.append("}");
 			return;
@@ -1450,7 +1453,8 @@ public class JavaTranspiler extends RegexCompiler {
 			return this == GlobalFunction || this == Function;
 		}
 	}
-	protected void generateScriptSource(SourceBuilder sourceBuilder, ScriptData script, java.lang.String methodPrefix, java.lang.String fileName, SourceScope scope) {
+	protected void transpileScriptSource(SourceBuilder sourceBuilder, ScriptData script, java.lang.String methodPrefix, java.lang.String fileName, SourceScope scope) {
+		optimizeScriptSource(script);
 		if(addDebugging || !scope.isFunction()) {
 			sourceBuilder.appendln("@Override");
 			sourceBuilder.appendln("public String source() {");
@@ -1625,7 +1629,7 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.appendln("\tbaseScope = scope;");
 			sourceBuilder.appendln("}");
 
-			generateScriptSource(sourceBuilder, function.impl, methodPrefix, fileName, SourceScope.Function);
+			transpileScriptSource(sourceBuilder, function.impl, methodPrefix, fileName, SourceScope.Function);
 
 			sourceBuilder.unindent();
 			sourceBuilder.appendln("}");
@@ -1671,7 +1675,7 @@ public class JavaTranspiler extends RegexCompiler {
 		sourceBuilder.indent();
 
 		try {
-			generateScriptSource(sourceBuilder, script, script.methodName, fileName, inFunction ? SourceScope.GlobalFunction : SourceScope.GlobalScript);
+			transpileScriptSource(sourceBuilder, script, script.methodName, fileName, inFunction ? SourceScope.GlobalFunction : SourceScope.GlobalScript);
 		} catch(RuntimeException t) {
 			System.err.println(sourceBuilder.toString());
 			throw t;

@@ -34,18 +34,21 @@ public class String extends AbstractFunction {
 			}
 		}
 		
+		public final boolean _const;
 		public final java.lang.String string;
-		Instance(Global global, final java.lang.String string) {
+		Instance(Global global, final java.lang.String string, boolean _const) {
 			super(global.String, global);
 			this.string = string;
 			
 			setReadOnly("length", Number.wrap(string.length()));
+			this._const = _const;
 		}
 		Instance(Number.Instance length, Number Number, Symbol.Instance iterator, String String, final java.lang.String string) {
 			super(String.prototype(), iterator, String, Number);
 			this.string = string;
 			
 			setReadOnly("length", length);
+			_const = false;
 		}
 
 		@Override
@@ -202,7 +205,7 @@ public class String extends AbstractFunction {
 		if(val instanceof Instance)
 			return ((Instance)val).clone();
 		
-		return new Instance(global, val.toString());
+		return new Instance(global, val.toString(), false);
 	}
 	
 	@Override
@@ -225,7 +228,7 @@ public class String extends AbstractFunction {
 					return um;
 			}
 			
-			Instance um = new Instance(global, string);
+			Instance um = new Instance(global, string, true);
 			WRAPS.add(new WeakReference(um));
 			um.seal();
 			return um;

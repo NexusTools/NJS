@@ -24,18 +24,12 @@ public abstract class Number extends AbstractFunction {
 	public static class Instance extends GenericObject {
 		public final double value;
 		private final Number Number;
-		Instance(Number Number, Symbol.Instance iterator, String String, double number) {
+		private final boolean _const;
+		Instance(Number Number, Symbol.Instance iterator, String String, double number, boolean _const) {
 			super(Number, iterator, String, (Number)null);
 			this.Number = Number;
 			this.value = number;
-		}
-		Instance(Number Number, Global global, double number) {
-			super(Number, global);
-			this.Number = Number;
-			this.value = number;
-		}
-		Instance(Global global, double number) {
-			this(global.Number, global, number);
+			this._const = _const;
 		}
 		public boolean isNaN() {
 			return Double.isNaN(value);
@@ -70,7 +64,7 @@ public abstract class Number extends AbstractFunction {
 		}
 		@Override
 		public Instance clone() {
-			return new Instance(Number, iterator, String, value);
+			return new Instance(Number, iterator, String, value, false);
 		}
 		@Override
 		public java.lang.String toString() {
@@ -106,6 +100,10 @@ public abstract class Number extends AbstractFunction {
 		@Override
 		public boolean toBool() {
 			return value != 0 && !Double.isNaN(value);
+		}
+		@Override
+		public java.lang.String typeOf() {
+			return _const ? "number" : "object";
 		}
 	}
 	
