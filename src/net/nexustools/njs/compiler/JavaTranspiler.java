@@ -118,6 +118,7 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.append(java.lang.String.valueOf(((Number)part).value));
 		} else if(part instanceof Integer) {
 			sourceBuilder.append(java.lang.String.valueOf(((Integer)part).value));
+			sourceBuilder.append(".0");
 		} else if(part instanceof String) {
 			try {
 				java.lang.Double.valueOf(((String)part).string);
@@ -187,13 +188,13 @@ public class JavaTranspiler extends RegexCompiler {
 				generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
 				sourceBuilder.append(")");
 				return;
-			} else if((!(lhs instanceof NumberReferency) || !(rhs instanceof NumberReferency))) {
+			} else if((!(lhs instanceof NumberReferency) && !(rhs instanceof NumberReferency))) {
 				if(!wrapAsBaseObject)
 					sourceBuilder.append("global.Number.fromValueOf(");
 				sourceBuilder.append("plus(global, ");
 				transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
 				sourceBuilder.append(", ");
-				transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName);
+				transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName);
 				sourceBuilder.append(")");
 				if(!wrapAsBaseObject)
 					sourceBuilder.append(").value");

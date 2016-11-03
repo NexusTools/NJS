@@ -1,6 +1,4 @@
 var Assert = importClass("org.junit.Assert");
-var System = importClass("java.lang.System");
-
 
 var first = 3+4*5;
 Assert.assertTrue(first === 23);
