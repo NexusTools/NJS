@@ -1,27 +1,28 @@
 /* 
- * Copyright (c) 2016 NexusTools.
- * 
- * This program is free software: you can redistribute it and/or modify  
- * it under the terms of the GNU Lesser General Public License as   
- * published by the Free Software Foundation, version 3.
+ * Copyright (C) 2016 NexusTools.
  *
- * This program is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
- * Lesser General Lesser Public License for more details.
+ * This library is free software: you can redistribute it and/or modify  
+ * it under the terms of the GNU Lesser General Public License as   
+ * published by the Free Software Foundation, version 3.0.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *
+ * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 package tests;
 
-import java.io.InputStreamReader;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import net.nexustools.njs.JSHelper;
 import net.nexustools.njs.compiler.Compiler;
 import net.nexustools.njs.compiler.JavaTranspiler;
 import net.nexustools.njs.compiler.RuntimeCompiler;
+
+import java.io.InputStreamReader;
 
 import org.junit.After;
 import org.junit.Before;
