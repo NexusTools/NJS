@@ -191,6 +191,27 @@ public class JavaTranspiler extends RegexCompiler {
 							sourceBuilder.append(((Reference)part).ref);
 							return;
 						}
+						if(type.equals("string")) {
+							try {
+								Double.valueOf(((Reference)part).ref);
+								sourceBuilder.append(((Reference)part).ref);
+								if(!((Reference)part).ref.contains("."))
+									sourceBuilder.append(".0");
+							} catch(NumberFormatException ex) {
+								sourceBuilder.append("Double.NaN");
+							}
+							return;
+						}
+					}
+				} else if(part instanceof ReferenceChain) {
+					List<java.lang.String> chain = ((ReferenceChain)part).chain;
+					java.lang.String type = localStack.get(chain.get(0));
+					if(type != null) {
+						if(type.equals("array") && chain.size() == 2 && chain.get(1).equals("length")) {
+							sourceBuilder.append(chain.get(0));
+							sourceBuilder.append(".length()");
+							return;
+						}
 					}
 				}
 			}

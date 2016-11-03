@@ -195,6 +195,8 @@ public abstract class Number extends AbstractFunction {
 			return Zero;
 		if(valueOf == Undefined.INSTANCE)
 			return NaN;
+		if(valueOf instanceof Instance && ((Instance)valueOf)._const)
+			return (Instance)valueOf;
 		return Utilities.valueOf(valueOf).toNumber();
 	}
 	

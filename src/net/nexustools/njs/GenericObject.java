@@ -36,13 +36,24 @@ public class GenericObject extends NumberObject {
 		public boolean has(int i, BaseObject _this);
 		public int length(BaseObject _this);
 	}
+	private static class PropertyNode {
+		public Property property;
+		public final java.lang.String key;
+		public PropertyNode(java.lang.String key) {
+			this.key = key;
+		}
+		public PropertyNode(java.lang.String key, Property property) {
+			this.key = key;
+			this.property = property;
+		}
+	}
 	
 	BaseObject __proto__;
 	private ArrayOverride arrayOverride;
 	private java.lang.Object metaObject;
 	private boolean sealed, hasArrayOverride;
 	protected final Map<Symbol.Instance, BaseObject> symbols = new HashMap();
-	protected final Map<java.lang.String, Property> properties = new HashMap();
+	protected final PropertyNode[][] properties = new PropertyNode[0x100][0];
 	protected Symbol.Instance iterator;
 	protected String String;
 	
@@ -105,9 +116,9 @@ public class GenericObject extends NumberObject {
 
 	@Override
 	public final void defineGetter(java.lang.String key, BaseFunction impl) {
-		Property prop = properties.get(key);
+		Property prop = getNode(key);
 		if(prop == null)
-			properties.put(key, prop = new ExtendedProperty());
+			setNode(key, prop = new ExtendedProperty());
 		else if(!(prop instanceof ExtendedProperty)) {
 			ExtendedProperty newProp = new ExtendedProperty();
 			newProp.setter = prop.getSetter();
@@ -120,9 +131,9 @@ public class GenericObject extends NumberObject {
 
 	@Override
 	public final void defineSetter(java.lang.String key, BaseFunction impl) {
-		Property prop = properties.get(key);
+		Property prop = getNode(key);
 		if(prop == null)
-			properties.put(key, prop = new ExtendedProperty());
+			setNode(key, prop = new ExtendedProperty());
 		else if(!(prop instanceof ExtendedProperty)) {
 			ExtendedProperty newProp = new ExtendedProperty();
 			newProp.setter = prop.getSetter();
@@ -149,7 +160,7 @@ public class GenericObject extends NumberObject {
 		
 		@Override
 		public Void or(java.lang.String key) {
-			properties.put(key, new BasicProperty(val));
+			setNode(key, new BasicProperty(val));
 			return null;
 		}
 		
@@ -157,36 +168,51 @@ public class GenericObject extends NumberObject {
 	
 	@Override
 	public void set(int i, BaseObject val) {
-		set(i, val, this, sealed ? OR_VOID : new OrSet(val));
+		set(i, val, this, sealed ? OR_VOID : null);
 	}
 	
 	@Override
 	public void set(int i, BaseObject val, BaseObject _this) {
-		set(i, val, _this, sealed ? OR_VOID : new OrSet(val));
+		set(i, val, _this, sealed ? OR_VOID : null);
 	}
 
 	@Override
 	public void set(java.lang.String key, BaseObject val) {
-		set(key, val, this, sealed ? OR_VOID : new OrSet(val));
+		set(key, val, this, sealed ? OR_VOID : null);
 	}
 
 	@Override
 	public final void set(java.lang.String key, BaseObject val, BaseObject _this) {
-		set(key, val, _this, sealed ? OR_VOID : new OrSet(val));
+		set(key, val, _this, sealed ? OR_VOID : null);
 	}
 
 	@Override
 	public final void set(java.lang.String key, BaseObject val, Or<Void> or) {
 		set(key, val, this, or);
 	}
+	
+	private PropertyNode[] grow(int index, int current) {
+		PropertyNode[] newProperties = new PropertyNode[Utilities.nextPowerOf2(current+1)];
+		System.arraycopy(properties[index], 0, newProperties, 0, current);
+		return properties[index] = newProperties;
+	}
 
 	@Override
-	public final void set(java.lang.String key, BaseObject val, BaseObject _this, Or<Void> or) {
-		Iterator<Map.Entry<java.lang.String, Property>> it = properties.entrySet().iterator();
-		while(it.hasNext()) {
-			Map.Entry<java.lang.String, Property> entry = it.next();
-			if(entry.getKey().equals(key)) {
-				Property prop = entry.getValue();
+	public final void set(java.lang.String key, final BaseObject val, BaseObject _this, Or<Void> or) {
+		int pos = 0;
+		final int index = key.hashCode() & 0xFF;
+		final PropertyNode[] nodes = properties[index];
+		final int max = nodes.length;
+		for(; pos<max; pos++) {
+			PropertyNode node = nodes[pos];
+			boolean equals;
+			try {
+				equals = node.key.equals(key);
+			} catch(NullPointerException ex) {
+				break;
+			}
+			if(equals){
+				Property prop = node.property;
 				BaseFunction setter = prop.getSetter();
 				if(setter == null) {
 					if(_this == this)
@@ -197,6 +223,21 @@ public class GenericObject extends NumberObject {
 					setter.call(_this, val);
 				return;
 			}
+		}
+		if(or == null) {
+			final int next = pos;
+			or = new Or<Void>() {
+				@Override
+				public Void or(java.lang.String key) {
+					PropertyNode node = new PropertyNode(key, new BasicProperty(val));
+					try {
+						nodes[next] = node;
+					} catch(ArrayIndexOutOfBoundsException ex) {
+						grow(index, max)[next] = node;
+					}
+					return null;
+				}
+			};
 		}
 		
 		if(Utilities.isUndefined(__proto__))
@@ -221,19 +262,32 @@ public class GenericObject extends NumberObject {
 	@Override
 	public final boolean setProperty(java.lang.String key, Property property) {
 		assert(key != null);
-		Iterator<Map.Entry<java.lang.String, Property>> it = properties.entrySet().iterator();
-		while(it.hasNext()) {
-			Map.Entry<java.lang.String, Property> entry = it.next();
-			if(entry.getKey().equals(key)) {
-				Property prop = entry.getValue();
+		int pos = 0;
+		final int index = key.hashCode() & 0xFF;
+		final PropertyNode[] nodes = properties[index];
+		final int max = nodes.length;
+		for(; pos<max; pos++) {
+			PropertyNode node = nodes[pos];
+			boolean equals;
+			try {
+				equals = node.key.equals(key);
+			} catch(NullPointerException ex) {
+				break;
+			}
+			if(equals){
+				Property prop = node.property;
 				if(!prop.configurable())
 					return false;
-				entry.setValue(property);
+				node.property = property;
 				return true;
 			}
 		}
-		
-		properties.put(key, property);
+		PropertyNode node = new PropertyNode(key, property);
+		try {
+			nodes[pos] = node;
+		} catch(ArrayIndexOutOfBoundsException ex) {
+			grow(index, max)[pos] = node;
+		}
 		return true;
 	}
 
@@ -264,11 +318,20 @@ public class GenericObject extends NumberObject {
 
 	@Override
 	public final BaseObject get(java.lang.String key, BaseObject _this, Or<BaseObject> or) {
-		Iterator<Map.Entry<java.lang.String, Property>> it = properties.entrySet().iterator();
-		while(it.hasNext()) {
-			Map.Entry<java.lang.String, Property> entry = it.next();
-			if(entry.getKey().equals(key)) {
-				Property prop = entry.getValue();
+		int pos = 0;
+		final int index = key.hashCode() & 0xFF;
+		final PropertyNode[] nodes = properties[index];
+		final int max = nodes.length;
+		for(; pos<max; pos++) {
+			PropertyNode node = nodes[pos];
+			boolean equals;
+			try {
+				equals = node.key.equals(key);
+			} catch(NullPointerException ex) {
+				break;
+			}
+			if(equals){
+				Property prop = node.property;
 				BaseFunction getter = prop.getGetter();
 				if(getter == null)
 					return prop.get();
@@ -335,14 +398,24 @@ public class GenericObject extends NumberObject {
 	
 	@Override
 	public final boolean delete(java.lang.String key, Or<java.lang.Boolean> or) {
-		Iterator<Map.Entry<java.lang.String, Property>> it = properties.entrySet().iterator();
-		while(it.hasNext()) {
-			Map.Entry<java.lang.String, Property> entry = it.next();
-			if(entry.getKey().equals(key)) {
-				if(!entry.getValue().configurable())
+		int pos = 0;
+		final int index = key.hashCode() & 0xFF;
+		final PropertyNode[] nodes = properties[index];
+		final int max = nodes.length;
+		for(; pos<max; pos++) {
+			PropertyNode node = nodes[pos];
+			boolean equals;
+			try {
+				equals = node.key.equals(key);
+			} catch(NullPointerException ex) {
+				break;
+			}
+			if(equals){
+				Property prop = node.property;
+				if(!prop.configurable())
 					return false;
 				
-				it.remove();
+				System.arraycopy(nodes, pos+1, nodes, pos, nodes.length-pos-1);
 				return true;
 			}
 		}
@@ -359,7 +432,7 @@ public class GenericObject extends NumberObject {
 	}
 	
 	public final BaseObject getDirectly(java.lang.String key, Or<BaseObject> or) {
-		Property prop = properties.get(key);
+		Property prop = getNode(key);
 		if(prop == null)
 			return or.or(key);
 		
@@ -371,7 +444,7 @@ public class GenericObject extends NumberObject {
 	
 	@Override
 	public final Property getProperty(java.lang.String key) {
-		return properties.get(key);
+		return getNode(key);
 	}
 
 	@Override
@@ -381,10 +454,9 @@ public class GenericObject extends NumberObject {
 				@Override
 				public Iterator<java.lang.String> iterator() {
 					final int max = arrayOverride.length(GenericObject.this);
-					final Iterator<Map.Entry<java.lang.String, Property>> it = properties.entrySet().iterator();
 					return new Iterator<java.lang.String>() {
-						int pos;
 						java.lang.String next;
+						int pos, index;
 						@Override
 						public boolean hasNext() {
 							if(pos < max) {
@@ -392,13 +464,20 @@ public class GenericObject extends NumberObject {
 								return true;
 							}
 							
-							while(it.hasNext()) {
-								Map.Entry<java.lang.String, Property> entry = it.next();
-								if(entry.getValue().enumerable()) {
-									next = entry.getKey();
+							while(pos < 0x100)
+								try {
+									PropertyNode node = properties[pos][index++];
+									if(!node.property.enumerable())
+										continue;
+									next = node.key;
 									return true;
+								} catch(NullPointerException ex) {
+									pos++;
+									index=0;
+								} catch(ArrayIndexOutOfBoundsException ex) {
+									pos++;
+									index=0;
 								}
-							}
 							return false;
 						}
 
@@ -412,27 +491,34 @@ public class GenericObject extends NumberObject {
 				@Override
 				public int size() {
 					int size = 0;
-					for(Property prop : properties.values())
-						if(prop.enumerable())
-							size ++;
+					Iterator it = iterator();
+					while(it.hasNext())
+						size ++;
 					return size + arrayOverride.length(GenericObject.this);
 				}
 			};
 		return new AbstractSet<java.lang.String>() {
 			@Override
 			public Iterator<java.lang.String> iterator() {
-				final Iterator<Map.Entry<java.lang.String, Property>> it = properties.entrySet().iterator();
 				return new Iterator<java.lang.String>() {
 					java.lang.String next;
+					int pos, index;
 					@Override
 					public boolean hasNext() {
-						while(it.hasNext()) {
-							Map.Entry<java.lang.String, Property> entry = it.next();
-							if(entry.getValue().enumerable()) {
-								next = entry.getKey();
+						while(pos < 0x100)
+							try {
+								PropertyNode node = properties[pos][index++];
+								if(!node.property.enumerable())
+									continue;
+								next = node.key;
 								return true;
+							} catch(NullPointerException ex) {
+								pos++;
+								index=0;
+							} catch(ArrayIndexOutOfBoundsException ex) {
+								pos++;
+								index=0;
 							}
-						}
 						return false;
 					}
 
@@ -446,9 +532,50 @@ public class GenericObject extends NumberObject {
 			@Override
 			public int size() {
 				int size = 0;
-				for(Property prop : properties.values())
-					if(prop.enumerable())
-						size ++;
+				Iterator it = iterator();
+				while(it.hasNext())
+					size ++;
+				return size + arrayOverride.length(GenericObject.this);
+			}
+		};
+	}
+	
+	private Set<java.lang.String> ownPropertyNames0() {
+		return new AbstractSet<java.lang.String>() {
+			@Override
+			public Iterator<java.lang.String> iterator() {
+				return new Iterator<java.lang.String>() {
+					java.lang.String next;
+					int pos, index;
+					@Override
+					public boolean hasNext() {
+						while(pos < 0x100)
+							try {
+								next = properties[pos][index++].key;
+								return true;
+							} catch(NullPointerException ex) {
+								pos++;
+								index=0;
+							} catch(ArrayIndexOutOfBoundsException ex) {
+								pos++;
+								index=0;
+							}
+						return false;
+					}
+
+					@Override
+					public java.lang.String next() {
+						return next;
+					}
+				};
+			}
+
+			@Override
+			public int size() {
+				int size = 0;
+				Iterator it = iterator();
+				while(it.hasNext())
+					size ++;
 				return size;
 			}
 		};
@@ -461,7 +588,7 @@ public class GenericObject extends NumberObject {
 				@Override
 				public Iterator<java.lang.String> iterator() {
 					final int max = arrayOverride.length(GenericObject.this);
-					final Iterator<java.lang.String> it = properties.keySet().iterator();
+					final Iterator<java.lang.String> it = ownPropertyNames0().iterator();
 					return new Iterator<java.lang.String>() {
 						int pos;
 						java.lang.String next;
@@ -486,10 +613,14 @@ public class GenericObject extends NumberObject {
 
 				@Override
 				public int size() {
-					return properties.keySet().size() + arrayOverride.length(GenericObject.this);
+					int size = 0;
+					Iterator it = iterator();
+					while(it.hasNext())
+						size ++;
+					return size + arrayOverride.length(GenericObject.this);
 				}
 			};
-		return properties.keySet();
+		return ownPropertyNames0();
 	}
 	
 	@Override
@@ -530,7 +661,12 @@ public class GenericObject extends NumberObject {
 				if(value >= 0)
 					return arrayOverride.has(value, this);
 			} catch(NumberFormatException ex) {}
-		return properties.containsKey(name);
+		
+		
+		for(java.lang.String propertyName : ownPropertyNames0())
+			if(propertyName.equals(name))
+				return true;
+		return false;
 	}
 
 	@Override
@@ -608,6 +744,23 @@ public class GenericObject extends NumberObject {
 	@Override
 	public boolean toBool() {
 		return true;
+	}
+
+	private Property getNode(java.lang.String key) {
+		for(PropertyNode node : properties[key.hashCode() & 0xFF]) {
+			try {
+				if(node.key.equals(key))
+					return node.property;
+			} catch(NullPointerException ex) {
+				break;
+			}
+		}
+		
+		return null;
+	}
+
+	private void setNode(java.lang.String key, Property extendedProperty) {
+		throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
 	}
 	
 }
