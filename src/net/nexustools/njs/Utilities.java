@@ -230,23 +230,18 @@ public class Utilities {
 	}
 
 	public static class ConversionAccuracy {
-
 		double accuracy;
 	}
 	private static final ConversionAccuracy DONT_CARE_ABOUT_ACCURACY = new ConversionAccuracy();
-
 	public static java.lang.Object jsToJava(final BaseObject jsObject, Class<?> desiredClass) {
 		return jsToJava(jsObject, desiredClass, DONT_CARE_ABOUT_ACCURACY);
 	}
-
 	public static java.lang.Object jsToJava(final BaseObject jsObject, Class<?> desiredClass, ConversionAccuracy accuracy) {
-		if (jsObject instanceof Undefined || jsObject instanceof Null) {
+		if (isUndefined(jsObject))
 			return null;
-		}
 
-		if (desiredClass == java.lang.Object.class) {
+		if (desiredClass == java.lang.Object.class)
 			return jsObject;
-		}
 
 		if (desiredClass.isArray()) {
 			Class<?> desiredArrayType = desiredClass.getComponentType();
@@ -259,7 +254,42 @@ public class Utilities {
 				} else {
 					accuracy.accuracy = 0.5;
 				}
-				return jsObject.toString();
+				return jsObject.toString().toCharArray();
+			} else if(desiredArrayType == Double.TYPE) {
+				if(jsObject instanceof Float64Array.Instance) {
+					accuracy.accuracy = 1;
+					return ((Float64Array.Instance)jsObject).arrayStorage;
+				}
+			} else if(desiredArrayType == Integer.TYPE) {
+				if(jsObject instanceof Uint32Array.Instance) {
+					accuracy.accuracy = 1;
+					return ((Uint32Array.Instance)jsObject).arrayStorage;
+				} else if(jsObject instanceof Int32Array.Instance) {
+					accuracy.accuracy = 1;
+					return ((Int32Array.Instance)jsObject).arrayStorage;
+				}
+			} else if(desiredArrayType == Short.TYPE) {
+				if(jsObject instanceof Uint16Array.Instance) {
+					accuracy.accuracy = 1;
+					return ((Uint16Array.Instance)jsObject).arrayStorage;
+				} else if(jsObject instanceof Int16Array.Instance) {
+					accuracy.accuracy = 1;
+					return ((Int16Array.Instance)jsObject).arrayStorage;
+				}
+			} else if(desiredArrayType == Byte.TYPE) {
+				if(jsObject instanceof Uint8Array.Instance) {
+					accuracy.accuracy = 1;
+					return ((Uint8Array.Instance)jsObject).arrayStorage;
+				} else if(jsObject instanceof Int8Array.Instance) {
+					accuracy.accuracy = 1;
+					return ((Int8Array.Instance)jsObject).arrayStorage;
+				} else if(jsObject instanceof String.Instance) {
+					accuracy.accuracy = 0.75;
+				} else {
+					accuracy.accuracy = 0.5;
+				}
+				
+				return jsObject.toString().getBytes();
 			}
 
 			throw new UnsupportedOperationException("Cannot convert array with component type " + desiredArrayType);
