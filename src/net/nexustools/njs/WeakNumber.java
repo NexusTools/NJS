@@ -16,14 +16,27 @@
 package net.nexustools.njs;
 
 import java.lang.ref.WeakReference;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  *
  * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class WeakNumber extends Number {
-	
+	private final ScheduledExecutorService EXECUTOR_SERVICE = Executors.newSingleThreadScheduledExecutor();
 	private final WeakReference<Instance>[][] INSTANCES = new WeakReference[0x10000][0];
+	private final Runnable CLEAN = new Runnable() {
+		@Override
+		public void run() {
+			synchronized(INSTANCES) {
+				// TODO: Implement
+			}
+		}
+	};
+	private ScheduledFuture<?> cleanFuture;
 
 	@Override
 	public Instance wrap(double number) {
@@ -36,7 +49,11 @@ public class WeakNumber extends Number {
 				try {
 					WeakReference<Instance> ref = array[pos];
 					Instance inst = ref.get();
-					if(inst.value == number)
+					if(inst == null) {
+						if(cleanFuture != null)
+							cleanFuture.cancel(false);
+						cleanFuture = EXECUTOR_SERVICE.schedule(CLEAN, 200, TimeUnit.MILLISECONDS);
+					} else if(inst.value == number)
 						return inst;
 				} catch(NullPointerException ex) {
 					break;

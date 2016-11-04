@@ -315,10 +315,10 @@ public class Utilities {
 			}
 			if (desiredClass == Integer.class) {
 				return (Integer) (int) value;
-			};
+			}
 			if (desiredClass == Float.class) {
 				return (Float) (float) value;
-			};
+			}
 			if (desiredClass == Double.class) {
 				return (Double) value;
 			}
@@ -343,95 +343,91 @@ public class Utilities {
 			if (desiredClass == Byte.TYPE) {
 				return (byte) value;
 			}
-		}
+		} else {
+			if (java.lang.Number.class.isAssignableFrom(desiredClass)) {
+				if (jsObject instanceof String.Instance) {
+					accuracy.accuracy = 0.75;
+				} else {
+					accuracy.accuracy = 0.5;
+				}
 
-		if (java.lang.Number.class.isAssignableFrom(desiredClass)) {
-			if (jsObject instanceof String.Instance) {
-				accuracy.accuracy = 0.75;
-			} else {
-				accuracy.accuracy = 0.5;
-			}
-
-			java.lang.String string = jsObject.toString();
-			if (desiredClass == Long.class) {
-				return Long.valueOf(string);
-			}
-			if (desiredClass == Integer.class) {
-				return Integer.valueOf(string);
-			}
-			if (desiredClass == Float.class) {
-				return Float.valueOf(string);
-			}
-			if (desiredClass == Double.class) {
-				return Double.valueOf(string);
-			}
-			if (desiredClass == Short.class) {
-				return Short.valueOf(string);
-			}
-			if (desiredClass == Byte.class) {
-				return Byte.valueOf(string);
-			}
-		}
-
-		if (desiredClass == Integer.TYPE) {
-			if (jsObject instanceof String.Instance) {
-				accuracy.accuracy = 0.75;
-			} else {
-				accuracy.accuracy = 0.5;
+				double number = jsObject.toDouble();
+				if(!Double.isNaN(number))
+					accuracy.accuracy += 0.15;
+				if (desiredClass == Long.class) {
+					return (Long)(long)number;
+				}
+				if (desiredClass == Integer.class) {
+					return (Integer)(int)number;
+				}
+				if (desiredClass == Float.class) {
+					return (Float)(float)number;
+				}
+				if (desiredClass == Double.class) {
+					return (Double)number;
+				}
+				if (desiredClass == Short.class) {
+					return (Short)(short)number;
+				}
+				if (desiredClass == Byte.class) {
+					return (Byte)(byte)number;
+				}
 			}
 
-			java.lang.String string = jsObject.toString();
-			return (int) Integer.valueOf(string);
-		}
-		if (desiredClass == Float.TYPE) {
-			if (jsObject instanceof String.Instance) {
-				accuracy.accuracy = 0.75;
-			} else {
-				accuracy.accuracy = 0.5;
-			}
+			if (desiredClass == Integer.TYPE) {
+				if (jsObject instanceof String.Instance) {
+					accuracy.accuracy = 0.75;
+				} else {
+					accuracy.accuracy = 0.5;
+				}
 
-			java.lang.String string = jsObject.toString();
-			return (float) Float.valueOf(string);
-		}
-		if (desiredClass == Double.TYPE) {
-			if (jsObject instanceof String.Instance) {
-				accuracy.accuracy = 0.75;
-			} else {
-				accuracy.accuracy = 0.5;
+				return (int) jsObject.toDouble();
 			}
+			if (desiredClass == Float.TYPE) {
+				if (jsObject instanceof String.Instance) {
+					accuracy.accuracy = 0.75;
+				} else {
+					accuracy.accuracy = 0.5;
+				}
 
-			java.lang.String string = jsObject.toString();
-			return (double) Double.valueOf(string);
-		}
-		if (desiredClass == Short.TYPE) {
-			if (jsObject instanceof String.Instance) {
-				accuracy.accuracy = 0.75;
-			} else {
-				accuracy.accuracy = 0.5;
+				return (float) jsObject.toDouble();
 			}
+			if (desiredClass == Double.TYPE) {
+				if (jsObject instanceof String.Instance) {
+					accuracy.accuracy = 0.75;
+				} else {
+					accuracy.accuracy = 0.5;
+				}
 
-			java.lang.String string = jsObject.toString();
-			return (short) Short.valueOf(string);
-		}
-		if (desiredClass == Byte.TYPE) {
-			if (jsObject instanceof String.Instance) {
-				accuracy.accuracy = 0.75;
-			} else {
-				accuracy.accuracy = 0.5;
+				return jsObject.toDouble();
 			}
+			if (desiredClass == Short.TYPE) {
+				if (jsObject instanceof String.Instance) {
+					accuracy.accuracy = 0.75;
+				} else {
+					accuracy.accuracy = 0.5;
+				}
 
-			java.lang.String string = jsObject.toString();
-			return (byte) Byte.valueOf(string);
-		}
-		if (desiredClass == Long.TYPE) {
-			if (jsObject instanceof String.Instance) {
-				accuracy.accuracy = 0.75;
-			} else {
-				accuracy.accuracy = 0.5;
+				return jsObject.toShort();
 			}
+			if (desiredClass == Byte.TYPE) {
+				if (jsObject instanceof String.Instance) {
+					accuracy.accuracy = 0.75;
+				} else {
+					accuracy.accuracy = 0.5;
+				}
 
-			java.lang.String string = jsObject.toString();
-			return (long) Long.valueOf(string);
+				return jsObject.toByte();
+			}
+			if (desiredClass == Long.TYPE) {
+				if (jsObject instanceof String.Instance) {
+					accuracy.accuracy = 0.75;
+				} else {
+					accuracy.accuracy = 0.5;
+				}
+
+				return jsObject.toLong();
+			}
 		}
 
 		if (jsObject instanceof JavaObjectWrapper && desiredClass.isInstance(((JavaObjectWrapper) jsObject).javaObject)) {
@@ -642,7 +638,7 @@ public class Utilities {
 	}
 
 	public static BaseObject get(BaseObject _this, double key) {
-		if (key >= 0 && key <= Integer.MAX_VALUE && key == (int)key) {
+		if (key >= 0 && key == (int)key) {
 			return _this.get((int)key);
 		} else {
 			return _this.get(Number.toString(key));
@@ -673,7 +669,7 @@ public class Utilities {
 	}
 
 	public static BaseObject set(BaseObject _this, double key, BaseObject val) {
-		if (key >= 0 && key <= Integer.MAX_VALUE && key == (int) key) {
+		if (key >= 0 && key == (int) key) {
 			_this.set((int)key, val);
 		} else {
 			_this.set(java.lang.String.valueOf(key), val);

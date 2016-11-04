@@ -20,8 +20,9 @@ package net.nexustools.njs;
  * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class GenericArray extends AbstractArray<BaseObject[]> {
+	private static final BaseObject[] EMPTY = new BaseObject[0];
 	public GenericArray(Global global) {
-		this(global, global.Array, 0);
+		this(global, global.Array, EMPTY);
 	}
 	public GenericArray(Global global, java.lang.Object[] array) {
 		this(global, global.Array, Utilities.convertArray(global, array));
@@ -30,7 +31,7 @@ public class GenericArray extends AbstractArray<BaseObject[]> {
 		this(global, global.Array, new BaseObject[len]);
 	}
 	public GenericArray(Global global, Array Array) {
-		this(global, Array, 0);
+		this(global, Array, EMPTY);
 	}
 	public GenericArray(Global global, Array Array, int len) {
 		super(global, Array, true, new BaseObject[len]);
