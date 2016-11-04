@@ -291,6 +291,14 @@ public abstract class RegexCompiler implements Compiler {
 				return new PlusPlus(this);
 			else if(part instanceof MinusMinus)
 				return new MinusMinus(this);
+			else if(part instanceof ShiftRight)
+				return new ShiftRight(this);
+			else if(part instanceof ShiftLeft)
+				return new ShiftLeft(this);
+			else if(part instanceof DoubleShiftRight)
+				return new DoubleShiftRight(this);
+			else if(part instanceof DoubleShiftLeft)
+				return new DoubleShiftLeft(this);
 			return super.transformFallback(part);
 		}
 		
@@ -1969,7 +1977,7 @@ public abstract class RegexCompiler implements Compiler {
 			return myself;
 		}
 	}
-	public static class MultiplyEq extends RhLh {
+	public static class MultiplyEq extends RhLhReferency {
 		public MultiplyEq() {}
 		public MultiplyEq(Parsed lhs) {
 			super(lhs);
@@ -1999,6 +2007,46 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public java.lang.String op() {
 			return "/";
+		}
+	}
+	public static class DoubleShiftLeft extends RhLhReferency implements NumberReferency {
+		public DoubleShiftLeft() {}
+		public DoubleShiftLeft(Parsed lhs) {
+			super(lhs);
+		}
+		@Override
+		public java.lang.String op() {
+			return "<<<";
+		}
+	}
+	public static class DoubleShiftRight extends RhLhReferency implements NumberReferency {
+		public DoubleShiftRight() {}
+		public DoubleShiftRight(Parsed lhs) {
+			super(lhs);
+		}
+		@Override
+		public java.lang.String op() {
+			return ">>>";
+		}
+	}
+	public static class ShiftLeft extends RhLhReferency implements NumberReferency {
+		public ShiftLeft() {}
+		public ShiftLeft(Parsed lhs) {
+			super(lhs);
+		}
+		@Override
+		public java.lang.String op() {
+			return "<<";
+		}
+	}
+	public static class ShiftRight extends RhLhReferency implements NumberReferency {
+		public ShiftRight() {}
+		public ShiftRight(Parsed lhs) {
+			super(lhs);
+		}
+		@Override
+		public java.lang.String op() {
+			return ">>";
 		}
 	}
 	public static class Equals extends RhLh {
@@ -2132,7 +2180,7 @@ public abstract class RegexCompiler implements Compiler {
 			return "instanceof";
 		}
 	}
-	public static class PlusEq extends RhLh {
+	public static class PlusEq extends RhLhReferency {
 		public PlusEq() {}
 		public PlusEq(Parsed lhs) {
 			super(lhs);
@@ -2598,6 +2646,10 @@ public abstract class RegexCompiler implements Compiler {
 	public static final Pattern LESSTHAN = Pattern.compile("^\\<");
 	public static final Pattern MOREEQUAL = Pattern.compile("^\\>=");
 	public static final Pattern LESSEQUAL = Pattern.compile("^\\<=");
+	public static final Pattern SHIFTRIGHT = Pattern.compile("^\\>\\>");
+	public static final Pattern SHIFTLEFT = Pattern.compile("^\\<\\<");
+	public static final Pattern DBLSHIFTRIGHT = Pattern.compile("^\\>\\>\\>");
+	public static final Pattern DBLSHIFTLEFT = Pattern.compile("^\\<\\<\\<");
 	public static final Pattern PLUSEQ = Pattern.compile("^\\+=");
 	public static final Pattern SEMICOLON = Pattern.compile("^;");
 	public static final Pattern NOTEQUALS = Pattern.compile("^!=");
@@ -2885,7 +2937,7 @@ public abstract class RegexCompiler implements Compiler {
 	}
 	public static class ScriptParser extends RegexParser {
 		public ScriptParser() {
-			super(NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, NUMBER, VARIABLE, VARIABLEGET, SINGLELINE_COMMENT, MULTILINE_COMMENT, DIVIDE, WHITESPACE, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, REGEX);
+			super(DBLSHIFTLEFT, DBLSHIFTRIGHT, SHIFTLEFT, SHIFTRIGHT, NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, NUMBER, VARIABLE, VARIABLEGET, SINGLELINE_COMMENT, MULTILINE_COMMENT, DIVIDE, WHITESPACE, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, REGEX);
 		}
 		@Override
 		public void match(Pattern pattern, Matcher matcher, ParserReader reader) {
@@ -2990,6 +3042,14 @@ public abstract class RegexCompiler implements Compiler {
 				throw new PartExchange(new Divide(), matcher.group().length());
 			if(pattern == MULTIPLY)
 				throw new PartExchange(new Multiply(), matcher.group().length());
+			if(pattern == SHIFTRIGHT)
+				throw new PartExchange(new ShiftRight(), matcher.group().length());
+			if(pattern == SHIFTLEFT)
+				throw new PartExchange(new ShiftLeft(), matcher.group().length());
+			if(pattern == DBLSHIFTRIGHT)
+				throw new PartExchange(new DoubleShiftRight(), matcher.group().length());
+			if(pattern == DBLSHIFTLEFT)
+				throw new PartExchange(new DoubleShiftLeft(), matcher.group().length());
 			if(pattern == EQUALS)
 				throw new PartExchange(new Equals(), matcher.group().length());
 			if(pattern == STRICTEQUALS)

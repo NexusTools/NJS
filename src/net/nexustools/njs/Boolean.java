@@ -22,8 +22,10 @@ package net.nexustools.njs;
 public class Boolean extends AbstractFunction {
 	public static class Instance extends GenericObject {
 		public final boolean value;
+		public final Number.Instance numberValue;
 		private Instance(Boolean Boolean, Number.Instance number, Global global, boolean value) {
 			super(Boolean, global);
+			numberValue = number;
 			this.value = value;
 		}
 		@Override
@@ -35,6 +37,10 @@ public class Boolean extends AbstractFunction {
 				return ((Instance)obj).value == value;
 			
 			return ((Number.Instance)obj).value == 1;
+		}
+		@Override
+		public net.nexustools.njs.Number.Instance toNumber() {
+			return numberValue;
 		}
 		@Override
 		public boolean toBool() {

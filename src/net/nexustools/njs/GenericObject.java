@@ -53,7 +53,7 @@ public class GenericObject extends NumberObject {
 	private java.lang.Object metaObject;
 	private boolean sealed, hasArrayOverride;
 	protected final Map<Symbol.Instance, BaseObject> symbols = new HashMap();
-	protected final PropertyNode[][] properties = new PropertyNode[0x100][0];
+	private PropertyNode[][] properties = new PropertyNode[0][0];
 	protected Symbol.Instance iterator;
 	protected String String;
 	
@@ -201,7 +201,14 @@ public class GenericObject extends NumberObject {
 	public final void set(java.lang.String key, final BaseObject val, BaseObject _this, Or<Void> or) {
 		int pos = 0;
 		final int index = key.hashCode() & 0xFF;
-		final PropertyNode[] nodes = properties[index];
+		PropertyNode[] nodes;
+		try {
+			nodes = properties[index];
+		} catch(ArrayIndexOutOfBoundsException ex) {
+			PropertyNode[][] newNodes = new PropertyNode[index+1][0];
+			System.arraycopy(properties, 0, newNodes, 0, properties.length);
+			nodes = (properties = newNodes)[index];
+		}
 		final int max = nodes.length;
 		for(; pos<max; pos++) {
 			PropertyNode node = nodes[pos];
@@ -226,12 +233,13 @@ public class GenericObject extends NumberObject {
 		}
 		if(or == null) {
 			final int next = pos;
+			final PropertyNode[] _nodes = nodes;
 			or = new Or<Void>() {
 				@Override
 				public Void or(java.lang.String key) {
 					PropertyNode node = new PropertyNode(key, new BasicProperty(val));
 					try {
-						nodes[next] = node;
+						_nodes[next] = node;
 					} catch(ArrayIndexOutOfBoundsException ex) {
 						grow(index, max)[next] = node;
 					}
@@ -264,7 +272,14 @@ public class GenericObject extends NumberObject {
 		assert(key != null);
 		int pos = 0;
 		final int index = key.hashCode() & 0xFF;
-		final PropertyNode[] nodes = properties[index];
+		PropertyNode[] nodes;
+		try {
+			nodes = properties[index];
+		} catch(ArrayIndexOutOfBoundsException ex) {
+			PropertyNode[][] newNodes = new PropertyNode[index+1][0];
+			System.arraycopy(properties, 0, newNodes, 0, properties.length);
+			nodes = (properties = newNodes)[index];
+		}
 		final int max = nodes.length;
 		for(; pos<max; pos++) {
 			PropertyNode node = nodes[pos];
@@ -320,23 +335,31 @@ public class GenericObject extends NumberObject {
 	public final BaseObject get(java.lang.String key, BaseObject _this, Or<BaseObject> or) {
 		int pos = 0;
 		final int index = key.hashCode() & 0xFF;
-		final PropertyNode[] nodes = properties[index];
-		final int max = nodes.length;
-		for(; pos<max; pos++) {
-			PropertyNode node = nodes[pos];
-			boolean equals;
+		while(true) {
+			final PropertyNode[] nodes;
 			try {
-				equals = node.key.equals(key);
-			} catch(NullPointerException ex) {
+				nodes = properties[index];
+			} catch(ArrayIndexOutOfBoundsException ex) {
 				break;
 			}
-			if(equals){
-				Property prop = node.property;
-				BaseFunction getter = prop.getGetter();
-				if(getter == null)
-					return prop.get();
-				return getter.call(_this);
+			final int max = nodes.length;
+			for(; pos<max; pos++) {
+				PropertyNode node = nodes[pos];
+				boolean equals;
+				try {
+					equals = node.key.equals(key);
+				} catch(NullPointerException ex) {
+					break;
+				}
+				if(equals){
+					Property prop = node.property;
+					BaseFunction getter = prop.getGetter();
+					if(getter == null)
+						return prop.get();
+					return getter.call(_this);
+				}
 			}
+			break;
 		}
 		
 		if(Utilities.isUndefined(__proto__))

@@ -191,12 +191,14 @@ public abstract class Number extends AbstractFunction {
 	}
 
 	public Instance fromValueOf(BaseObject valueOf) {
+		if(valueOf instanceof Instance && ((Instance)valueOf)._const)
+			return (Instance)valueOf;
+		if(valueOf instanceof String.Instance && ((String.Instance)valueOf)._const)
+			return ((String.Instance)valueOf).toNumber();
 		if(valueOf == Null.INSTANCE)
 			return Zero;
 		if(valueOf == Undefined.INSTANCE)
 			return NaN;
-		if(valueOf instanceof Instance && ((Instance)valueOf)._const)
-			return (Instance)valueOf;
 		return Utilities.valueOf(valueOf).toNumber();
 	}
 	

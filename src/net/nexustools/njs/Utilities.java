@@ -672,6 +672,15 @@ public class Utilities {
 		return val;
 	}
 
+	public static BaseObject set(BaseObject _this, double key, BaseObject val) {
+		if (key >= 0 && key <= Integer.MAX_VALUE && key == (int) key) {
+			_this.set((int)key, val);
+		} else {
+			_this.set(java.lang.String.valueOf(key), val);
+		}
+		return val;
+	}
+
 	public static boolean delete(BaseObject _this, BaseObject key) {
 		if (key instanceof String.Instance) {
 			return _this.delete(((String.Instance) key).string);
