@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import net.nexustools.njs.Global;
 import net.nexustools.njs.Utilities.FilePosition;
@@ -635,6 +636,8 @@ public class JavaTranspiler extends RegexCompiler {
 	private void generateLocalStackAccess(SourceBuilder sourceBuilder, java.lang.String ref, java.lang.String baseScope, LocalStack localStack) {
 		java.lang.String type;
 		if(localStack != null && (type = localStack.get(ref)) != null) {
+			if(ref.equals("this"))
+				ref = "_this";
 			if(type.equals("number")) {
 				sourceBuilder.append("global.Number.wrap(");
 				sourceBuilder.append(ref);
@@ -676,10 +679,13 @@ public class JavaTranspiler extends RegexCompiler {
 		return false;
 	}
 
+	private static final Pattern RESTRICTED_PATTERN = Pattern.compile("^(_this|__this|global|(block|catch|base)Scope\\d*)$");
 	public static class ScopeOptimizer {
 		public final ArrayList<java.lang.String> volati = new ArrayList();
 		public final HashMap<java.lang.String, java.lang.String> scope = new HashMap();
 		public void var(java.lang.String key, java.lang.String type) {
+			if(RESTRICTED_PATTERN.matcher(key).matches())
+				throw new CannotOptimize("Encountered " + key);
 			java.lang.String current = scope.get(key);
 			if(current == null || current.equals("any"))
 				scope.put(key, type);
@@ -855,12 +861,15 @@ public class JavaTranspiler extends RegexCompiler {
 				return current;
 		}
 	}
-	public static final class CannotOptimize extends RuntimeException {
-
+	private static class CannotOptimize extends RuntimeException {
 		public CannotOptimize(java.lang.String reason) {
 			super(reason);
 		}
-		
+	}
+	private static final class CannotOptimizeUnimplemented extends CannotOptimize {
+		public CannotOptimizeUnimplemented(java.lang.String reason) {
+			super(reason);
+		}
 	}
 	private void scanParsedSource(Parsed parsed, ScopeOptimizer variableScope) {
 		if(parsed instanceof Let) {
@@ -887,13 +896,29 @@ public class JavaTranspiler extends RegexCompiler {
 						variableScope.assertTyped(((Reference)argument).ref, "number", "boolean");
 					else if(argument instanceof Call)
 						scanParsedSource(argument, variableScope);
+					else if(argument instanceof RhLh) {
+						scanParsedSource(((RhLh)argument).lhs, variableScope);
+						scanParsedSource(((RhLh)argument).rhs, variableScope);
+					} else if(argument instanceof Rh)
+						scanParsedSource(((Rh)argument).rhs, variableScope);
+					else if(argument instanceof String || argument instanceof Number || argument instanceof Integer || argument instanceof Null || argument instanceof Undefined) {
+						// IGNORED
+					} else if(argument instanceof ReferenceChain)
+						throw new CannotOptimize("Encountered " + argument.getClass().getSimpleName());
 					else
-						throw new CannotOptimize("Unhandled argument: " + describe(argument));
+						throw new CannotOptimizeUnimplemented("Unhandled argument: " + describe(argument));
 				} else if(argument instanceof Equals || argument instanceof NotEquals || argument instanceof InstanceOf ||
 						argument instanceof StrictEquals || argument instanceof StrictNotEquals) {
 					// IGNORED
-				} else
-					throw new CannotOptimize("Unhandled argument: " + describe(argument));
+				}else if(argument instanceof RhLh) {
+						scanParsedSource(((RhLh)argument).lhs, variableScope);
+						scanParsedSource(((RhLh)argument).rhs, variableScope);
+				} else if(argument instanceof Rh)
+					scanParsedSource(((Rh)argument).rhs, variableScope);
+				else if(argument instanceof Function)
+					scanScriptSource(((Function)argument).impl);
+				else
+					throw new CannotOptimizeUnimplemented("Unhandled argument: " + describe(argument));
 			}
 		} else if(parsed instanceof If) {
 			scanParsedSource(((If)parsed).condition, variableScope);
@@ -932,16 +957,18 @@ public class JavaTranspiler extends RegexCompiler {
 			else
 				scanScriptSource(((While)parsed).impl, new BlockScopeOptimizer(variableScope));
 		} else if(parsed instanceof Try) {
-			//scanScriptSource(((Try)parsed).impl, variableScope);
-			//scanScriptSource(((Try)parsed).impl, variableScope);
-			throw new CannotOptimize("Try loops are not implemented yet");
+			scanScriptSource(((Try)parsed).impl, variableScope);
+			if(((Try)parsed).c != null)
+				scanScriptSource(((Try)parsed).c.impl, variableScope);
+			if(((Try)parsed).f != null)
+				scanScriptSource(((Try)parsed).f.impl, variableScope);
 		} else if(parsed instanceof BaseReferency) {
 			if(parsed instanceof PlusPlus) {
 				Parsed ref = ((PlusPlus)parsed).ref;
 				if(ref instanceof Reference) {
 					variableScope.update(((Reference)ref).ref, "number");
 				} else
-					throw new CannotOptimize("No implementation for optimizing " + describe(ref));
+					throw new CannotOptimizeUnimplemented("No implementation for optimizing " + describe(ref));
 			} else if(parsed instanceof PlusEq) {
 				Parsed ref = ((PlusEq)parsed).lhs;
 				Parsed rhs = ((PlusEq)parsed).rhs;
@@ -949,20 +976,20 @@ public class JavaTranspiler extends RegexCompiler {
 					if(ref instanceof Reference) {
 						variableScope.update(((Reference)ref).ref, "number");
 					} else
-						throw new CannotOptimize("No implementation for optimizing " + describe(ref));
+						throw new CannotOptimizeUnimplemented("No implementation for optimizing " + describe(ref));
 				}
 			} else if(parsed instanceof MultiplyEq) {
 				Parsed ref = ((MultiplyEq)parsed).lhs;
 				if(ref instanceof Reference) {
 					variableScope.update(((Reference)ref).ref, "number");
 				} else
-					throw new CannotOptimize("No implementation for optimizing " + describe(ref));
+					throw new CannotOptimizeUnimplemented("No implementation for optimizing " + describe(ref));
 			} else if(parsed instanceof MinusMinus) {
 				Parsed ref = ((MinusMinus)parsed).ref;
 				if(ref instanceof Reference) {
 					variableScope.update(((Reference)ref).ref, "number");
 				} else
-					throw new CannotOptimize("No implementation for optimizing " + describe(ref));
+					throw new CannotOptimizeUnimplemented("No implementation for optimizing " + describe(ref));
 				
 				//variableScope.update(, NUMBER_REG);
 			} else if(parsed instanceof Set) {
@@ -976,24 +1003,27 @@ public class JavaTranspiler extends RegexCompiler {
 						else
 							variableScope.update(((Reference)lhs).ref, rhs.primaryType());
 					} else if(rhs instanceof Function) {
+						for(java.lang.String arg : ((Function)rhs).arguments)
+							if(RESTRICTED_PATTERN.matcher(arg).matches())
+								throw new CannotOptimize("Encountered: " + arg);
 						scanScriptSource(((Function)rhs).impl, new FunctionScopeOptimizer(variableScope));
 					} else
-						throw new CannotOptimize("No implementation for optimizing set " + describe(rhs));
+						throw new CannotOptimizeUnimplemented("No implementation for optimizing set " + describe(rhs));
 				} else if(lhs instanceof ReferenceChain || lhs instanceof VariableReference || lhs instanceof IntegerReference) {
 					// IGNORED
 				} else
-					throw new CannotOptimize("No implementation for optimizing set " + describe(lhs));
+					throw new CannotOptimizeUnimplemented("No implementation for optimizing set " + describe(lhs));
 			} else if(parsed instanceof New || parsed instanceof Boolean || parsed instanceof String || parsed instanceof Integer || parsed instanceof ShiftLeft || parsed instanceof ShiftRight ||
 					parsed instanceof ReferenceChain || parsed instanceof Reference || parsed instanceof Number || parsed instanceof DoubleShiftLeft || parsed instanceof DoubleShiftRight) {
 				// IGNORED
 			} else
-				throw new CannotOptimize("No implementation for optimizing " + describe(parsed));
+				throw new CannotOptimizeUnimplemented("No implementation for optimizing " + describe(parsed));
 		} else if(parsed instanceof AndAnd || parsed instanceof OrOr || parsed instanceof Equals || parsed instanceof NotEquals || parsed instanceof StrictEquals || parsed instanceof StrictNotEquals || parsed instanceof Throw ||
 				parsed instanceof New || parsed instanceof Boolean || parsed instanceof String || parsed instanceof Integer || parsed instanceof LessThan || parsed instanceof MoreThan || parsed instanceof Return ||
 					parsed instanceof ReferenceChain || parsed instanceof Reference || parsed instanceof Number || parsed instanceof LessEqual || parsed instanceof MoreEqual || parsed instanceof Not) {
 			// IGNORED
 		} else
-			throw new CannotOptimize("Unhandled " + describe(parsed));
+			throw new CannotOptimizeUnimplemented("Unhandled " + describe(parsed));
 	}
 	private void scanParsedSource(Parsed[] impl, ScopeOptimizer variableScope) {
 		for(Parsed parsed : impl) {
@@ -1016,7 +1046,7 @@ public class JavaTranspiler extends RegexCompiler {
 			scanScriptSource(script, variableScope);
 			script.optimizations = variableScope.scope;
 		} catch(CannotOptimize ex) {
-			if(DEBUG)
+			if(DEBUG || ex instanceof CannotOptimizeUnimplemented)
 				ex.printStackTrace(System.out);
 		}
 	}
@@ -1319,10 +1349,13 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.indent();
 			ScopeOptimizer variableScope = new ScopeOptimizer();
 			try {
+				for(java.lang.String arg : ((Function)part).arguments)
+					if(RESTRICTED_PATTERN.matcher(arg).matches())
+						throw new CannotOptimize("Encountered: " + arg);
 				scanScriptSource(((Function)part).impl, variableScope);
 				((Function)part).impl.optimizations = variableScope.scope;
 			} catch(CannotOptimize ex) {
-				if(DEBUG)
+				if(DEBUG || ex instanceof CannotOptimizeUnimplemented)
 					ex.printStackTrace(System.out);
 			}
 			if(((Function)part).impl.optimizations == null) {
@@ -1333,7 +1366,7 @@ public class JavaTranspiler extends RegexCompiler {
 				sourceBuilder.appendln("}");
 			}
 			((Function)part).impl.callee = ((Function)part);
-			transpileScriptSource(sourceBuilder, ((Function)part).impl, methodPrefix, fileName, SourceScope.Function);
+			transpileScriptSource(sourceBuilder, ((Function)part).impl, methodPrefix, fileName, SourceScope.NewFunction);
 			sourceBuilder.unindent();
 			sourceBuilder.append("}");
 			return;
@@ -2147,14 +2180,17 @@ public class JavaTranspiler extends RegexCompiler {
 	private static enum SourceScope {
 		GlobalFunction,
 		GlobalScript,
+		NewFunction,
 		Function;
 
 		private boolean isFunction() {
-			return this == GlobalFunction || this == Function;
+			return this == GlobalFunction || this == NewFunction || this == Function;
+		}
+		private boolean isGlobal() {
+			return this == GlobalFunction || this == GlobalScript;
 		}
 	}
 	protected void transpileScriptSource(SourceBuilder sourceBuilder, ScriptData script, java.lang.String methodPrefix, java.lang.String fileName, SourceScope scope) {
-		scanScriptSource(script);
 		if(addDebugging || !scope.isFunction()) {
 			sourceBuilder.appendln("@Override");
 			sourceBuilder.appendln("public String source() {");
@@ -2167,7 +2203,7 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.appendln("}");
 		}
 		LocalStack localStack = script.optimizations == null ? null : new LocalStack();
-		if (scope == SourceScope.Function) {
+		if (!scope.isGlobal()) {
 			sourceBuilder.appendln("@Override");
 			sourceBuilder.appendln("public String name() {");
 			sourceBuilder.append("\treturn \"");
@@ -2189,6 +2225,7 @@ public class JavaTranspiler extends RegexCompiler {
 				if(script.optimizations == null)
 					sourceBuilder.appendln("\tbaseScope.var(\"arguments\", new Arguments(global, this, params));");
 				else {
+					localStack.put("this", "unknown");
 					if(!arguments.contains("arguments")) {
 						sourceBuilder.appendln("\tBaseObject arguments = new Arguments(global, this, params);");
 						localStack.put("arguments", "arguments");
@@ -2253,6 +2290,7 @@ public class JavaTranspiler extends RegexCompiler {
 			
 			sourceBuilder.appendln("\tfinal Scope baseScope = scope;");
 		}
+		
 		sourceBuilder.indent();
 		if(script.optimizations != null) {
 			for (Function function : script.functions) {
@@ -2279,6 +2317,8 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.append(fileName);
 			sourceBuilder.appendln("\", SOURCE_MAP);");
 		}
+		sourceBuilder.appendln("BaseFunction function;");
+		sourceBuilder.appendln("BaseObject __this;");
 		if(script.optimizations == null) {
 			sourceBuilder.appendln("baseScope.enter();");
 			sourceBuilder.appendln("try {");
@@ -2332,7 +2372,7 @@ public class JavaTranspiler extends RegexCompiler {
 		
 		for (Function function : script.functions) {
 			java.lang.String functionName;
-			if(scope != SourceScope.Function)
+			if(scope != SourceScope.NewFunction)
 				sourceBuilder.append("private static final ");
 			sourceBuilder.append("class ");
 			if(function.uname == null)
@@ -2343,10 +2383,13 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.appendln("private final Scope baseScope;");
 			ScopeOptimizer variableScope = new ScopeOptimizer();
 			try {
+				for(java.lang.String arg : function.arguments)
+					if(RESTRICTED_PATTERN.matcher(arg).matches())
+						throw new CannotOptimize("Encountered: " + arg);
 				scanScriptSource(function.impl, variableScope);
 				function.impl.optimizations = variableScope.scope;
 			} catch(CannotOptimize ex) {
-				if(DEBUG)
+				if(DEBUG || ex instanceof CannotOptimizeUnimplemented)
 					ex.printStackTrace(System.out);
 			}
 			if(script.optimizations == null) {
@@ -2361,7 +2404,7 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.appendln("\tbaseScope = scope;");
 			sourceBuilder.appendln("}");
 
-			transpileScriptSource(sourceBuilder, function.impl, methodPrefix, fileName, SourceScope.Function);
+			transpileScriptSource(sourceBuilder, function.impl, methodPrefix, fileName, scope == SourceScope.NewFunction ? SourceScope.NewFunction : SourceScope.Function);
 
 			sourceBuilder.unindent();
 			sourceBuilder.appendln("}");
@@ -2369,7 +2412,10 @@ public class JavaTranspiler extends RegexCompiler {
 		
 		if(addDebugging) {
 			sourceBuilder.appendln("@SuppressWarnings(\"all\")");
-			sourceBuilder.append("public final Map<Integer, Utilities.FilePosition> SOURCE_MAP = Collections.unmodifiableMap(new LinkedHashMap()");
+			sourceBuilder.append("public");
+			if(scope != SourceScope.NewFunction)
+				sourceBuilder.append(" static");
+			sourceBuilder.append(" final Map<Integer, Utilities.FilePosition> SOURCE_MAP = Collections.unmodifiableMap(new LinkedHashMap()");
 			if(!sourceMap.isEmpty()) {
 				sourceBuilder.appendln(" {");
 				sourceBuilder.appendln("\t{");
@@ -2433,6 +2479,8 @@ public class JavaTranspiler extends RegexCompiler {
 		sourceBuilder.indent();
 
 		try {
+			if(inFunction)
+				scanScriptSource(script);
 			transpileScriptSource(sourceBuilder, script, script.methodName, fileName, inFunction ? SourceScope.GlobalFunction : SourceScope.GlobalScript);
 		} catch(RuntimeException t) {
 			System.err.println(sourceBuilder.toString());

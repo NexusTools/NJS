@@ -558,7 +558,7 @@ public class GenericObject extends NumberObject {
 				Iterator it = iterator();
 				while(it.hasNext())
 					size ++;
-				return size + arrayOverride.length(GenericObject.this);
+				return size;
 			}
 		};
 	}

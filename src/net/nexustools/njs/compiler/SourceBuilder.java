@@ -21,47 +21,49 @@ package net.nexustools.njs.compiler;
  */
 public class SourceBuilder {
 
-        java.lang.String indent = "";
-        StringBuilder builder = new StringBuilder();
-		int row = 1;
-		
-		public int row() {
-			return row;
+	java.lang.String indent = "";
+	StringBuilder builder = new StringBuilder();
+	int row = 1;
+
+	public int row() {
+		return row;
+	}
+
+	public void append(java.lang.String source) {
+		assert (source.indexOf('\n') == -1);
+		builder.append(source);
+	}
+
+	public void appendln(java.lang.String source) {
+		append(source);
+		builder.append('\n');
+		builder.append(indent);
+		row++;
+	}
+
+	public void appendln() {
+		builder.append('\n');
+		builder.append(indent);
+		row++;
+	}
+
+	public void indent() {
+		indent += '\t';
+		if (Character.isWhitespace(builder.charAt(builder.length() - 1))) {
+			builder.append('\t');
 		}
+	}
 
-        public void append(java.lang.String source) {
-                assert (source.indexOf('\n') == -1);
-                builder.append(source);
-        }
+	public void unindent() {
+		int pos = builder.length() - 1;
+		indent = indent.substring(0, indent.length() - 1);
+		if (Character.isWhitespace(builder.charAt(pos))) {
+			builder.deleteCharAt(pos);
+		}
+	}
 
-        public void appendln(java.lang.String source) {
-                append(source);
-                builder.append('\n');
-                builder.append(indent);
-				row++;
-        }
-
-        public void appendln() {
-                builder.append('\n');
-                builder.append(indent);
-				row++;
-        }
-
-        public void indent() {
-                indent += '\t';
-                if(Character.isWhitespace(builder.charAt(builder.length() - 1)))
-                        builder.append('\t');
-        }
-
-        public void unindent() {
-                int pos = builder.length() - 1;
-                indent = indent.substring(0, indent.length() - 1);
-                if(Character.isWhitespace(builder.charAt(pos)))
-                        builder.deleteCharAt(pos);
-        }
-
-        @Override
-        public java.lang.String toString() {
-                return builder.toString(); //To change body of generated methods, choose Tools | Templates.
-        }
+	@Override
+	public java.lang.String toString() {
+		return builder.toString(); //To change body of generated methods, choose Tools | Templates.
+	}
 }
