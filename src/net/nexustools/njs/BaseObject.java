@@ -207,4 +207,5 @@ public interface BaseObject extends Scopeable, Iterable<BaseObject> {
 	public java.lang.Object getMetaObject();
 	
 	public Iterator<java.lang.String> deepPropertyNameIterator();
+	public String.Instance _toString();
 }

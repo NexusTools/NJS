@@ -31,6 +31,7 @@ public class JavaPackageWrapper implements BaseObject {
 	private final java.lang.String pkg;
 	private final BaseFunction valueOf;
 	private final BaseFunction toString;
+	private final String.Instance _toString;
 	private final ArrayList<WeakReference<JavaPackageWrapper>> cache = new ArrayList();
 	public JavaPackageWrapper(final Global global) {
 		this(global, "");
@@ -39,7 +40,7 @@ public class JavaPackageWrapper implements BaseObject {
 		this.global = global;
 		this.pkg = pkg;
 		
-		final String.Instance _toString = global.wrap("package " + pkg);
+		_toString = global.wrap("package " + pkg);
 		valueOf = new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
@@ -366,6 +367,16 @@ public class JavaPackageWrapper implements BaseObject {
 	@Override
 	public boolean toBool() {
 		return true;
+	}
+
+	@Override
+	public String.Instance _toString() {
+		return _toString;
+	}
+
+	@Override
+	public java.lang.String toString() {
+		return _toString.toString();
 	}
 	
 }

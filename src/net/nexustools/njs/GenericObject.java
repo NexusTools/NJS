@@ -718,12 +718,22 @@ public class GenericObject extends NumberObject {
 	}
 
 	@Override
+	public String.Instance _toString() {
+		String.Instance string;
+		try {
+			string = String.from(((BaseFunction)get("toString")).call(this));
+		} catch(Throwable t) {
+			string = String.wrap("");
+		}
+		return string;
+	}
+
+	@Override
 	public java.lang.String toString() {
 		try {
 			return ((BaseFunction)get("toString")).call(this).toString();
-		} catch(RuntimeException ex) {
-			System.err.println(getClass());
-			throw ex;
+		} catch(Throwable t) {
+			return "";
 		}
 	}
 

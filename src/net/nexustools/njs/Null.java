@@ -303,6 +303,11 @@ public final class Null implements BaseObject {
 	public boolean toBool() {
 		return false;
 	}
+
+	@Override
+	public String.Instance _toString() {
+		throw new UnsupportedOperationException("Not supported");
+	}
 	
 	
 }

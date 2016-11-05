@@ -303,5 +303,10 @@ public final class Undefined implements BaseObject {
 	public boolean toBool() {
 		return false;
 	}
+
+	@Override
+	public String.Instance _toString() {
+		throw new UnsupportedOperationException("Not supported");
+	}
 	
 }
