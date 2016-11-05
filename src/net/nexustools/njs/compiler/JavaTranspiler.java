@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import net.nexustools.njs.Global;
 import net.nexustools.njs.Utilities.FilePosition;
 import static net.nexustools.njs.compiler.RegexCompiler.DEBUG;
 
