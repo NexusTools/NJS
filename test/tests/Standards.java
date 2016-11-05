@@ -66,12 +66,15 @@ public class Standards {
 			try {
 				compiler.compile(new InputStreamReader(Standards.class.getResourceAsStream("/tests/standards/" + name + ".js")), name + ".js", false).exec(Utilities.createExtendedGlobal(), null);
 			} catch(net.nexustools.njs.Error.ConvertedException re) {
+				((net.nexustools.njs.Error.ConvertedException)re).printOriginalStackTrace();
 				re.printStackTrace();
 				throw re;
 			} catch(java.lang.RuntimeException re) {
+				re.printStackTrace();
 				System.err.println(Utilities.extractStack(re.toString(), re));
 				throw re;
 			} catch(java.lang.Error e) {
+				e.printStackTrace();
 				System.err.println(Utilities.extractStack(e.toString(), e));
 				throw e;
 			}

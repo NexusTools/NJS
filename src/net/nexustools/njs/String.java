@@ -70,8 +70,16 @@ public class String extends AbstractFunction {
 			return false;
 		}
 		@Override
+		public int hashCode() {
+			return string.hashCode();
+		}
+		@Override
 		public Instance clone() {
 			return new Instance((Number.Instance)getDirectly("length"), Number, iterator, String, string);
+		}
+		@Override
+		public Instance _toString() {
+			return this;
 		}
 		@Override
 		public java.lang.String toString() {

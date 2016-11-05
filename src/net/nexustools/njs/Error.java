@@ -35,6 +35,10 @@ public class Error extends AbstractFunction implements BaseFunction {
 			super(message, cause);
 		}
 
+		public void printOriginalStackTrace() {
+			super.printStackTrace(System.err);
+		}
+
 		@Override
 		public void printStackTrace(final PrintStream s) {
 			printStackTrace((Appendable)s);

@@ -41,6 +41,7 @@ import static net.nexustools.njs.compiler.RegexCompiler.DEBUG;
  * @author Katelyn Slater <ktaeyln@gmail.com>
  */
 public class JavaTranspiler extends RegexCompiler {
+	public static final boolean DUMP_SOURCE = DEBUG;
 	private static final List<java.lang.String> RESTRICTED_NAMES = Arrays.asList(new java.lang.String[]{
 		"abstract",     "assert",        "boolean",      "break",           "byte",
 		"case",         "catch",         "char",         "class",           "const",
@@ -151,10 +152,6 @@ public class JavaTranspiler extends RegexCompiler {
 			} catch(NumberFormatException ex) {
 				sourceBuilder.append("Double.NaN");
 			}
-		} else if (part instanceof DoubleShiftLeft) {
-			Parsed lhs = ((DoubleShiftLeft)part).lhs;
-			Parsed rhs = ((DoubleShiftLeft)part).rhs;
-			generateMath(sourceBuilder, lhs, rhs, "<<<", methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap, false);
 		} else if (part instanceof DoubleShiftRight) {
 			Parsed lhs = ((DoubleShiftRight)part).lhs;
 			Parsed rhs = ((DoubleShiftRight)part).rhs;
@@ -323,7 +320,7 @@ public class JavaTranspiler extends RegexCompiler {
 			if((lhs instanceof StringReferency && !isNumber(lhs, localStack)) || (rhs instanceof StringReferency && !isNumber(rhs, localStack))) {
 				if(lhs instanceof String && ((String)lhs).string.isEmpty()) {
 					if(wrapAsBaseObject) {
-						generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
+						transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
 						sourceBuilder.append("._toString()");
 					} else
 						generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
@@ -332,22 +329,20 @@ public class JavaTranspiler extends RegexCompiler {
 				
 				if(wrapAsBaseObject)
 					sourceBuilder.append("global.wrap(");
-				else
-					sourceBuilder.append("(");
 				generateStringSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
 				sourceBuilder.append(" + ");
 				generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
-				sourceBuilder.append(")");
+				if(wrapAsBaseObject)
+					sourceBuilder.append(")");
 				return;
 			} else if(((lhs instanceof Plus && ((Plus)lhs).isStringReferenceChain()) || (rhs instanceof Plus && ((Plus)rhs).isStringReferenceChain()))) {
 				if(wrapAsBaseObject) 
 					sourceBuilder.append("global.wrap(");
-				else
-					sourceBuilder.append("(");
 				generateStringSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
 				sourceBuilder.append(" + ");
 				generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
-				sourceBuilder.append(")");
+				if(wrapAsBaseObject)
+					sourceBuilder.append(")");
 				return;
 			} else if((!(lhs instanceof NumberReferency) && !(rhs instanceof NumberReferency))) {
 				if(!wrapAsBaseObject)
@@ -365,8 +360,6 @@ public class JavaTranspiler extends RegexCompiler {
 		
 		if(wrapAsBaseObject)
 			sourceBuilder.append("global.wrap(");
-		else
-			sourceBuilder.append("(");
 		boolean andOrOr = op.equals("|") || op.equals("&") || op.startsWith("<") || op.startsWith(">");
 		if(andOrOr)
 			generateIntegerSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
@@ -377,7 +370,8 @@ public class JavaTranspiler extends RegexCompiler {
 			generateIntegerSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
 		else
 			generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap);
-		sourceBuilder.append(")");
+		if(wrapAsBaseObject)
+			sourceBuilder.append(")");
 	}
 
 	private void generateIfBlockSource(SourceBuilder sourceBuilder, Else els, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, HashMap<java.lang.String, java.lang.String> expectedStack, Map<java.lang.Integer, FilePosition> sourceMap) {
@@ -973,6 +967,29 @@ public class JavaTranspiler extends RegexCompiler {
 				scanScriptSource(((Try)parsed).c.impl, variableScope);
 			if(((Try)parsed).f != null)
 				scanScriptSource(((Try)parsed).f.impl, variableScope);
+		} else if(parsed instanceof OpenBracket) {
+			scanParsedSource(((OpenBracket)parsed).contents, variableScope);
+		} else if(parsed instanceof VariableReference) {
+			scanParsedSource(((VariableReference)parsed).ref, variableScope);
+			scanParsedSource(((VariableReference)parsed).lhs, variableScope);
+		} else if(parsed instanceof New) {
+			scanParsedSource(((New)parsed).reference, variableScope);
+			if(((New)parsed).arguments != null)
+				for(Parsed entry : ((New)parsed).arguments)
+					scanParsedSource(entry, variableScope);
+		} else if(parsed instanceof OpenArray) {
+			for(Parsed entry : ((OpenArray)parsed).entries)
+				scanParsedSource(entry, variableScope);
+		} else if(parsed instanceof RightReference) {
+			scanParsedSource(((RightReference)parsed).ref, variableScope);
+		} else if(parsed instanceof Reference || parsed instanceof ReferenceChain || parsed instanceof Integer || parsed instanceof Boolean ||
+				parsed instanceof Number || parsed instanceof String || parsed instanceof Null || parsed instanceof Undefined) {
+			// IGNORED
+		} else if(parsed instanceof RhLh) {
+			scanParsedSource(((RhLh)parsed).lhs, variableScope);
+			scanParsedSource(((RhLh)parsed).rhs, variableScope);
+		} else if(parsed instanceof Rh) {
+			scanParsedSource(((Rh)parsed).rhs, variableScope);
 		} else if(parsed instanceof BaseReferency) {
 			if(parsed instanceof PlusPlus) {
 				Parsed ref = ((PlusPlus)parsed).ref;
@@ -1024,15 +1041,8 @@ public class JavaTranspiler extends RegexCompiler {
 					// IGNORED
 				} else
 					throw new CannotOptimizeUnimplemented("No implementation for optimizing set " + describe(lhs));
-			} else if(parsed instanceof New || parsed instanceof Boolean || parsed instanceof String || parsed instanceof Integer || parsed instanceof ShiftLeft || parsed instanceof ShiftRight ||
-					parsed instanceof ReferenceChain || parsed instanceof Reference || parsed instanceof Number || parsed instanceof DoubleShiftLeft || parsed instanceof DoubleShiftRight) {
-				// IGNORED
 			} else
 				throw new CannotOptimizeUnimplemented("No implementation for optimizing " + describe(parsed));
-		} else if(parsed instanceof AndAnd || parsed instanceof OrOr || parsed instanceof Equals || parsed instanceof NotEquals || parsed instanceof StrictEquals || parsed instanceof StrictNotEquals || parsed instanceof Throw ||
-				parsed instanceof New || parsed instanceof Boolean || parsed instanceof String || parsed instanceof Integer || parsed instanceof LessThan || parsed instanceof MoreThan || parsed instanceof Return ||
-					parsed instanceof ReferenceChain || parsed instanceof Reference || parsed instanceof Number || parsed instanceof LessEqual || parsed instanceof MoreEqual || parsed instanceof Not) {
-			// IGNORED
 		} else
 			throw new CannotOptimizeUnimplemented("Unhandled " + describe(parsed));
 	}
@@ -1343,11 +1353,6 @@ public class JavaTranspiler extends RegexCompiler {
 			return;
 		} else if (part instanceof Reference) {
 			generateLocalStackAccess(sourceBuilder, ((Reference) part).ref, baseScope, localStack);
-			return;
-		} else if (part instanceof DoubleShiftLeft) {
-			Parsed lhs = ((DoubleShiftLeft)part).lhs;
-			Parsed rhs = ((DoubleShiftLeft)part).rhs;
-			generateMath(sourceBuilder, lhs, rhs, "<<<", methodPrefix, baseScope, fileName, localStack, expectedStack, sourceMap, !atTop);
 			return;
 		} else if (part instanceof DoubleShiftRight) {
 			Parsed lhs = ((DoubleShiftRight)part).lhs;
@@ -2658,7 +2663,7 @@ public class JavaTranspiler extends RegexCompiler {
 		final java.lang.String source = transpileJavaClassSource(script, className, fileName, "net.nexustools.njs.gen", inFunction, false);
 		final java.lang.String classPath = "net.nexustools.njs.gen." + className;
 
-		if(DEBUG)
+		if(DUMP_SOURCE)
 			System.out.println(source);
 		
 		try {

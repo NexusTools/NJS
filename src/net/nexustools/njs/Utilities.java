@@ -284,9 +284,9 @@ public class Utilities {
 					accuracy.accuracy = 1;
 					return ((Int8Array.Instance)jsObject).arrayStorage;
 				} else if(jsObject instanceof String.Instance) {
-					accuracy.accuracy = 0.75;
+					accuracy.accuracy = 0.8;
 				} else {
-					accuracy.accuracy = 0.5;
+					accuracy.accuracy = 0.35;
 				}
 				
 				return jsObject.toString().getBytes();
@@ -299,9 +299,9 @@ public class Utilities {
 			if (jsObject instanceof String.Instance) {
 				accuracy.accuracy = 1;
 			} else if (jsObject instanceof Number.Instance) {
-				accuracy.accuracy = 0.75;
+				accuracy.accuracy = 0.85;
 			} else {
-				accuracy.accuracy = 0.5;
+				accuracy.accuracy = 0.7;
 			}
 			return jsObject.toString();
 		}
@@ -338,39 +338,49 @@ public class Utilities {
 		}
 
 		if (jsObject instanceof Number.Instance) {
-			accuracy.accuracy = 1;
 			double value = ((Number.Instance) jsObject).value;
 			if (desiredClass == Long.class) {
+				accuracy.accuracy = 1;
 				return (Long) (long) value;
 			}
 			if (desiredClass == Integer.class) {
+				accuracy.accuracy = 1;
 				return (Integer) (int) value;
 			}
 			if (desiredClass == Float.class) {
+				accuracy.accuracy = 1;
 				return (Float) (float) value;
 			}
 			if (desiredClass == Double.class) {
+				accuracy.accuracy = 1;
 				return (Double) value;
 			}
 			if (desiredClass == Short.class) {
+				accuracy.accuracy = 1;
 				return (Short) (short) value;
 			}
 			if (desiredClass == Byte.class) {
+				accuracy.accuracy = 1;
 				return (Byte) (byte) value;
 			}
 			if (desiredClass == Integer.TYPE) {
+				accuracy.accuracy = 1;
 				return (int) value;
 			}
 			if (desiredClass == Float.TYPE) {
+				accuracy.accuracy = 1;
 				return (float) value;
 			}
 			if (desiredClass == Double.TYPE) {
+				accuracy.accuracy = 1;
 				return value;
 			}
 			if (desiredClass == Short.TYPE) {
+				accuracy.accuracy = 1;
 				return (short) value;
 			}
 			if (desiredClass == Byte.TYPE) {
+				accuracy.accuracy = 1;
 				return (byte) value;
 			}
 		} else {

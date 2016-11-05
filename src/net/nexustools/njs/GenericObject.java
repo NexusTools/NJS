@@ -719,13 +719,14 @@ public class GenericObject extends NumberObject {
 
 	@Override
 	public String.Instance _toString() {
-		String.Instance string;
 		try {
-			string = String.from(((BaseFunction)get("toString")).call(this));
+			BaseObject ret = ((BaseFunction)get("toString")).call(this);
+			if(ret instanceof String.Instance)
+				return (String.Instance)ret;
+			return String.from(ret);
 		} catch(Throwable t) {
-			string = String.wrap("");
+			return String.wrap("");
 		}
-		return string;
 	}
 
 	@Override

@@ -183,6 +183,7 @@ public abstract class RegexCompiler implements Compiler {
 	public static interface NumberReferency {}
 	public static interface StringReferency {}
 	public static interface BaseReferency {
+		public int precedence();
 		public Parsed transformFallback(Parsed part);
 	}
 	public static abstract class PrimitiveReferency extends Parsed implements BaseReferency {
@@ -298,8 +299,6 @@ public abstract class RegexCompiler implements Compiler {
 				return new ShiftLeft(this);
 			else if(part instanceof DoubleShiftRight)
 				return new DoubleShiftRight(this);
-			else if(part instanceof DoubleShiftLeft)
-				return new DoubleShiftLeft(this);
 			return super.transformFallback(part);
 		}
 		
@@ -358,6 +357,11 @@ public abstract class RegexCompiler implements Compiler {
 				builder.append(']');
 			return builder.toString();
 		}
+
+		@Override
+		public int precedence() {
+			return 19;
+		}
 		
 	}
 	public static class Reference extends Referency {
@@ -377,8 +381,13 @@ public abstract class RegexCompiler implements Compiler {
 			chain.chain.add(reference.ref);
 			return chain;
 		}
+
+		@Override
+		public int precedence() {
+			return 19;
+		}
 	}
-	public static class OrOr extends RhLh {
+	public static class OrOr extends RhLhReferency {
 		public OrOr() {}
 		public OrOr(Parsed lhs) {
 			super(lhs);
@@ -387,8 +396,12 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String op() {
 			return "||";
 		}
+		@Override
+		public int precedence() {
+			return 5;
+		}
 	}
-	public static class AndAnd extends RhLh {
+	public static class AndAnd extends RhLhReferency {
 		public AndAnd() {}
 		public AndAnd(Parsed lhs) {
 			super(lhs);
@@ -396,6 +409,10 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public java.lang.String op() {
 			return "&&";
+		}
+		@Override
+		public int precedence() {
+			return 6;
 		}
 	}
 	public static class Colon extends Helper {
@@ -448,6 +465,10 @@ public abstract class RegexCompiler implements Compiler {
 			}
 			return this;
 		}
+		@Override
+		public int precedence() {
+			return 19;
+		}
 	}
 	public static class RightReference extends Referency {
 		public final Parsed ref;
@@ -470,6 +491,10 @@ public abstract class RegexCompiler implements Compiler {
 		public Referency extend(DirectReference reference) {
 			chain.add(reference.ref);
 			return this;
+		}
+		@Override
+		public int precedence() {
+			return 19;
 		}
 	}
 	public static class Call extends Referency {
@@ -547,6 +572,10 @@ public abstract class RegexCompiler implements Compiler {
 				throw new Error.JavaException("SyntaxError", "Unexpected EOF");
 			return this;
 		}
+		@Override
+		public int precedence() {
+			return 18;
+		}
 	}
 	public static class Return extends Rh {
 		public Return() {}
@@ -578,6 +607,10 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public java.lang.String op() {
 			return "typeof";
+		}
+		@Override
+		public int precedence() {
+			return 16;
 		}
 	}
 	public static class Yield extends Rh {
@@ -621,6 +654,10 @@ public abstract class RegexCompiler implements Compiler {
 		public Referency extend(DirectReference reference) {
 			chain.add(reference.ref);
 			return this;
+		}
+		@Override
+		public int precedence() {
+			return 19;
 		}
 	}
 	public static class OpenBracket extends Referency {
@@ -702,6 +739,10 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public java.lang.String primaryType() {
 			return contents.primaryType();
+		}
+		@Override
+		public int precedence() {
+			return 20;
 		}
 
 	}
@@ -1025,6 +1066,10 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public boolean isBoolean() {
 			return true;
+		}
+		@Override
+		public int precedence() {
+			return -1;
 		}
 	}
 	public static class Finally extends Block {
@@ -1408,6 +1453,10 @@ public abstract class RegexCompiler implements Compiler {
 			
 			return this;
 		}
+		@Override
+		public int precedence() {
+			return -1;
+		}
 	}
 	public static class CloseGroup extends Helper {
 		public CloseGroup() {}
@@ -1475,6 +1524,10 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String primaryType() {
 			return "array";
 		}
+		@Override
+		public int precedence() {
+			return -1;
+		}
 	}
 	public static class CloseArray extends Helper {
 		public CloseArray() {}
@@ -1496,12 +1549,20 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String toSource() {
 			return "null";
 		}
+		@Override
+		public int precedence() {
+			return -1;
+		}
 	}
 	public static class Undefined extends VolatileReferency {
 		public Undefined() {}
 		@Override
 		public java.lang.String toSource() {
 			return "undefined";
+		}
+		@Override
+		public int precedence() {
+			return -1;
 		}
 	}
 	public static class Function extends Parsed {
@@ -1796,49 +1857,200 @@ public abstract class RegexCompiler implements Compiler {
 				return this;
 			}
 			
-			if(part instanceof InstanceOf)
+			boolean useRhs = rhs instanceof Rh && rhs instanceof BaseReferency;
+			int precedence = useRhs ? ((BaseReferency)rhs).precedence() : precedence();
+			
+			if(part instanceof InstanceOf) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new InstanceOf(rhs);
+					return this;
+				}
 				return new InstanceOf(this);
-			else if(part instanceof MoreThan)
+			} else if(part instanceof MoreThan) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new MoreThan(rhs);
+					return this;
+				}
 				return new MoreThan(this);
-			else if(part instanceof LessThan)
+			} else if(part instanceof LessThan) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new LessThan(rhs);
+					return this;
+				}
 				return new LessThan(this);
-			else if(part instanceof MoreEqual)
+			} else if(part instanceof MoreEqual) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new MoreEqual(rhs);
+					return this;
+				}
 				return new MoreEqual(this);
-			else if(part instanceof LessEqual)
+			} else if(part instanceof LessEqual) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new LessEqual(rhs);
+					return this;
+				}
 				return new LessEqual(this);
-			else if(part instanceof StrictEquals)
+			} else if(part instanceof StrictEquals) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new StrictEquals(rhs);
+					return this;
+				}
 				return new StrictEquals(this);
-			else if(part instanceof NotEquals)
+			} else if(part instanceof NotEquals) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new NotEquals(rhs);
+					return this;
+				}
 				return new NotEquals(this);
-			else if(part instanceof StrictNotEquals)
+			} else if(part instanceof StrictNotEquals) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new StrictNotEquals(rhs);
+					return this;
+				}
 				return new StrictNotEquals(this);
-			else if(part instanceof Equals)
+			} else if(part instanceof Equals) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new Equals(rhs);
+					return this;
+				}
 				return new Equals(this);
-			else if(part instanceof Multiply) {
-				if(this instanceof Divide)
-					return new Multiply(this);
-				rhs = new Multiply(rhs);
-				return this;
+			} else if(part instanceof Multiply) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new Multiply(rhs);
+					return this;
+				}
+				return new Multiply(this);
 			} else if(part instanceof Divide) {
-				rhs = new Divide(rhs);
-				return this;
-			} else if(part instanceof Plus)
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new Divide(rhs);
+					return this;
+				}
+				return new Divide(this);
+			} else if(part instanceof Plus) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new Plus(rhs);
+					return this;
+				}
 				return new Plus(this);
-			else if(part instanceof Minus)
+			} else if(part instanceof Minus) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new Minus(rhs);
+					return this;
+				}
 				return new Minus(this);
-			else if(part instanceof Set)
+			} else if(part instanceof Set) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new Set(rhs);
+					return this;
+				}
 				return new Set(this);
-			else if(part instanceof Percent)
+			} else if(part instanceof Percent) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new Percent(rhs);
+					return this;
+				}
 				return new Percent(this);
-			else if(part instanceof And)
+			} else if(part instanceof And) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new And(rhs);
+					return this;
+				}
 				return new And(this);
-			else if(part instanceof Or)
+			} else if(part instanceof Or) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new Or(rhs);
+					return this;
+				}
 				return new Or(this);
-			else if(part instanceof AndAnd)
+			} else if(part instanceof AndAnd) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new AndAnd(rhs);
+					return this;
+				}
 				return new AndAnd(this);
-			else if(part instanceof OrOr)
+			} else if(part instanceof OrOr) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new OrOr(rhs);
+					return this;
+				}
 				return new OrOr(this);
-			else if(part instanceof Number && ((Number)part).value < 0)
+			} else if(part instanceof Number && ((Number)part).value < 0)
 				return new Minus(this, new Number(-((Number)part).value));
 			else if(part instanceof Integer && ((Integer)part).value < 0)
 				return new Minus(this, new Number(-((Integer)part).value));
@@ -1903,47 +2115,200 @@ public abstract class RegexCompiler implements Compiler {
 				return this;
 			}
 			
-			if(part instanceof InstanceOf)
+			boolean useRhs = rhs instanceof Rh && rhs instanceof BaseReferency;
+			int precedence = useRhs ? ((BaseReferency)rhs).precedence() : precedence();
+			
+			if(part instanceof InstanceOf) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new InstanceOf(rhs);
+					return this;
+				}
 				return new InstanceOf(this);
-			else if(part instanceof MoreThan)
+			} else if(part instanceof MoreThan) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new MoreThan(rhs);
+					return this;
+				}
 				return new MoreThan(this);
-			else if(part instanceof LessThan)
+			} else if(part instanceof LessThan) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new LessThan(rhs);
+					return this;
+				}
 				return new LessThan(this);
-			else if(part instanceof MoreEqual)
+			} else if(part instanceof MoreEqual) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new MoreEqual(rhs);
+					return this;
+				}
 				return new MoreEqual(this);
-			else if(part instanceof LessEqual)
+			} else if(part instanceof LessEqual) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new LessEqual(rhs);
+					return this;
+				}
 				return new LessEqual(this);
-			else if(part instanceof StrictEquals)
+			} else if(part instanceof StrictEquals) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new StrictEquals(rhs);
+					return this;
+				}
 				return new StrictEquals(this);
-			else if(part instanceof NotEquals)
+			} else if(part instanceof NotEquals) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new NotEquals(rhs);
+					return this;
+				}
 				return new NotEquals(this);
-			else if(part instanceof StrictNotEquals)
+			} else if(part instanceof StrictNotEquals) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new StrictNotEquals(rhs);
+					return this;
+				}
 				return new StrictNotEquals(this);
-			else if(part instanceof Equals)
+			} else if(part instanceof Equals) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new Equals(rhs);
+					return this;
+				}
 				return new Equals(this);
-			else if(part instanceof Multiply) {
-				rhs = new Multiply(rhs);
-				return this;
+			} else if(part instanceof Multiply) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new Multiply(rhs);
+					return this;
+				}
+				return new Multiply(this);
 			} else if(part instanceof Divide) {
-				rhs = new Divide(rhs);
-				return this;
-			} else if(part instanceof Plus)
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new Divide(rhs);
+					return this;
+				}
+				return new Divide(this);
+			} else if(part instanceof Plus) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new Plus(rhs);
+					return this;
+				}
 				return new Plus(this);
-			else if(part instanceof Minus)
+			} else if(part instanceof Minus) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new Minus(rhs);
+					return this;
+				}
 				return new Minus(this);
-			else if(part instanceof Set)
+			} else if(part instanceof Set) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new Set(rhs);
+					return this;
+				}
 				return new Set(this);
-			else if(part instanceof Percent)
+			} else if(part instanceof Percent) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new Percent(rhs);
+					return this;
+				}
 				return new Percent(this);
-			else if(part instanceof And)
+			} else if(part instanceof And) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new And(rhs);
+					return this;
+				}
 				return new And(this);
-			else if(part instanceof Or)
+			} else if(part instanceof Or) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new Or(rhs);
+					return this;
+				}
 				return new Or(this);
-			else if(part instanceof AndAnd)
+			} else if(part instanceof AndAnd) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new AndAnd(rhs);
+					return this;
+				}
 				return new AndAnd(this);
-			else if(part instanceof OrOr)
+			} else if(part instanceof OrOr) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new OrOr(rhs);
+					return this;
+				}
 				return new OrOr(this);
-			else if(part instanceof Number && ((Number)part).value < 0)
+			} else if(part instanceof Number && ((Number)part).value < 0)
 				return new Minus(this, new Number(-((Number)part).value));
 			else if(part instanceof Integer && ((Integer)part).value < 0)
 				return new Minus(this, new Number(-((Integer)part).value));
@@ -1985,6 +2350,10 @@ public abstract class RegexCompiler implements Compiler {
 				((Function)rhs).name = lhs.toSource();
 			return myself;
 		}
+		@Override
+		public int precedence() {
+			return 3;
+		}
 	}
 	public static class MultiplyEq extends RhLhReferency {
 		public MultiplyEq() {}
@@ -1997,6 +2366,11 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String op() {
 			return "*=";
 		}
+
+		@Override
+		public int precedence() {
+			return 3;
+		}
 	}
 	public static class Multiply extends RhLhReferency implements NumberReferency {
 		public Multiply() {}
@@ -2006,6 +2380,10 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public java.lang.String op() {
 			return "*";
+		}
+		@Override
+		public int precedence() {
+			return 14;
 		}
 	}
 	public static class Divide extends RhLhReferency implements NumberReferency {
@@ -2017,15 +2395,9 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String op() {
 			return "/";
 		}
-	}
-	public static class DoubleShiftLeft extends RhLhReferency implements NumberReferency {
-		public DoubleShiftLeft() {}
-		public DoubleShiftLeft(Parsed lhs) {
-			super(lhs);
-		}
 		@Override
-		public java.lang.String op() {
-			return "<<<";
+		public int precedence() {
+			return 14;
 		}
 	}
 	public static class DoubleShiftRight extends RhLhReferency implements NumberReferency {
@@ -2037,6 +2409,10 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String op() {
 			return ">>>";
 		}
+		@Override
+		public int precedence() {
+			return 12;
+		}
 	}
 	public static class ShiftLeft extends RhLhReferency implements NumberReferency {
 		public ShiftLeft() {}
@@ -2046,6 +2422,10 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public java.lang.String op() {
 			return "<<";
+		}
+		@Override
+		public int precedence() {
+			return 12;
 		}
 	}
 	public static class ShiftRight extends RhLhReferency implements NumberReferency {
@@ -2057,8 +2437,12 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String op() {
 			return ">>";
 		}
+		@Override
+		public int precedence() {
+			return 12;
+		}
 	}
-	public static class Equals extends RhLh {
+	public static class Equals extends RhLhReferency {
 		public Equals() {}
 		public Equals(Parsed lhs) {
 			super(lhs);
@@ -2067,8 +2451,12 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String op() {
 			return "==";
 		}
+		@Override
+		public int precedence() {
+			return 10;
+		}
 	}
-	public static class NotEquals extends RhLh {
+	public static class NotEquals extends RhLhReferency {
 		public NotEquals() {}
 		public NotEquals(Parsed lhs) {
 			super(lhs);
@@ -2077,8 +2465,12 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String op() {
 			return "!=";
 		}
+		@Override
+		public int precedence() {
+			return 10;
+		}
 	}
-	public static class StrictNotEquals extends RhLh {
+	public static class StrictNotEquals extends RhLhReferency {
 		public StrictNotEquals() {}
 		public StrictNotEquals(Parsed lhs) {
 			super(lhs);
@@ -2087,8 +2479,12 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String op() {
 			return "!==";
 		}
+		@Override
+		public int precedence() {
+			return 10;
+		}
 	}
-	public static class StrictEquals extends RhLh {
+	public static class StrictEquals extends RhLhReferency {
 		public StrictEquals() {}
 		public StrictEquals(Parsed lhs) {
 			super(lhs);
@@ -2096,6 +2492,10 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public java.lang.String op() {
 			return "===";
+		}
+		@Override
+		public int precedence() {
+			return 10;
 		}
 	}
 	public static class Percent extends RhLhReferency implements NumberReferency {
@@ -2109,6 +2509,10 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String op() {
 			return "%";
 		}
+		@Override
+		public int precedence() {
+			return 14;
+		}
 	}
 	public static class Or extends RhLhReferency {
 		public Or() {
@@ -2121,6 +2525,10 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String op() {
 			return "|";
 		}
+		@Override
+		public int precedence() {
+			return 7;
+		}
 	}
 	public static class And extends RhLhReferency {
 		public And() {
@@ -2132,6 +2540,10 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public java.lang.String op() {
 			return "&";
+		}
+		@Override
+		public int precedence() {
+			return 9;
 		}
 	}
 	public static class Plus extends RhLhReferency {
@@ -2163,6 +2575,11 @@ public abstract class RegexCompiler implements Compiler {
 			return lhs.isNumber() || rhs.isNumber();
 		}
 		
+		@Override
+		public int precedence() {
+			return 13;
+		}
+		
 	}
 	public static class Minus extends RhLhReferency implements NumberReferency {
 		public Minus() {
@@ -2178,8 +2595,13 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String op() {
 			return "-";
 		}
+		
+		@Override
+		public int precedence() {
+			return 13;
+		}
 	}
-	public static class InstanceOf extends RhLh {
+	public static class InstanceOf extends RhLhReferency {
 		public InstanceOf() {}
 		public InstanceOf(Parsed lhs) {
 			super(lhs);
@@ -2187,6 +2609,11 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public java.lang.String op() {
 			return "instanceof";
+		}
+		
+		@Override
+		public int precedence() {
+			return 11;
 		}
 	}
 	public static class PlusEq extends RhLhReferency {
@@ -2199,6 +2626,11 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public java.lang.String op() {
 			return "+=";
+		}
+		
+		@Override
+		public int precedence() {
+			return 3;
 		}
 	}
 	public static class PlusPlus extends Referency implements NumberReferency {
@@ -2260,6 +2692,11 @@ public abstract class RegexCompiler implements Compiler {
 			if(!right)
 				builder.append(unparsed(ref));
 			return builder.toString();
+		}
+		
+		@Override
+		public int precedence() {
+			return right ? 17 : 16;
 		}
 		
 	}
@@ -2324,8 +2761,13 @@ public abstract class RegexCompiler implements Compiler {
 			return builder.toString();
 		}
 		
+		@Override
+		public int precedence() {
+			return right ? 17 : 16;
+		}
+		
 	}
-	public static class MoreThan extends RhLh {
+	public static class MoreThan extends RhLhReferency {
 		public MoreThan() {}
 		public MoreThan(Parsed lhs) {
 			super(lhs);
@@ -2334,8 +2776,13 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String op() {
 			return ">";
 		}
+
+		@Override
+		public int precedence() {
+			return 11;
+		}
 	}
-	public static class LessThan extends RhLh {
+	public static class LessThan extends RhLhReferency {
 		public LessThan() {}
 		public LessThan(Parsed lhs) {
 			super(lhs);
@@ -2344,8 +2791,13 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String op() {
 			return "<";
 		}
+
+		@Override
+		public int precedence() {
+			return 11;
+		}
 	}
-	public static class MoreEqual extends RhLh {
+	public static class MoreEqual extends RhLhReferency {
 		public MoreEqual() {}
 		public MoreEqual(Parsed lhs) {
 			super(lhs);
@@ -2354,8 +2806,13 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String op() {
 			return ">=";
 		}
+
+		@Override
+		public int precedence() {
+			return 11;
+		}
 	}
-	public static class LessEqual extends RhLh {
+	public static class LessEqual extends RhLhReferency {
 		public LessEqual() {}
 		public LessEqual(Parsed lhs) {
 			super(lhs);
@@ -2364,17 +2821,41 @@ public abstract class RegexCompiler implements Compiler {
 		public java.lang.String op() {
 			return "<=";
 		}
+
+		@Override
+		public int precedence() {
+			return 11;
+		}
 	}
-	public static class In extends Helper {
+	public static class In extends Helper implements BaseReferency {
 		@Override
 		public java.lang.String toSource() {
 			return "in";
 		}
+
+		@Override
+		public int precedence() {
+			return 11;
+		}
+
+		@Override
+		public Parsed transformFallback(Parsed part) {
+			throw new UnsupportedOperationException("Not supported");
+		}
 	}
-	public static class Of extends Helper {
+	public static class Of extends Helper implements BaseReferency {
 		@Override
 		public java.lang.String toSource() {
 			return "of";
+		}
+
+		@Override
+		public int precedence() {
+			return 11;
+		}
+		@Override
+		public Parsed transformFallback(Parsed part) {
+			throw new UnsupportedOperationException("Not supported");
 		}
 	}
 	public static class New extends Referency {
@@ -2455,6 +2936,11 @@ public abstract class RegexCompiler implements Compiler {
 				throw new Error.JavaException("SyntaxError", "Unexpected EOF");
 			return this;
 		}
+
+		@Override
+		public int precedence() {
+			return arguments == null || arguments.isEmpty() ? 18 : 19;
+		}
 	}
 	public static class RegEx extends Referency {
 		
@@ -2467,6 +2953,11 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public java.lang.String toSource() {
 			return '/' + pattern + '/' + flags;
+		}
+
+		@Override
+		public int precedence() {
+			return -1;
 		}
 		
 	}
@@ -2567,9 +3058,7 @@ public abstract class RegexCompiler implements Compiler {
 			return this;
 		}
 	}
-	public static class Let extends Var {
-		
-	}
+	public static class Let extends Var {}
 	public static class String extends PrimitiveReferency implements StringReferency {
 		public final java.lang.String string;
 		public String(java.lang.String string) {
@@ -2592,6 +3081,11 @@ public abstract class RegexCompiler implements Compiler {
 				return false;
 			}
 		}
+
+		@Override
+		public int precedence() {
+			return -1;
+		}
 		
 	}
 	public static class Integer extends PrimitiveReferency implements NumberReferency {
@@ -2602,6 +3096,11 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public java.lang.String toSource() {
 			return java.lang.String.valueOf(value);
+		}
+
+		@Override
+		public int precedence() {
+			return -1;
 		}
 	}
 	public static class Number extends PrimitiveReferency implements NumberReferency {
@@ -2620,6 +3119,11 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public Referency extend(IntegerReference reference) {
 			throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + reference);
+		}
+
+		@Override
+		public int precedence() {
+			return -1;
 		}
 	}
 	
@@ -2658,7 +3162,6 @@ public abstract class RegexCompiler implements Compiler {
 	public static final Pattern SHIFTRIGHT = Pattern.compile("^\\>\\>");
 	public static final Pattern SHIFTLEFT = Pattern.compile("^\\<\\<");
 	public static final Pattern DBLSHIFTRIGHT = Pattern.compile("^\\>\\>\\>");
-	public static final Pattern DBLSHIFTLEFT = Pattern.compile("^\\<\\<\\<");
 	public static final Pattern PLUSEQ = Pattern.compile("^\\+=");
 	public static final Pattern SEMICOLON = Pattern.compile("^;");
 	public static final Pattern NOTEQUALS = Pattern.compile("^!=");
@@ -2946,7 +3449,7 @@ public abstract class RegexCompiler implements Compiler {
 	}
 	public static class ScriptParser extends RegexParser {
 		public ScriptParser() {
-			super(DBLSHIFTLEFT, DBLSHIFTRIGHT, SHIFTLEFT, SHIFTRIGHT, NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, NUMBER, VARIABLE, VARIABLEGET, SINGLELINE_COMMENT, MULTILINE_COMMENT, DIVIDE, WHITESPACE, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, REGEX);
+			super(DBLSHIFTRIGHT, SHIFTLEFT, SHIFTRIGHT, NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, NUMBER, VARIABLE, VARIABLEGET, SINGLELINE_COMMENT, MULTILINE_COMMENT, DIVIDE, WHITESPACE, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, REGEX);
 		}
 		@Override
 		public void match(Pattern pattern, Matcher matcher, ParserReader reader) {
@@ -3057,8 +3560,6 @@ public abstract class RegexCompiler implements Compiler {
 				throw new PartExchange(new ShiftLeft(), matcher.group().length());
 			if(pattern == DBLSHIFTRIGHT)
 				throw new PartExchange(new DoubleShiftRight(), matcher.group().length());
-			if(pattern == DBLSHIFTLEFT)
-				throw new PartExchange(new DoubleShiftLeft(), matcher.group().length());
 			if(pattern == EQUALS)
 				throw new PartExchange(new Equals(), matcher.group().length());
 			if(pattern == STRICTEQUALS)

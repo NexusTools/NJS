@@ -107,7 +107,7 @@ public class JavaClassWrapper extends AbstractFunction {
 		}
 		
 		methods.clear();
-		for(final Method method : javaClass.getDeclaredMethods()) {
+		for(final Method method : javaClass.getMethods()) {
 			if((method.getModifiers() & Modifier.STATIC) != 0) 
 				continue;
 			

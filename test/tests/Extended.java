@@ -47,6 +47,11 @@ public class Extended {
 	}
 	
 	@Test
+	public void byte__() {
+		test("byte[]");
+	}
+	
+	@Test
 	public void java() {
 		test("java");
 	}
