@@ -1034,7 +1034,7 @@ public class JavaTranspiler extends RegexCompiler {
 		}
 	}
 	private void scanScriptSource(ScriptData script, ScopeOptimizer variableScope) {
-		if(script.functions.length > 0)
+		if(!script.functions.isEmpty())
 			throw new CannotOptimize("Contains primary functions...");
 		
 		scanParsedSource(script.impl, variableScope);
@@ -2293,7 +2293,7 @@ public class JavaTranspiler extends RegexCompiler {
 		
 		sourceBuilder.indent();
 		if(script.optimizations != null) {
-			for (Function function : script.functions) {
+			for (Function function : script.functions.values()) {
 				sourceBuilder.append(function.uname = toClassName(function.name, false));
 				sourceBuilder.append(" ");
 				sourceBuilder.append(function.name);
@@ -2302,7 +2302,7 @@ public class JavaTranspiler extends RegexCompiler {
 				sourceBuilder.appendln("(global, baseScope);");
 			}
 		} else
-			for (Function function : script.functions) {
+			for (Function function : script.functions.values()) {
 				sourceBuilder.append("baseScope.var(\"");
 				sourceBuilder.append(convertStringSource(function.name));
 				sourceBuilder.append("\", new ");
@@ -2370,7 +2370,7 @@ public class JavaTranspiler extends RegexCompiler {
 		sourceBuilder.unindent();
 		sourceBuilder.appendln("}");
 		
-		for (Function function : script.functions) {
+		for (Function function : script.functions.values()) {
 			java.lang.String functionName;
 			if(scope != SourceScope.NewFunction)
 				sourceBuilder.append("private static final ");

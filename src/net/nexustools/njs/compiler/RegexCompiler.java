@@ -82,21 +82,22 @@ public abstract class RegexCompiler implements Compiler {
 		Function callee;
 		final Parsed[] impl;
 		final int rows, columns;
-		final Function[] functions;
 		java.lang.Object optimizations;
 		java.lang.String methodName = null, source;
+		final Map<java.lang.String, Function> functions;
 		public ScriptData(Parsed[] impl, java.lang.String source, int rows, int columns) {
+			functions = new HashMap();
 			List<Parsed> imp = new ArrayList();
-			List<Function> funcs = new ArrayList();
 			for(int i=0; i<impl.length; i++) {
-				if(impl[i] instanceof Function && ((Function)impl[i]).name != null) {
-					funcs.add((Function)impl[i]);
+				Parsed im = impl[i];
+				if(im instanceof Function && ((Function)im).name != null) {
+					assert(((Function)im).name != null && !((Function)im).name.isEmpty());
+					functions.put(((Function)im).name, (Function)im);
 					continue;
 				}
 				
 				imp.add(impl[i]);
 			}
-			functions = funcs.toArray(new Function[funcs.size()]);
 			this.impl = imp.toArray(new Parsed[imp.size()]);
 			this.source = source;
 			this.columns = columns;
@@ -1397,6 +1398,14 @@ public abstract class RegexCompiler implements Compiler {
 			return state != State.Complete;
 		}
 		public Parsed finish() {
+			if(state == State.Complete) {
+				for(Map.Entry<java.lang.String, Parsed> entry : entries.entrySet()) {
+					Parsed rhs = entry.getValue();
+					if(rhs instanceof Function)
+						((Function)rhs).name = entry.getKey();
+				}
+			}
+			
 			return this;
 		}
 	}

@@ -28,6 +28,7 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +62,8 @@ public class RuntimeCompiler extends RegexCompiler {
 	}
 	private final ArrayList<java.lang.String> methodNameStack = new ArrayList();
 	private ScriptCompilerData precompile(ScriptData script, java.lang.String fileName) {
-		Impl[] functionImpls = new Impl[script.functions.length];
+		Function[] functions = script.functions.values().toArray(new Function[script.functions.size()]);
+		Impl[] functionImpls = new Impl[functions.length];
 		for(int i=0; i<functionImpls.length; i++) {
 			StringBuilder builder = new StringBuilder();
 			for(java.lang.String methodName : methodNameStack) {
@@ -73,8 +75,9 @@ public class RuntimeCompiler extends RegexCompiler {
 			}
 			if(builder.length() > 0)
 				builder.append('.');
-			builder.append(script.functions[i].name);
-			functionImpls[i] = compile(new ScriptCompilerData(null, fileName, builder.toString()), script.functions[i]);
+			Function function = functions[i];
+			builder.append(function.name);
+			functionImpls[i] = compile(new ScriptCompilerData(null, fileName, builder.toString()), function);
 		}
 		int min = methodNameStack.size()-1;
 		StringBuilder builder = new StringBuilder();
