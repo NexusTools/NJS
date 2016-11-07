@@ -60,6 +60,16 @@ public class Standards {
 	public void valueOf() {
 		test("valueOf");
 	}
+	
+	@Test
+	public void main() {
+		test("main");
+	}
+	
+	@Test
+	public void let() {
+		test("let");
+	}
 
 	public void test(java.lang.String name) {
 		for(Compiler compiler : compilers) {

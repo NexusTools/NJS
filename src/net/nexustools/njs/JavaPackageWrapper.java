@@ -37,6 +37,7 @@ public class JavaPackageWrapper implements BaseObject {
 		this(global, "");
 	}
 	public JavaPackageWrapper(final Global global, final java.lang.String pkg) {
+		assert(pkg != null);
 		this.global = global;
 		this.pkg = pkg;
 		

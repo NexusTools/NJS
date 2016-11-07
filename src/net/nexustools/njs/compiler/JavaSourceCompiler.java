@@ -118,7 +118,7 @@ public class JavaSourceCompiler {
 				perr.println(diagnostic);
 			}
 			perr.flush();
-			throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Failed to compile transpiled java source");
+			throw new RuntimeException("Failed to compile java source");
 		}
 
 		Map<java.lang.String, byte[]> classBytes = fileManager.getClassBytes();
