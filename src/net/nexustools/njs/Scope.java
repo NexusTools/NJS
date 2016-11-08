@@ -23,7 +23,7 @@ import java.util.Map;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public class Scope implements Scopable {
 	

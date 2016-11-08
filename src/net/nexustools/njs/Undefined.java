@@ -20,7 +20,7 @@ import java.util.Set;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public final class Undefined implements BaseObject {
 	public static final Undefined INSTANCE = new Undefined();

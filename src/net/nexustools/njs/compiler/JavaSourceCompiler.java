@@ -44,7 +44,7 @@ import javax.tools.ToolProvider;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public class JavaSourceCompiler {
 	private static final javax.tools.JavaCompiler JAVA_COMPILER;

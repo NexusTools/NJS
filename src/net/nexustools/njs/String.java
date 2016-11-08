@@ -22,7 +22,7 @@ import java.util.List;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public class String extends AbstractFunction {
 	public static class Instance extends GenericObject {

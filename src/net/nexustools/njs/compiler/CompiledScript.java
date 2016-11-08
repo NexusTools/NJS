@@ -23,7 +23,7 @@ import net.nexustools.njs.Scopable;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public abstract class CompiledScript implements Script {
 	public static abstract class Debuggable extends CompiledScript {

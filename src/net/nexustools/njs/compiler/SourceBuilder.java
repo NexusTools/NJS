@@ -17,7 +17,7 @@ package net.nexustools.njs.compiler;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public class SourceBuilder {
 

@@ -31,36 +31,33 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
-import net.nexustools.njs.Global;
 
 import net.nexustools.njs.Utilities.FilePosition;
-import static net.nexustools.njs.compiler.RegexCompiler.DEBUG;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public class JavaTranspiler extends RegexCompiler {
 	public static final boolean DUMP_SOURCE = DEBUG;
-	private static final List<java.lang.String> RESTRICTED_NAMES = Arrays.asList(new java.lang.String[]{
-		"abstract",     "assert",        "boolean",      "break",           "byte",
-		"case",         "catch",         "char",         "class",           "const",
-		"continue",     "default",       "do",           "double",          "else",
-		"enum",         "extends",       "false",        "final",           "finally",
-		"float",        "for",           "goto",         "if",              "implements",
-		"import",       "instanceof",    "int",          "interface",       "long",
-		"native",       "new",           "null",         "package",         "private",
-		"protected",    "public",        "return",       "short",           "static",
-		"strictfp",     "super",         "switch",       "synchronized",    "this",
-		"throw",        "throws",        "transient",    "true",            "try",
-		"void",         "volatile",      "while",		 "BaseObject",		"BaseFunction",
-		"AbstractFunction", "GenericObject", "GenericArray", "CompiledFunction", "Utilities",
-		"Iterator", "String", "SyntheticScope", "Null", "Undefined"});
 	
 	private static final Map<java.lang.String, AtomicInteger> GEN_PACKAGE_USED_NAMES = new HashMap();
 	static {
-		for(java.lang.String NAME : RESTRICTED_NAMES)
-			GEN_PACKAGE_USED_NAMES.put(NAME, new AtomicInteger(2));
+		for(java.lang.String name : new java.lang.String[]{
+				"abstract",     "assert",        "boolean",      "break",           "byte",
+				"case",         "catch",         "char",         "class",           "const",
+				"continue",     "default",       "do",           "double",          "else",
+				"enum",         "extends",       "false",        "final",           "finally",
+				"float",        "for",           "goto",         "if",              "implements",
+				"import",       "instanceof",    "int",          "interface",       "long",
+				"native",       "new",           "null",         "package",         "private",
+				"protected",    "public",        "return",       "short",           "static",
+				"strictfp",     "super",         "switch",       "synchronized",    "this",
+				"throw",        "throws",        "transient",    "true",            "try",
+				"void",         "volatile",      "while",		 "BaseObject",		"BaseFunction",
+				"AbstractFunction", "GenericObject", "GenericArray", "CompiledScript", "Null", "Undefined",
+				"CompiledFunction", "Utilities", "Iterator", "String", "SyntheticScope"})
+			GEN_PACKAGE_USED_NAMES.put(name, new AtomicInteger(2));
 	}
 
 	private void scanArgument(Parsed argument, ScopeOptimizer variableScope) {

@@ -27,7 +27,7 @@ import java.util.Map;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public class JavaClassWrapper extends AbstractFunction {
 	public static final boolean DEBUG = System.getProperties().containsKey("NJSWRAPDEBUG");

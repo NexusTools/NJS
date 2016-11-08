@@ -27,7 +27,7 @@ import net.nexustools.njs.compiler.RuntimeCompiler;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public class Global extends GenericObject {
 	private static boolean SHOW_UNAVAILABLE_MESSAGE = true;

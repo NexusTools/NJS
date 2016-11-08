@@ -31,7 +31,7 @@ import java.util.Set;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public class JSON extends GenericObject {
 	

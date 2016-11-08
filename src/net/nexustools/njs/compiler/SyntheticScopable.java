@@ -20,7 +20,7 @@ import net.nexustools.njs.Scopable;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public abstract class SyntheticScopable implements Scopable {
 

@@ -36,7 +36,7 @@ import net.nexustools.njs.Scopable;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public class RuntimeCompiler extends RegexCompiler {
 

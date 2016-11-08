@@ -22,7 +22,7 @@ import net.nexustools.njs.Global;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public abstract class CompiledFunction extends AbstractFunction {
 	

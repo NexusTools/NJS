@@ -24,7 +24,7 @@ import java.util.Set;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public class Error extends AbstractFunction implements BaseFunction {
 	public static class ConvertedException extends RuntimeException {

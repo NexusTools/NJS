@@ -19,7 +19,7 @@ import java.util.Iterator;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public class Float64Array extends AbstractFunction {
 	public static class Instance extends AbstractArray<double[]> {

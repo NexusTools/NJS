@@ -19,7 +19,7 @@ import java.io.Reader;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public interface Compiler {
 	public Script compile(String source, String fileName, boolean inFunction);

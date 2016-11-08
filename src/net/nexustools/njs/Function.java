@@ -20,7 +20,7 @@ import net.nexustools.njs.compiler.Script;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public class Function extends AbstractFunction {
 	private final Global global;

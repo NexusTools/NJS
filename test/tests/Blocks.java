@@ -29,7 +29,7 @@ import org.junit.Test;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public class Blocks {
 	

@@ -31,7 +31,7 @@ import net.nexustools.njs.Error;
 
 /**
  *
- * @author Katelyn Slater <ktaeyln@gmail.com>
+ * @author Katelyn Slater <kate@nexustools.com>
  */
 public abstract class RegexCompiler implements Compiler {
 	public static final boolean DEBUG = System.getProperty("NJSDEBUG", "false").equals("true");
