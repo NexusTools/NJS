@@ -2556,13 +2556,6 @@ public class JavaTranspiler extends RegexCompiler {
 					sourceBuilder.appendln("\tbaseScope.var(\"arguments\", new Arguments(global, this, params));");
 				else {
 					localStack.put("this", "unknown");
-					if(!arguments.contains("arguments") && opt.usesArguments()) {
-						if(synthScope)
-							sourceBuilder.appendln("\tlocalStack.arguments = new Arguments(global, this, params);");
-						else
-							sourceBuilder.appendln("\tBaseObject arguments = new Arguments(global, this, params);");
-						localStack.put("arguments", "arguments");
-					}
 					if(synthScope) {
 						for(int i=0; i<arguments.size(); i++) {
 							localStack.put(arguments.get(i), "argument");
@@ -2577,7 +2570,15 @@ public class JavaTranspiler extends RegexCompiler {
 							sourceBuilder.appendln("();");
 							sourceBuilder.appendln("\tfinal Scope baseScope = extendScope(_this, localStack);");
 						}
+						if(!arguments.contains("arguments") && opt.usesArguments()) {
+							sourceBuilder.appendln("\tlocalStack.arguments = new Arguments(global, this, params);");
+							localStack.put("arguments", "arguments");
+						}
 					} else {
+						if(!arguments.contains("arguments") && opt.usesArguments()) {
+							sourceBuilder.appendln("\tBaseObject arguments = new Arguments(global, this, params);");
+							localStack.put("arguments", "arguments");
+						}
 						for(int i=0; i<arguments.size(); i++) {
 							sourceBuilder.append("\tBaseObject ");
 							sourceBuilder.append(arguments.get(i));
