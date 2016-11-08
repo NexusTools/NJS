@@ -39,6 +39,7 @@ import net.nexustools.njs.Utilities.FilePosition;
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public class JavaTranspiler extends RegexCompiler {
+	public static final boolean DEBUG = RegexCompiler.DEBUG;
 	public static final boolean DUMP_SOURCE = DEBUG;
 	
 	private static final Map<java.lang.String, AtomicInteger> GEN_PACKAGE_USED_NAMES = new HashMap();
@@ -843,12 +844,10 @@ public class JavaTranspiler extends RegexCompiler {
 			if(RESTRICTED_SCOPE_NAMES.matcher(key).matches())
 				markCreateSyntheticScope();
 			java.lang.String current = scope.get(key);
-			if(current == null || current.equals("any"))
+			if(current == null)
 				scope.put(key, type);
-			else if(!current.equals(type))
-				scope.put(key, "unknown");
 			else
-				scope.put(key, type);
+				update(key, type);
 		}
 		public void let(java.lang.String key, java.lang.String type) {
 			var(key, type);
@@ -1143,6 +1142,67 @@ public class JavaTranspiler extends RegexCompiler {
 				scanParsedSource(entry, variableScope);
 		} else if(parsed instanceof RightReference) {
 			scanParsedSource(((RightReference)parsed).ref, variableScope);
+		} else if(parsed instanceof PlusPlus) {
+			Parsed ref = ((PlusPlus)parsed).ref;
+			if(ref instanceof Reference) {
+				variableScope.update(((Reference)ref).ref, "number");
+			} else
+				throw new CannotOptimizeUnimplemented("No implementation for optimizing " + describe(ref));
+		} else if(parsed instanceof PlusEq) {
+			Parsed ref = ((PlusEq)parsed).lhs;
+			Parsed rhs = ((PlusEq)parsed).rhs;
+			if(rhs.isNumber() || (rhs instanceof Reference && variableScope.isTyped(((Reference)rhs).ref, "number"))) {
+				if(ref instanceof Reference) {
+					variableScope.update(((Reference)ref).ref, "number");
+				} else
+					throw new CannotOptimizeUnimplemented("No implementation for optimizing " + describe(ref));
+			}
+		} else if(parsed instanceof MultiplyEq) {
+			Parsed ref = ((MultiplyEq)parsed).lhs;
+			if(ref instanceof Reference) {
+				variableScope.update(((Reference)ref).ref, "number");
+			} else
+				throw new CannotOptimizeUnimplemented("No implementation for optimizing " + describe(ref));
+		} else if(parsed instanceof MinusMinus) {
+			Parsed ref = ((MinusMinus)parsed).ref;
+			if(ref instanceof Reference) {
+				variableScope.update(((Reference)ref).ref, "number");
+			} else
+				throw new CannotOptimizeUnimplemented("No implementation for optimizing " + describe(ref));
+
+			//variableScope.update(, NUMBER_REG);
+		} else if(parsed instanceof Set) {
+			Parsed lhs = ((Set)parsed).lhs;
+
+			if(lhs instanceof Reference) {
+				Parsed rhs = ((Set)parsed).rhs;
+				if(rhs instanceof BaseReferency) {
+					if(rhs instanceof Reference)
+						variableScope.update(((Reference)lhs).ref, variableScope.lookup(((Reference)rhs).ref));
+					else
+						variableScope.update(((Reference)lhs).ref, rhs.primaryType());
+				} else if(rhs instanceof Function) {
+					FunctionScopeOptimizer scopeOptimizer = new FunctionScopeOptimizer(variableScope);
+					scopeOptimizer.scope.put("arguments", "arguments");
+					for(java.lang.String arg : ((Function)rhs).arguments) {
+						if(RESTRICTED_SCOPE_NAMES.matcher(arg).matches()) {
+							variableScope.markCreateSyntheticScope();
+							return;
+						}
+						scopeOptimizer.scope.put(arg, "argument");
+					}
+
+					scanScriptSource(((Function)rhs).impl, scopeOptimizer);
+				} else
+					throw new CannotOptimizeUnimplemented("No implementation for optimizing set " + describe(rhs));
+			} else if(lhs instanceof ReferenceChain || lhs instanceof VariableReference || lhs instanceof IntegerReference) {
+				// IGNORED
+			} else
+				throw new CannotOptimizeUnimplemented("No implementation for optimizing set " + describe(lhs));
+		} else if(parsed instanceof OpenGroup) {
+			for(Map.Entry<?, Parsed> entry : ((OpenGroup)parsed).entries.entrySet()) {
+				scanParsedSource(entry.getValue(), variableScope);
+			}
 		} else if(parsed instanceof Reference || parsed instanceof ReferenceChain || parsed instanceof Integer || parsed instanceof Boolean ||
 				parsed instanceof Number || parsed instanceof String || parsed instanceof Null || parsed instanceof Undefined) {
 			// IGNORED
@@ -1151,70 +1211,6 @@ public class JavaTranspiler extends RegexCompiler {
 			scanParsedSource(((RhLh)parsed).rhs, variableScope);
 		} else if(parsed instanceof Rh) {
 			scanParsedSource(((Rh)parsed).rhs, variableScope);
-		} else if(parsed instanceof BaseReferency) {
-			if(parsed instanceof PlusPlus) {
-				Parsed ref = ((PlusPlus)parsed).ref;
-				if(ref instanceof Reference) {
-					variableScope.update(((Reference)ref).ref, "number");
-				} else
-					throw new CannotOptimizeUnimplemented("No implementation for optimizing " + describe(ref));
-			} else if(parsed instanceof PlusEq) {
-				Parsed ref = ((PlusEq)parsed).lhs;
-				Parsed rhs = ((PlusEq)parsed).rhs;
-				if(rhs.isNumber() || (rhs instanceof Reference && variableScope.isTyped(((Reference)rhs).ref, "number"))) {
-					if(ref instanceof Reference) {
-						variableScope.update(((Reference)ref).ref, "number");
-					} else
-						throw new CannotOptimizeUnimplemented("No implementation for optimizing " + describe(ref));
-				}
-			} else if(parsed instanceof MultiplyEq) {
-				Parsed ref = ((MultiplyEq)parsed).lhs;
-				if(ref instanceof Reference) {
-					variableScope.update(((Reference)ref).ref, "number");
-				} else
-					throw new CannotOptimizeUnimplemented("No implementation for optimizing " + describe(ref));
-			} else if(parsed instanceof MinusMinus) {
-				Parsed ref = ((MinusMinus)parsed).ref;
-				if(ref instanceof Reference) {
-					variableScope.update(((Reference)ref).ref, "number");
-				} else
-					throw new CannotOptimizeUnimplemented("No implementation for optimizing " + describe(ref));
-				
-				//variableScope.update(, NUMBER_REG);
-			} else if(parsed instanceof Set) {
-				Parsed lhs = ((Set)parsed).lhs;
-				
-				if(lhs instanceof Reference) {
-					Parsed rhs = ((Set)parsed).rhs;
-					if(rhs instanceof BaseReferency) {
-						if(rhs instanceof Reference)
-							variableScope.update(((Reference)lhs).ref, variableScope.lookup(((Reference)rhs).ref));
-						else
-							variableScope.update(((Reference)lhs).ref, rhs.primaryType());
-					} else if(rhs instanceof Function) {
-						FunctionScopeOptimizer scopeOptimizer = new FunctionScopeOptimizer(variableScope);
-						scopeOptimizer.scope.put("arguments", "arguments");
-						for(java.lang.String arg : ((Function)rhs).arguments) {
-							if(RESTRICTED_SCOPE_NAMES.matcher(arg).matches()) {
-								variableScope.markCreateSyntheticScope();
-								return;
-							}
-							scopeOptimizer.scope.put(arg, "argument");
-						}
-								
-						scanScriptSource(((Function)rhs).impl, scopeOptimizer);
-					} else
-						throw new CannotOptimizeUnimplemented("No implementation for optimizing set " + describe(rhs));
-				} else if(lhs instanceof ReferenceChain || lhs instanceof VariableReference || lhs instanceof IntegerReference) {
-					// IGNORED
-				} else
-					throw new CannotOptimizeUnimplemented("No implementation for optimizing set " + describe(lhs));
-			} else if(parsed instanceof OpenGroup) {
-				for(Map.Entry<?, Parsed> entry : ((OpenGroup)parsed).entries.entrySet()) {
-					scanParsedSource(entry.getValue(), variableScope);
-				}
-			} else
-				throw new CannotOptimizeUnimplemented("No implementation for optimizing " + describe(parsed));
 		} else if(parsed instanceof Function) {
 			scanScriptSource(((Function)parsed).impl, new FunctionScopeOptimizer(variableScope));
 		} else
@@ -2301,6 +2297,7 @@ public class JavaTranspiler extends RegexCompiler {
 				if(ref instanceof Reference) {
 					if(!atTop)
 						sourceBuilder.append("global.wrap(");
+					
 					sourceBuilder.append(((Reference)ref).ref);
 					sourceBuilder.append(" += ");
 					generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);

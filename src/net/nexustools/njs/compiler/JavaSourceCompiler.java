@@ -20,18 +20,16 @@ import java.io.File;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.io.Writer;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URL;
-import java.net.URLClassLoader;
+
 import java.nio.CharBuffer;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.StringTokenizer;
+
+import java.net.URI;
+
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.FileObject;
@@ -62,130 +60,75 @@ public class JavaSourceCompiler {
 	}
 	
 	public static ClassLoader compileToClassLoader(java.lang.String fileName, java.lang.String source) {
-		return new MemoryClassLoader(compile(fileName, source));
+		return new ByteMapClassLoader(compileJavaSource(fileName, source));
 	}
 	
-	public static Map<java.lang.String, byte[]> compile(java.lang.String fileName, java.lang.String source) {
-		return compile(fileName, source, new PrintWriter(System.err), null, null);
-	}
-
-	private static Map<java.lang.String, byte[]> compile(java.lang.String fileName, java.lang.String source,
-		Writer err, java.lang.String sourcePath, java.lang.String classPath) {
-		// to collect errors, warnings etc.
-		DiagnosticCollector<JavaFileObject> diagnostics
-			= new DiagnosticCollector<JavaFileObject>();
-
-		// create a new memory JavaFileManager
-		MemoryJavaFileManager fileManager = new MemoryJavaFileManager(STANDARD_FILE_MANAGER);
-
-		// prepare the compilation unit
+	public static Map<java.lang.String, byte[]> compileJavaSource(java.lang.String fileName, java.lang.String source) {
+		DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();
+		ByteMapJavaFileManager fileManager = new ByteMapJavaFileManager();
 		List<JavaFileObject> compUnits = new ArrayList<JavaFileObject>(1);
-		compUnits.add(fileManager.makeStringSource(fileName, source));
+		compUnits.add(new StringJavaFileObject(fileName, source));
 
-		return compile(compUnits, fileManager, err, sourcePath, classPath);
-	}
-
-	private static Map<java.lang.String, byte[]> compile(final List<JavaFileObject> compUnits,
-		final MemoryJavaFileManager fileManager,
-		Writer err, java.lang.String sourcePath, java.lang.String classPath) {
-		// to collect errors, warnings etc.
-		DiagnosticCollector<JavaFileObject> diagnostics
-			= new DiagnosticCollector<JavaFileObject>();
-
-		// javac options
-		List<java.lang.String> options = new ArrayList();
-		options.add("-Xlint:all");
-		//      options.add("-g:none");
-		options.add("-deprecation");
-		if (sourcePath != null) {
-			options.add("-sourcepath");
-			options.add(sourcePath);
-		}
-
-		if (classPath != null) {
-			options.add("-classpath");
-			options.add(classPath);
-		}
-
-		// create a compilation task
-		javax.tools.JavaCompiler.CompilationTask task
-			= JAVA_COMPILER.getTask(err, fileManager, diagnostics,
-				options, null, compUnits);
+		javax.tools.JavaCompiler.CompilationTask task = JAVA_COMPILER.getTask(null, fileManager, diagnostics, new ArrayList(), null, compUnits);
 
 		if (task.call() == false) {
-			PrintWriter perr = new PrintWriter(err);
-			for (Diagnostic diagnostic : diagnostics.getDiagnostics()) {
-				perr.println(diagnostic);
-			}
-			perr.flush();
+			for (Diagnostic diagnostic : diagnostics.getDiagnostics())
+				System.out.println(diagnostic);
 			throw new RuntimeException("Failed to compile java source");
 		}
 
-		Map<java.lang.String, byte[]> classBytes = fileManager.getClassBytes();
+		Map<java.lang.String, byte[]> classBytes = fileManager.classBytes;
 		try {
 			fileManager.close();
-		} catch (IOException exp) {
-		}
+		} catch (IOException ex) {}
 
 		return classBytes;
 	}
+	
+	private static class StringJavaFileObject extends SimpleJavaFileObject {
 
-	private static class MemoryJavaFileManager extends ForwardingJavaFileManager {
-
-		/**
-		 * Java source file extension.
-		 */
-		private final static java.lang.String EXT = ".java";
-
-		private Map<java.lang.String, byte[]> classBytes;
-
-		public MemoryJavaFileManager(JavaFileManager fileManager) {
-			super(fileManager);
-			classBytes = new HashMap();
+		final java.lang.String source;
+		StringJavaFileObject(java.lang.String fileName, java.lang.String code) {
+			super(ByteMapJavaFileManager.toURI(fileName), JavaFileObject.Kind.SOURCE);
+			this.source = code;
 		}
 
-		public Map<java.lang.String, byte[]> getClassBytes() {
-			return classBytes;
+		@Override
+		public CharBuffer getCharContent(boolean ignoreEncodingErrors) {
+			return CharBuffer.wrap(source);
+		}
+	}
+
+	private static class ByteMapJavaFileManager extends ForwardingJavaFileManager {
+
+		private Map<java.lang.String, byte[]> classBytes = new HashMap();
+
+		public ByteMapJavaFileManager() {
+			super(STANDARD_FILE_MANAGER);
 		}
 
+		@Override
 		public void close() throws IOException {
 			classBytes = null;
 		}
 
+		@Override
 		public void flush() throws IOException {
 		}
 
-		/**
-		 * A file object used to represent Java source coming from a string.
-		 */
-		private static class StringInputBuffer extends SimpleJavaFileObject {
-
-			final java.lang.String source;
-
-			StringInputBuffer(java.lang.String fileName, java.lang.String code) {
-				super(toURI(fileName), JavaFileObject.Kind.SOURCE);
-				this.source = code;
-			}
-
-			public CharBuffer getCharContent(boolean ignoreEncodingErrors) {
-				return CharBuffer.wrap(source);
-			}
-		}
-
-		/**
-		 * A file object that stores Java bytecode into the classBytes map.
-		 */
 		private class ClassOutputBuffer extends SimpleJavaFileObject {
 
-			private java.lang.String name;
+			private final java.lang.String name;
 
 			ClassOutputBuffer(java.lang.String name) {
 				super(toURI(name), JavaFileObject.Kind.CLASS);
 				this.name = name;
 			}
 
+			@Override
 			public OutputStream openOutputStream() {
 				return new FilterOutputStream(new ByteArrayOutputStream()) {
+					@Override
 					public void close() throws IOException {
 						out.close();
 						ByteArrayOutputStream bos = (ByteArrayOutputStream) out;
@@ -195,6 +138,7 @@ public class JavaSourceCompiler {
 			}
 		}
 
+		@Override
 		public JavaFileObject getJavaFileForOutput(JavaFileManager.Location location,
 			java.lang.String className,
 			JavaFileObject.Kind kind,
@@ -206,10 +150,6 @@ public class JavaSourceCompiler {
 			}
 		}
 
-		static JavaFileObject makeStringSource(java.lang.String fileName, java.lang.String source) {
-			return new StringInputBuffer(fileName, source);
-		}
-
 		static URI toURI(java.lang.String name) {
 			File file = new File(name);
 			if (file.exists()) {
@@ -219,8 +159,8 @@ public class JavaSourceCompiler {
 					final StringBuilder newUri = new StringBuilder();
 					newUri.append("mfm:///");
 					newUri.append(name.replace('.', '/'));
-					if (name.endsWith(EXT)) {
-						newUri.replace(newUri.length() - EXT.length(), newUri.length(), EXT);
+					if (name.endsWith(".java")) {
+						newUri.replace(newUri.length() - ".java".length(), newUri.length(), ".java");
 					}
 					return URI.create(newUri.toString());
 				} catch (Exception exp) {
@@ -230,72 +170,22 @@ public class JavaSourceCompiler {
 		}
 	}
 
-	private static class MemoryClassLoader extends URLClassLoader {
+	private static class ByteMapClassLoader extends ClassLoader {
 
-		private Map<java.lang.String, byte[]> classBytes;
-
-		public MemoryClassLoader(Map<java.lang.String, byte[]> classBytes,
-			java.lang.String classPath, ClassLoader parent) {
-			super(toURLs(classPath), parent);
+		private final Map<java.lang.String, byte[]> classBytes;
+		public ByteMapClassLoader(Map<java.lang.String, byte[]> classBytes) {
 			this.classBytes = classBytes;
 		}
 
-		public MemoryClassLoader(Map<java.lang.String, byte[]> classBytes, java.lang.String classPath) {
-			this(classBytes, classPath, ClassLoader.getSystemClassLoader());
-		}
-
-		public MemoryClassLoader(Map<java.lang.String, byte[]> classBytes) {
-			this(classBytes, null, ClassLoader.getSystemClassLoader());
-		}
-
-		public Class load(java.lang.String className) throws ClassNotFoundException {
-			return loadClass(className);
-		}
-
-		public Iterable<Class> loadAll() throws ClassNotFoundException {
-			List<Class> classes = new ArrayList<Class>(classBytes.size());
-			for (java.lang.String name : classBytes.keySet()) {
-				classes.add(loadClass(name));
-			}
-			return classes;
-		}
-
+		@Override
 		protected Class findClass(java.lang.String className) throws ClassNotFoundException {
 			byte[] buf = classBytes.get(className);
 			if (buf != null) {
-				// clear the bytes in map -- we don't need it anymore
 				classBytes.put(className, null);
 				return defineClass(className, buf, 0, buf.length);
 			} else {
 				return super.findClass(className);
 			}
-		}
-
-		private static URL[] toURLs(java.lang.String classPath) {
-			if (classPath == null) {
-				return new URL[0];
-			}
-
-			List<URL> list = new ArrayList<URL>();
-			StringTokenizer st = new StringTokenizer(classPath, File.pathSeparator);
-			while (st.hasMoreTokens()) {
-				java.lang.String token = st.nextToken();
-				File file = new File(token);
-				if (file.exists()) {
-					try {
-						list.add(file.toURI().toURL());
-					} catch (MalformedURLException mue) {
-					}
-				} else {
-					try {
-						list.add(new URL(token));
-					} catch (MalformedURLException mue) {
-					}
-				}
-			}
-			URL[] res = new URL[list.size()];
-			list.toArray(res);
-			return res;
 		}
 	}
 }

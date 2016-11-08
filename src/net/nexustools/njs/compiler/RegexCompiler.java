@@ -1870,6 +1870,36 @@ public abstract class RegexCompiler implements Compiler {
 					return this;
 				}
 				return new InstanceOf(this);
+			} else if(part instanceof ShiftLeft) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new ShiftLeft(rhs);
+					return this;
+				}
+				return new ShiftLeft(this);
+			} else if(part instanceof ShiftRight) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new ShiftRight(rhs);
+					return this;
+				}
+				return new ShiftRight(this);
+			} else if(part instanceof DoubleShiftRight) {
+				if(precedence < ((BaseReferency)part).precedence()){
+					rhs = rhs.transform(part);
+					return this;
+				}
+				if(useRhs) {
+					rhs = new DoubleShiftRight(rhs);
+					return this;
+				}
+				return new DoubleShiftRight(this);
 			} else if(part instanceof MoreThan) {
 				if(precedence < ((BaseReferency)part).precedence()){
 					rhs = rhs.transform(part);
