@@ -22,7 +22,7 @@ import java.util.Set;
  *
  * @author Katelyn Slater <ktaeyln@gmail.com>
  */
-public interface BaseObject extends Scopeable, Iterable<BaseObject> {
+public interface BaseObject extends Scopable, Iterable<BaseObject> {
 	public static interface Property {
 		public BaseObject get();
 		public BaseObject getValue();

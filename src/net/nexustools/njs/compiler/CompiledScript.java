@@ -19,7 +19,7 @@ import net.nexustools.njs.BaseFunction;
 import net.nexustools.njs.BaseObject;
 import net.nexustools.njs.Global;
 import net.nexustools.njs.Utilities;
-import net.nexustools.njs.Scopeable;
+import net.nexustools.njs.Scopable;
 
 /**
  *
@@ -108,25 +108,25 @@ public abstract class CompiledScript implements Script {
 		return exec(global, null);
 	}
 	
-	public static net.nexustools.njs.Number.Instance plusPlusLeft(Global global, java.lang.String key, Scopeable _this) {
+	public static net.nexustools.njs.Number.Instance plusPlusLeft(Global global, java.lang.String key, Scopable _this) {
 		net.nexustools.njs.Number.Instance incremented = global.wrap(global.Number.fromValueOf(_this.get(key)).value + 1);
 		_this.set(key, incremented);
 		return incremented;
 	}
 	
-	public static net.nexustools.njs.Number.Instance plusPlusRight(Global global, java.lang.String key, Scopeable _this) {
+	public static net.nexustools.njs.Number.Instance plusPlusRight(Global global, java.lang.String key, Scopable _this) {
 		net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
 		_this.set(key, global.Number.wrap(current.value + 1));
 		return current;
 	}
 	
-	public static net.nexustools.njs.Number.Instance minusMinusLeft(Global global, java.lang.String key, Scopeable _this) {
+	public static net.nexustools.njs.Number.Instance minusMinusLeft(Global global, java.lang.String key, Scopable _this) {
 		net.nexustools.njs.Number.Instance decremented = global.wrap(global.Number.fromValueOf(_this.get(key)).value - 1);
 		_this.set(key, decremented);
 		return decremented;
 	}
 	
-	public static net.nexustools.njs.Number.Instance minusMinusRight(Global global, java.lang.String key, Scopeable _this) {
+	public static net.nexustools.njs.Number.Instance minusMinusRight(Global global, java.lang.String key, Scopable _this) {
 		net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
 		_this.set(key, global.Number.wrap(current.value - 1));
 		return current;
@@ -156,7 +156,7 @@ public abstract class CompiledScript implements Script {
 		return lhs;
 	}
 	
-	public static BaseObject callSet(Scopeable _this, java.lang.String key, BaseObject val) {
+	public static BaseObject callSet(Scopable _this, java.lang.String key, BaseObject val) {
 		_this.set(key, val);
 		return val;
 	}

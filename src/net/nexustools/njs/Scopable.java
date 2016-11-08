@@ -19,7 +19,7 @@ package net.nexustools.njs;
  *
  * @author Katelyn Slater <ktaeyln@gmail.com>
  */
-public interface Scopeable {
+public interface Scopable {
 	public static interface Or<R> {
 		public R or(java.lang.String key);
 	}

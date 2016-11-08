@@ -25,9 +25,9 @@ import java.util.Map;
  *
  * @author Katelyn Slater <ktaeyln@gmail.com>
  */
-public class Scope implements Scopeable {
+public class Scope implements Scopable {
 	
-	private static class BlockScopeable implements Scopeable {
+	private static class BlockScopeable implements Scopable {
 		private final HashMap<java.lang.String, BaseObject> arguments = new HashMap();
 		
 		public void let(java.lang.String key, BaseObject val) {
@@ -85,19 +85,19 @@ public class Scope implements Scopeable {
 
 	public static class Extended extends Scope {
 		private final HashMap<java.lang.String, BaseObject> storage;
-		private Extended(BaseObject _this, HashMap<java.lang.String, BaseObject> storage, Scopeable... scopeables) {
+		private Extended(BaseObject _this, HashMap<java.lang.String, BaseObject> storage, Scopable... scopeables) {
 			super(_this, scopeables);
 			this.storage = storage;
 		}
-		public Extended(Global global, Scopeable... scopeables) {
+		public Extended(Global global, Scopable... scopeables) {
 			super(global, scopeables);
 			storage = new HashMap();
 		}
-		public Extended(BaseObject _this, Global global, Scopeable... scopeables) {
+		public Extended(BaseObject _this, Global global, Scopable... scopeables) {
 			super(_this, global, scopeables);
 			storage = new HashMap();
 		}
-		private Extended(BaseObject _this, Scopeable... scopeables) {
+		private Extended(BaseObject _this, Scopable... scopeables) {
 			super(_this, scopeables);
 			storage = new HashMap();
 		}
@@ -156,19 +156,19 @@ public class Scope implements Scopeable {
 	private static final OrNotFound<java.lang.Boolean> OR_NOT_FOUND_B = new OrNotFound();
 	
 	public final BaseObject _this;
-	public final Scopeable[] scopeables;
-	public Scope(BaseObject _this, Scopeable... scopeables) {
+	public final Scopable[] scopeables;
+	public Scope(BaseObject _this, Scopable... scopeables) {
 		this.scopeables = scopeables;
 		this._this = _this;
 	}
-	public Scope(Global global, Scopeable... scopeables) {
+	public Scope(Global global, Scopable... scopeables) {
 		this(global, global, scopeables);
 	}
-	public Scope(BaseObject _this, Global global, Scopeable... scopeables) {
+	public Scope(BaseObject _this, Global global, Scopable... scopeables) {
 		if(scopeables.length == 0)
-			this.scopeables = new Scopeable[]{global};
+			this.scopeables = new Scopable[]{global};
 		else {
-			this.scopeables = new Scopeable[scopeables.length+1];
+			this.scopeables = new Scopable[scopeables.length+1];
 			System.arraycopy(scopeables, 0, this.scopeables, 0, scopeables.length);
 			this.scopeables[scopeables.length] = global;
 		}
@@ -193,7 +193,7 @@ public class Scope implements Scopeable {
 
 	@Override
 	public void set(java.lang.String key, BaseObject val, Or<Void> or) {
-		for(Scopeable object : scopeables) {
+		for(Scopable object : scopeables) {
 			try {
 				object.set(key, val, OR_NOT_FOUND_V);
 				return;
@@ -213,7 +213,7 @@ public class Scope implements Scopeable {
 		if(key.equals("this"))
 			return _this;
 		
-		for(Scopeable object : scopeables) {
+		for(Scopable object : scopeables) {
 			try {
 				return object.get(key, OR_NOT_FOUND_BO);
 			} catch(NotFound f) {}
@@ -229,7 +229,7 @@ public class Scope implements Scopeable {
 
 	@Override
 	public boolean delete(java.lang.String key, Or<java.lang.Boolean> or) {
-		for(Scopeable object : scopeables)
+		for(Scopable object : scopeables)
 			try {
 				return object.delete(key, OR_NOT_FOUND_B);
 			} catch(NotFound f) {}
@@ -238,14 +238,22 @@ public class Scope implements Scopeable {
 	}
 	
 	public final Scope extend(BaseObject _this) {
-		Scopeable[] scopeables = new Scopeable[this.scopeables.length+1];
+		Scopable[] scopeables = new Scopable[this.scopeables.length+1];
 		System.arraycopy(this.scopeables, 0, scopeables, 1, this.scopeables.length);
 		scopeables[0] = this;
 		return new Extended(_this, scopeables);
 	}
 
+	public Scope extend(BaseObject _this, Scopable stack) {
+		Scopable[] scopeables = new Scopable[this.scopeables.length+2];
+		System.arraycopy(this.scopeables, 0, scopeables, 2, this.scopeables.length);
+		scopeables[0] = stack;
+		scopeables[1] = this;
+		return new Extended(_this, scopeables);
+	}
+
 	public Scope beginBlock() {
-		Scopeable[] scopeables = new Scopeable[this.scopeables.length+1];
+		Scopable[] scopeables = new Scopable[this.scopeables.length+1];
 		System.arraycopy(this.scopeables, 0, scopeables, 1, this.scopeables.length);
 		scopeables[0] = new BlockScopeable();
 		return this instanceof Extended ? new Extended(_this, ((Extended)this).storage, scopeables) : new Scope(_this, scopeables);
@@ -256,7 +264,7 @@ public class Scope implements Scopeable {
 		if(it.hasNext()) {
 			int index = 0;
 			boolean useNumberIndex;
-			Scopeable obj = this;
+			Scopable obj = this;
 			do {
 				java.lang.String ref = it.next();
 				try {

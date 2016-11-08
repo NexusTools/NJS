@@ -22,7 +22,6 @@ import net.nexustools.njs.Utilities;
 import net.nexustools.njs.Scope;
 import net.nexustools.njs.GenericArray;
 import net.nexustools.njs.GenericObject;
-import net.nexustools.njs.Scopeable;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -33,6 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import net.nexustools.njs.Scopable;
 
 /**
  *
@@ -123,19 +123,19 @@ public class RuntimeCompiler extends RegexCompiler {
 		}
 	}
 	public static interface ParentedReferenceable extends Referenceable {
-		public Scopeable parent();
+		public Scopable parent();
 	}
 	public static class StringKeyReferenceable implements KnownReferenceable, ParentedReferenceable {
-		public final Scopeable parent;
+		public final Scopable parent;
 		public final java.lang.String key;
 		public final java.lang.String source;
-		public StringKeyReferenceable(java.lang.String source, java.lang.String key, Scopeable parent) {
+		public StringKeyReferenceable(java.lang.String source, java.lang.String key, Scopable parent) {
 			this.parent = parent;
 			this.source = source;
 			this.key = key;
 		}
 		@Override
-		public Scopeable parent() {
+		public Scopable parent() {
 			return parent;
 		}
 		@Override
@@ -166,7 +166,7 @@ public class RuntimeCompiler extends RegexCompiler {
 			this.key = key;
 		}
 		@Override
-		public Scopeable parent() {
+		public Scopable parent() {
 			return parent;
 		}
 		@Override
@@ -196,7 +196,7 @@ public class RuntimeCompiler extends RegexCompiler {
 			this.key = key;
 		}
 		@Override
-		public Scopeable parent() {
+		public Scopable parent() {
 			return parent;
 		}
 		@Override

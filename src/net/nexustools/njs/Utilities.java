@@ -734,7 +734,7 @@ public class Utilities {
 		}
 		BaseObject valueOf = val.get("valueOf");
 		if (valueOf instanceof BaseFunction) {
-			return ((BaseFunction) val.get("valueOf", Scopeable.OR_NULL)).call(val);
+			return ((BaseFunction) val.get("valueOf", Scopable.OR_NULL)).call(val);
 		}
 		return val;
 	}
