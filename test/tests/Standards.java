@@ -66,10 +66,10 @@ public class Standards {
 		test("main");
 	}
 	
-	@Test
+	/*@Test
 	public void let() {
 		test("let");
-	}
+	}*/
 
 	public void test(java.lang.String name) {
 		for(Compiler compiler : compilers) {
