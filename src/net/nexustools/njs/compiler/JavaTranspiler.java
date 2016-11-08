@@ -167,6 +167,8 @@ public class JavaTranspiler extends RegexCompiler {
 		public java.lang.String get(java.lang.String key);
 		public boolean createSyntheticScope();
 		public boolean usesArguments();
+
+		public java.util.Set<java.lang.String> keys();
 	}
 	private static class MapStackOptimizations implements StackOptimizations {
 		private final boolean createSyntheticScope, usesArguments;
@@ -190,6 +192,11 @@ public class JavaTranspiler extends RegexCompiler {
 		@Override
 		public boolean createSyntheticScope() {
 			return createSyntheticScope;
+		}
+
+		@Override
+		public java.util.Set<java.lang.String> keys() {
+			return map.keySet();
 		}
 	}
 	private static class ExtendedStackOptimizations extends MapStackOptimizations {
@@ -2539,7 +2546,6 @@ public class JavaTranspiler extends RegexCompiler {
 			if(opt == null)
 				sourceBuilder.appendln("\tfinal Scope baseScope = extendScope(_this);");
 			if(script.callee != null) {
-				
 				methodPrefix = extendMethodChain(methodPrefix, script.callee.name);
 				List<java.lang.String> arguments = script.callee.arguments;
 				if(opt == null)
@@ -2567,13 +2573,32 @@ public class JavaTranspiler extends RegexCompiler {
 							sourceBuilder.appendln("();");
 							sourceBuilder.appendln("\tfinal Scope baseScope = extendScope(_this, localStack);");
 						}
-					} else
+					} else {
 						for(int i=0; i<arguments.size(); i++) {
 							sourceBuilder.append("\tBaseObject ");
 							sourceBuilder.append(arguments.get(i));
 							sourceBuilder.appendln(";");
 							localStack.put(arguments.get(i), "argument");
 						}
+						for(java.lang.String key : opt.keys()) {
+							java.lang.String type = opt.get(key);
+							if(type.equals("string"))
+								sourceBuilder.append("String");
+							else if(type.equals("boolean"))
+								sourceBuilder.append("boolean");
+							else if(type.equals("number"))
+								sourceBuilder.append("double");
+							else if(type.equals("array"))
+								sourceBuilder.append("GenericArray");
+							else if(type.equals("object"))
+								sourceBuilder.append("GenericObject");
+							else
+								sourceBuilder.append("BaseObject");
+							sourceBuilder.append(" ");
+							sourceBuilder.append(key);
+							sourceBuilder.appendln(";");
+						}
+					}
 				}
 				if(!arguments.isEmpty()) {
 					sourceBuilder.appendln("\tswitch(params.length) {");
