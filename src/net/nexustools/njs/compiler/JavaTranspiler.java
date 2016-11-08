@@ -904,7 +904,7 @@ public class JavaTranspiler extends RegexCompiler {
 		}
 	}
 	public static class FunctionScopeOptimizer extends ScopeOptimizer {
-		boolean usesArguments;
+		boolean usesArguments = true;
 		final ScopeOptimizer parent;
 		FunctionScopeOptimizer(ScopeOptimizer parent) {
 			this.parent = parent;
@@ -1195,13 +1195,17 @@ public class JavaTranspiler extends RegexCompiler {
 						else
 							variableScope.update(((Reference)lhs).ref, rhs.primaryType());
 					} else if(rhs instanceof Function) {
-						for(java.lang.String arg : ((Function)rhs).arguments)
+						FunctionScopeOptimizer scopeOptimizer = new FunctionScopeOptimizer(variableScope);
+						scopeOptimizer.scope.put("arguments", "arguments");
+						for(java.lang.String arg : ((Function)rhs).arguments) {
 							if(RESTRICTED_SCOPE_NAMES.matcher(arg).matches()) {
 								variableScope.markCreateSyntheticScope();
 								return;
 							}
+							scopeOptimizer.scope.put(arg, "argument");
+						}
 								
-						scanScriptSource(((Function)rhs).impl, new FunctionScopeOptimizer(variableScope));
+						scanScriptSource(((Function)rhs).impl, scopeOptimizer);
 					} else
 						throw new CannotOptimizeUnimplemented("No implementation for optimizing set " + describe(rhs));
 				} else if(lhs instanceof ReferenceChain || lhs instanceof VariableReference || lhs instanceof IntegerReference) {
@@ -2581,7 +2585,12 @@ public class JavaTranspiler extends RegexCompiler {
 							localStack.put(arguments.get(i), "argument");
 						}
 						for(java.lang.String key : opt.keys()) {
+							if(key.equals("arguments"))
+								continue;
 							java.lang.String type = opt.get(key);
+							if(type.equals("argument"))
+								continue;
+							sourceBuilder.append("\t");
 							if(type.equals("string"))
 								sourceBuilder.append("String");
 							else if(type.equals("boolean"))
@@ -2667,30 +2676,6 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.append(fileName);
 			sourceBuilder.appendln("\", SOURCE_MAP);");
 		}
-		if(opt != null && !synthScope)
-			for(java.lang.String name : localStack.keys()) {
-				java.lang.String type = opt.get(name);
-				if(type == null)
-					continue;
-				if(type.startsWith("parent"))
-					continue;
-				
-				if(type.equals("string"))
-					sourceBuilder.append("String");
-				else if(type.equals("boolean"))
-					sourceBuilder.append("boolean");
-				else if(type.equals("number"))
-					sourceBuilder.append("double");
-				else if(type.equals("array"))
-					sourceBuilder.append("GenericArray");
-				else if(type.equals("object"))
-					sourceBuilder.append("GenericObject");
-				else
-					sourceBuilder.append("BaseObject");
-				sourceBuilder.append(" ");
-				sourceBuilder.append(name);
-				sourceBuilder.appendln(";");
-			}
 		if(opt != null) {
 			for (Function function : script.functions.values()) {
 				if(function.uname == null)
@@ -2870,9 +2855,12 @@ public class JavaTranspiler extends RegexCompiler {
 			StackOptimizations funcopt = null;
 			FunctionScopeOptimizer variableScope = new FunctionScopeOptimizer(new ScopeOptimizer());
 			try {
-				for(java.lang.String arg : function.arguments)
+				variableScope.scope.put("arguments", "arguments");
+				for(java.lang.String arg : function.arguments) {
 					if(RESTRICTED_SCOPE_NAMES.matcher(arg).matches())
 						variableScope.markCreateSyntheticScope();
+					variableScope.scope.put(arg, "argument");
+				}
 				scanScriptSource(function.impl, variableScope);
 				function.impl.optimizations = funcopt = script.optimizations == null ? new MapStackOptimizations(variableScope.scope, variableScope.createSyntheticScope, variableScope.usesArguments) : new ExtendedStackOptimizations((StackOptimizations)script.optimizations, variableScope.scope, variableScope.createSyntheticScope, variableScope.usesArguments);
 			} catch(CannotOptimize ex) {
