@@ -120,6 +120,10 @@ public abstract class CompiledScript implements Script {
 		return current;
 	}
 	
+	public static void plusPlusTop(Global global, java.lang.String key, Scopable _this) {
+		_this.set(key, global.Number.wrap(global.Number.fromValueOf(_this.get(key)).value + 1));
+	}
+	
 	public static net.nexustools.njs.Number.Instance minusMinusLeft(Global global, java.lang.String key, Scopable _this) {
 		net.nexustools.njs.Number.Instance decremented = global.wrap(global.Number.fromValueOf(_this.get(key)).value - 1);
 		_this.set(key, decremented);
