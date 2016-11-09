@@ -2559,6 +2559,16 @@ public abstract class RegexCompiler implements Compiler {
 		public int precedence() {
 			return 7;
 		}
+
+		@Override
+		public boolean isNumber() {
+			return true;
+		}
+		@Override
+		public java.lang.String primaryType() {
+			return "number";
+		}
+		
 	}
 	public static class And extends RhLhReferency {
 		public And() {
@@ -2574,6 +2584,15 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public int precedence() {
 			return 9;
+		}
+
+		@Override
+		public boolean isNumber() {
+			return true;
+		}
+		@Override
+		public java.lang.String primaryType() {
+			return "number";
 		}
 	}
 	public static class Plus extends RhLhReferency {
@@ -2601,8 +2620,13 @@ public abstract class RegexCompiler implements Compiler {
 		}
 
 		@Override
+		public boolean isString() {
+			return lhs.isString() || rhs.isString();
+		}
+
+		@Override
 		public boolean isNumber() {
-			return lhs.isNumber() || rhs.isNumber();
+			return !lhs.isString() || !rhs.isString();
 		}
 		
 		@Override
@@ -2629,6 +2653,15 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public int precedence() {
 			return 13;
+		}
+
+		@Override
+		public boolean isNumber() {
+			return true;
+		}
+		@Override
+		public java.lang.String primaryType() {
+			return "number";
 		}
 	}
 	public static class InstanceOf extends RhLhReferency {
@@ -2661,6 +2694,15 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public int precedence() {
 			return 3;
+		}
+
+		@Override
+		public boolean isNumber() {
+			return true;
+		}
+		@Override
+		public java.lang.String primaryType() {
+			return "number";
 		}
 	}
 	public static class PlusPlus extends Referency implements NumberReferency {
@@ -2722,6 +2764,15 @@ public abstract class RegexCompiler implements Compiler {
 			if(!right)
 				builder.append(unparsed(ref));
 			return builder.toString();
+		}
+
+		@Override
+		public boolean isNumber() {
+			return true;
+		}
+		@Override
+		public java.lang.String primaryType() {
+			return "number";
 		}
 		
 		@Override
@@ -2795,6 +2846,15 @@ public abstract class RegexCompiler implements Compiler {
 		public int precedence() {
 			return right ? 17 : 16;
 		}
+
+		@Override
+		public boolean isNumber() {
+			return true;
+		}
+		@Override
+		public java.lang.String primaryType() {
+			return "number";
+		}
 		
 	}
 	public static class MoreThan extends RhLhReferency {
@@ -2811,6 +2871,18 @@ public abstract class RegexCompiler implements Compiler {
 		public int precedence() {
 			return 11;
 		}
+
+		@Override
+		public java.lang.String primaryType() {
+			return "boolean";
+		}
+
+		@Override
+		public boolean isBoolean() {
+			return true;
+		}
+		
+		
 	}
 	public static class LessThan extends RhLhReferency {
 		public LessThan() {}
@@ -2825,6 +2897,16 @@ public abstract class RegexCompiler implements Compiler {
 		@Override
 		public int precedence() {
 			return 11;
+		}
+
+		@Override
+		public java.lang.String primaryType() {
+			return "boolean";
+		}
+
+		@Override
+		public boolean isBoolean() {
+			return true;
 		}
 	}
 	public static class MoreEqual extends RhLhReferency {
@@ -2841,6 +2923,16 @@ public abstract class RegexCompiler implements Compiler {
 		public int precedence() {
 			return 11;
 		}
+
+		@Override
+		public java.lang.String primaryType() {
+			return "boolean";
+		}
+
+		@Override
+		public boolean isBoolean() {
+			return true;
+		}
 	}
 	public static class LessEqual extends RhLhReferency {
 		public LessEqual() {}
@@ -2856,21 +2948,36 @@ public abstract class RegexCompiler implements Compiler {
 		public int precedence() {
 			return 11;
 		}
-	}
-	public static class In extends Helper implements BaseReferency {
+
 		@Override
-		public java.lang.String toSource() {
-			return "in";
+		public java.lang.String primaryType() {
+			return "boolean";
 		}
 
+		@Override
+		public boolean isBoolean() {
+			return true;
+		}
+	}
+	public static class In extends RhLhReferency {
 		@Override
 		public int precedence() {
 			return 11;
 		}
 
 		@Override
-		public Parsed transformFallback(Parsed part) {
-			throw new UnsupportedOperationException("Not supported");
+		public java.lang.String primaryType() {
+			return "boolean";
+		}
+
+		@Override
+		public boolean isBoolean() {
+			return true;
+		}
+
+		@Override
+		public java.lang.String op() {
+			return "in";
 		}
 	}
 	public static class Of extends Helper implements BaseReferency {

@@ -139,10 +139,7 @@ public class JavaSourceCompiler {
 		}
 
 		@Override
-		public JavaFileObject getJavaFileForOutput(JavaFileManager.Location location,
-			java.lang.String className,
-			JavaFileObject.Kind kind,
-			FileObject sibling) throws IOException {
+		public JavaFileObject getJavaFileForOutput(JavaFileManager.Location location, java.lang.String className, JavaFileObject.Kind kind, FileObject sibling) throws IOException {
 			if (kind == JavaFileObject.Kind.CLASS) {
 				return new ClassOutputBuffer(className);
 			} else {

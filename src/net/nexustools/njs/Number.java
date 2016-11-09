@@ -23,8 +23,8 @@ public abstract class Number extends AbstractFunction {
 
 	public static class Instance extends GenericObject {
 		public final double value;
-		private final Number Number;
-		private final boolean _const;
+		public final Number Number;
+		public final boolean _const;
 		Instance(Number Number, Symbol.Instance iterator, String String, double number, boolean _const) {
 			super(Number, iterator, String, (Number)null);
 			this.Number = Number;

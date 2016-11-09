@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
  *
  * @author Katelyn Slater <kate@nexustools.com>
  */
-public class WeakNumber extends Number {
+public class CachedNumber extends Number {
 	private final ScheduledExecutorService EXECUTOR_SERVICE = Executors.newSingleThreadScheduledExecutor();
 	private final WeakReference<Instance>[][] INSTANCES = new WeakReference[0x10000][0];
 	private final Runnable CLEAN = new Runnable() {

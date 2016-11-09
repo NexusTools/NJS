@@ -58,7 +58,7 @@ public class Global extends GenericObject {
 	public final Function Function = new Function(this);
 	public final GeneratorFunction GeneratorFunction;
 	public final Object Object = new Object();
-	public final String String = new String();
+	public final String String;
 	public final Number Number;
 	public final Boolean Boolean;
 	public final Symbol Symbol;
@@ -79,12 +79,17 @@ public class Global extends GenericObject {
 		this.compiler = compiler;
 		
 		try {
-			super.Number = new StrongNumber();
+			super.Number = new ConstructNumber();
 		} catch(Throwable ex) {
-			super.Number = new WeakNumber();
+			super.Number = new CachedNumber();
 		}
 		Number = super.Number;
-		super.String = String;
+		try {
+			super.String = new ConstructString();
+		} catch(Throwable ex) {
+			super.String = new CachedString();
+		}
+		String = super.String;
 		
 		Symbol = new Symbol(this);
 		Symbol.initConstants();

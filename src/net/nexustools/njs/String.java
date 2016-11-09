@@ -24,7 +24,7 @@ import java.util.List;
  *
  * @author Katelyn Slater <kate@nexustools.com>
  */
-public class String extends AbstractFunction {
+public abstract class String extends AbstractFunction {
 	public static class Instance extends GenericObject {
 		private static double stringToDouble(java.lang.String input) {
 			try {
@@ -91,8 +91,7 @@ public class String extends AbstractFunction {
 		}
 	}
 	
-	private Global global;
-	final List<WeakReference<Instance>> WRAPS = new ArrayList();
+	protected Global global;
 	public String() {
 		this.String = this;
 	}
@@ -223,25 +222,7 @@ public class String extends AbstractFunction {
 		return _this;
 	}
 
-	public Instance wrap(java.lang.String string) {
-		assert(string != null);
-		synchronized(WRAPS) {
-			Iterator<WeakReference<Instance>> it = WRAPS.iterator();
-			while(it.hasNext()) {
-				WeakReference<Instance> ref = it.next();
-				Instance um = ref.get();
-				if(um == null)
-					it.remove();
-				else if(string.equals(um.string))
-					return um;
-			}
-			
-			Instance um = new Instance(global, string, true);
-			WRAPS.add(new WeakReference(um));
-			um.seal();
-			return um;
-		}
-	}
+	public abstract Instance wrap(java.lang.String string);
 	
 	public String.Instance from(BaseObject param) {
 		if(param instanceof Instance)
