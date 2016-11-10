@@ -780,7 +780,7 @@ public class RuntimeCompiler extends RegexCompiler {
 			return new Impl() {
 				@Override
 				public Referencable run(Global global, Scope scope) {
-					return new ValueReferenceable(global.wrap(lhs.run(global, scope).get() == rhs.run(global, scope).get()), rows, columns);
+					return new ValueReferenceable(lhs.run(global, scope).get().strictEquals(rhs.run(global, scope).get()) ? global.Boolean.TRUE : global.Boolean.FALSE, rows, columns);
 				}
 			};
 		} else if (object instanceof StrictNotEquals) {
@@ -789,7 +789,7 @@ public class RuntimeCompiler extends RegexCompiler {
 			return new Impl() {
 				@Override
 				public Referencable run(Global global, Scope scope) {
-					return new ValueReferenceable(global.wrap(lhs.run(global, scope).get() != rhs.run(global, scope).get()), rows, columns);
+					return new ValueReferenceable(lhs.run(global, scope).get().strictEquals(rhs.run(global, scope).get()) ? global.Boolean.FALSE : global.Boolean.TRUE, rows, columns);
 				}
 			};
 		} else if (object instanceof LessThan) {

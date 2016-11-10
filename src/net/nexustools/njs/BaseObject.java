@@ -208,4 +208,6 @@ public interface BaseObject extends Scopable, Iterable<BaseObject> {
 	
 	public Iterator<java.lang.String> deepPropertyNameIterator();
 	public String.Instance _toString();
+
+	public boolean strictEquals(java.lang.Object obj);
 }

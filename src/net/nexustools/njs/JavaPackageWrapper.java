@@ -379,5 +379,10 @@ public class JavaPackageWrapper implements BaseObject {
 	public java.lang.String toString() {
 		return _toString.toString();
 	}
+
+	@Override
+	public boolean strictEquals(java.lang.Object obj) {
+		return this == obj;
+	}
 	
 }

@@ -771,17 +771,18 @@ public class Utilities {
 		private ReplacementStackTraceElement(java.lang.String methodName, java.lang.String fileName, int rows, int columns) {
 			this.methodName = methodName;
 			this.fileName = fileName;
-			this.rows = rows;
 			this.columns = columns;
+			this.rows = rows;
 			sourceMap = null;
 		}
 
 		private ReplacementStackTraceElement(java.lang.String methodName, java.lang.String fileName, Map<Integer, FilePosition> SOURCE_MAP) {
+			assert(SOURCE_MAP != null);
 			this.methodName = methodName;
 			this.fileName = fileName;
-			rows = 0;
-			columns = 0;
 			sourceMap = SOURCE_MAP;
+			columns = 0;
+			rows = 0;
 		}
 
 		private StackTraceElement toStackTraceElement() {

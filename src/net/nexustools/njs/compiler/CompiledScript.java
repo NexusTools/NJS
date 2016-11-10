@@ -175,22 +175,6 @@ public abstract class CompiledScript implements Script {
 		return val;
 	}
 	
-	public static boolean strictEquals(BaseObject lhs, BaseObject rhs) {
-		if(lhs == rhs)
-			return true;
-		if(lhs instanceof net.nexustools.njs.String.Instance)
-			return rhs instanceof net.nexustools.njs.String.Instance && 
-				((net.nexustools.njs.String.Instance)lhs)._const && 
-				((net.nexustools.njs.String.Instance)rhs)._const && 
-				((net.nexustools.njs.String.Instance)lhs).string.equals(((net.nexustools.njs.String.Instance)rhs).string);
-		if(lhs instanceof net.nexustools.njs.Number.Instance)
-			return rhs instanceof net.nexustools.njs.Number.Instance && 
-				((net.nexustools.njs.Number.Instance)lhs)._const && 
-				((net.nexustools.njs.Number.Instance)rhs)._const && 
-				((net.nexustools.njs.Number.Instance)lhs).value == ((net.nexustools.njs.Number.Instance)rhs).value;
-		return false;
-	}
-	
 	public static boolean moreThan(BaseObject _lhs, BaseObject _rhs) {
 		BaseObject lhs = Utilities.valueOf(_lhs);
 		BaseObject rhs = Utilities.valueOf(_rhs);

@@ -796,5 +796,10 @@ public class GenericObject extends NumberObject {
 	private void setNode(java.lang.String key, Property extendedProperty) {
 		throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
 	}
+
+	@Override
+	public boolean strictEquals(java.lang.Object obj) {
+		return this == obj;
+	}
 	
 }

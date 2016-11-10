@@ -15,25 +15,12 @@
  */
 package net.nexustools.njs;
 
-import java.lang.ref.WeakReference;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
 /**
  *
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public abstract class String extends AbstractFunction {
 	public static class Instance extends GenericObject {
-		private static double stringToDouble(java.lang.String input) {
-			try {
-				return Double.valueOf(input);
-			} catch(NumberFormatException ex) {
-				return Double.NaN;
-			}
-		}
-		
 		public final boolean _const;
 		public final java.lang.String string;
 		Instance(Global global, final java.lang.String string, boolean _const) {
@@ -89,6 +76,20 @@ public abstract class String extends AbstractFunction {
 		public boolean toBool() {
 			return string.length() > 0;
 		}
+		@Override
+		public java.lang.String typeOf() {
+			return _const ? "string" : "object";
+		}
+
+		@Override
+		public boolean strictEquals(java.lang.Object obj) {
+			if(obj == this)
+				return true;
+			
+			return _const && obj instanceof Instance &&
+				((Instance)obj)._const && string.equals(((Instance)obj).string);
+		}
+		
 	}
 	
 	protected Global global;

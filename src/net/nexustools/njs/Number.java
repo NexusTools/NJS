@@ -105,6 +105,15 @@ public abstract class Number extends AbstractFunction {
 		public java.lang.String typeOf() {
 			return _const ? "number" : "object";
 		}
+
+		@Override
+		public boolean strictEquals(java.lang.Object obj) {
+			if(obj == this)
+				return true;
+			
+			return _const && !Double.isNaN(value) && obj instanceof Instance &&
+				((Instance)obj)._const && value == ((Instance)obj).value;
+		}
 	}
 	
 	public Number.Instance NaN;

@@ -308,5 +308,10 @@ public final class Undefined implements BaseObject {
 	public String.Instance _toString() {
 		throw new UnsupportedOperationException("Not supported");
 	}
+
+	@Override
+	public boolean strictEquals(java.lang.Object obj) {
+		return this == obj;
+	}
 	
 }
