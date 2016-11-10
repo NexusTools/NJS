@@ -67,13 +67,16 @@ public class JavaTranspiler extends RegexCompiler {
 
 		if(argument.isNumberOrBool() || argument instanceof OpenGroup || argument instanceof OpenArray)
 			return;
-
+		
+		if(argument.isString())
+			variableScope.markUseSyntheticStack();
 		if(argument instanceof BaseReferency) {
 			if(argument instanceof Reference)
-				variableScope.assertTyped(((Reference)argument).ref, "number", "boolean");
-			else if(argument instanceof Call)
+				variableScope.assertTyped(((Reference)argument).ref, "number", "boolean", "object", "array", "arguments");
+			else if(argument instanceof Call) {
 				scanParsedSource(argument, variableScope);
-			else if(argument instanceof RhLh) {
+				variableScope.markUseSyntheticStack();
+			} else if(argument instanceof RhLh) {
 				if(argument instanceof Set) {
 					scanArgument(((RhLh)argument).lhs, variableScope);
 					scanParsedSource(argument, variableScope);
@@ -82,18 +85,19 @@ public class JavaTranspiler extends RegexCompiler {
 					scanArgument(((RhLh)argument).rhs, variableScope);
 				} else
 					scanParsedSource(argument, variableScope);
+			} else if(argument instanceof AndAnd || argument instanceof OrOr) {
+				scanArgument(((RhLh)argument).lhs, variableScope);
+				scanArgument(((RhLh)argument).rhs, variableScope);
 			} else if(argument instanceof Rh)
 				scanParsedSource(argument, variableScope);
 			else if(argument instanceof Number || argument instanceof Integer || argument instanceof Null || argument instanceof Undefined) {
 				// IGNORED
-			} else if(argument instanceof String)
-				variableScope.markCreateSyntheticScope();
-			else if(argument instanceof RightReference || argument instanceof ReferenceChain) {
-				variableScope.markCreateSyntheticScope();
+			} else if(argument instanceof RightReference || argument instanceof ReferenceChain) {
+				variableScope.markUseSyntheticStack();
 				scanParsedSource(argument, variableScope);
 			} else
 				throw new CannotOptimizeUnimplemented("Unhandled argument: " + describe(argument));
-		}else if(argument instanceof RhLh) {
+		} else if(argument instanceof RhLh) {
 			scanParsedSource(((RhLh)argument).lhs, variableScope);
 			scanParsedSource(((RhLh)argument).rhs, variableScope);
 		} else if(argument instanceof Rh)
@@ -163,17 +167,19 @@ public class JavaTranspiler extends RegexCompiler {
 	
 	private static interface StackOptimizations {
 		public java.lang.String get(java.lang.String key);
-		public boolean createSyntheticScope();
+		public ScopeOptimizer.StackType stackType();
 		public boolean usesArguments();
 
 		public java.util.Set<java.lang.String> keys();
+		public java.lang.String getReference(java.lang.String ref);
 	}
 	private static class MapStackOptimizations implements StackOptimizations {
-		private final boolean createSyntheticScope, usesArguments;
+		private final boolean usesArguments;
+		private final ScopeOptimizer.StackType stackType;
 		private final Map<java.lang.String, java.lang.String> map;
-		public MapStackOptimizations(Map<java.lang.String, java.lang.String> map, boolean createSyntheticScope, boolean usesArguments) {
-			this.createSyntheticScope = createSyntheticScope;
+		public MapStackOptimizations(Map<java.lang.String, java.lang.String> map, ScopeOptimizer.StackType stackType, boolean usesArguments) {
 			this.usesArguments = usesArguments;
+			this.stackType = stackType;
 			this.map = map;
 		}
 
@@ -188,19 +194,30 @@ public class JavaTranspiler extends RegexCompiler {
 		}
 
 		@Override
-		public boolean createSyntheticScope() {
-			return createSyntheticScope;
+		public ScopeOptimizer.StackType stackType() {
+			return stackType;
 		}
 
 		@Override
 		public java.util.Set<java.lang.String> keys() {
 			return map.keySet();
 		}
+
+		@Override
+		public java.lang.String getReference(java.lang.String ref) {
+			switch(stackType) {
+				case SyntheticScopeable:
+				case TypedClass:
+					return "localStack." + ref;
+				default:
+					return ref;
+			}
+		}
 	}
 	private static class ExtendedStackOptimizations extends MapStackOptimizations {
 		private final StackOptimizations parent;
-		public ExtendedStackOptimizations(StackOptimizations parent, Map<java.lang.String, java.lang.String> map, boolean createSyntheticScope, boolean usesArguments) {
-			super(map, createSyntheticScope, usesArguments);
+		public ExtendedStackOptimizations(StackOptimizations parent, Map<java.lang.String, java.lang.String> map, ScopeOptimizer.StackType stackType, boolean usesArguments) {
+			super(map, stackType, usesArguments);
 			this.parent = parent;
 		}
 
@@ -799,31 +816,27 @@ public class JavaTranspiler extends RegexCompiler {
 	private void generateBaseScopeAccess(SourceBuilder sourceBuilder, java.lang.String ref, java.lang.String baseScope, StackOptimizations opts, LocalStack localStack) {
 		java.lang.String type;
 		if(localStack != null && (type = localStack.get(ref)) != null) {
-			if(opts != null && opts.createSyntheticScope()) {
-				if(ref.equals("this"))
-					sourceBuilder.append("_this");
-				else {
-					sourceBuilder.append("localStack.");
-					sourceBuilder.append(ref);
-				}
+			if(ref.equals("this")) {
+				sourceBuilder.append("_this");
 				return;
 			}
-			if(ref.equals("this"))
-				ref = "_this";
+			
+			if(opts.stackType() == ScopeOptimizer.StackType.SyntheticScopeable)
+				type = "unknown";
 			if(type.equals("number")) {
 				sourceBuilder.append("global.Number.wrap(");
-				sourceBuilder.append(ref);
+				sourceBuilder.append(opts.getReference(ref));
 				sourceBuilder.append(")");
 			} else if(type.equals("string")) {
 				sourceBuilder.append("global.String.wrap(");
-				sourceBuilder.append(ref);
+				sourceBuilder.append(opts.getReference(ref));
 				sourceBuilder.append(")");
 			} else if(type.equals("boolean")) {
 				sourceBuilder.append("(");
-				sourceBuilder.append(ref);
+				sourceBuilder.append(opts.getReference(ref));
 				sourceBuilder.append(" ? global.Boolean.TRUE : global.Boolean.FALSE)");
 			} else
-				sourceBuilder.append(ref);
+				sourceBuilder.append(opts.getReference(ref));
 		} else {
 			sourceBuilder.append(baseScope);
 			sourceBuilder.append(".get(\"");
@@ -853,12 +866,18 @@ public class JavaTranspiler extends RegexCompiler {
 
 	private static final Pattern RESTRICTED_SCOPE_NAMES = Pattern.compile("^(_this|__this|function|global|(localStack|(block|catch|base)Scope)\\d*)$");
 	public static class ScopeOptimizer {
-		public boolean createSyntheticScope;
+		public static enum StackType {
+			TypedLocal,
+			TypedClass,
+			SyntheticScopeable
+		}
+		
+		public StackType stackType = StackType.TypedLocal;
 		public final ArrayList<java.lang.String> volati = new ArrayList();
 		public final HashMap<java.lang.String, java.lang.String> scope = new HashMap();
 		public void var(java.lang.String key, java.lang.String type) {
 			if(RESTRICTED_SCOPE_NAMES.matcher(key).matches())
-				markCreateSyntheticScope();
+				markUseTypedClassStack();
 			java.lang.String current = scope.get(key);
 			if(current == null)
 				scope.put(key, type);
@@ -869,12 +888,14 @@ public class JavaTranspiler extends RegexCompiler {
 			var(key, type);
 		}
 		public void markVolatile(java.lang.String key) {
+			reference(key);
 			if(scope.containsKey(key) && !volati.contains(key))
 				volati.add(key);
 		}
 		public void update(java.lang.String key, java.lang.String newType) {
 			java.lang.String current = scope.get(key);
 			if(DEBUG) System.out.println(key + " : " + current + " : " + newType);
+			reference(key);
 			if(current == null)
 				return;
 			if(current.equals("any"))
@@ -882,25 +903,28 @@ public class JavaTranspiler extends RegexCompiler {
 			else if(!current.equals(newType)) {
 				scope.put(key, "unknown");
 				if(volati.contains(key))
-					markCreateSyntheticScope();
+					markUseSyntheticStack();
 			}
-			return;
 		}
+		
+		public void reference(java.lang.String key) {}
 
 		public boolean isTyped(java.lang.String key, java.lang.String type) {
+			reference(key);
 			return type.equals(scope.get(key));
 		}
 
 		public void assertTyped(java.lang.String key, java.lang.String... _types) {
 			java.lang.String current = scope.get(key);
 			if(current == null || !Arrays.asList(_types).contains(current)) {
-				markCreateSyntheticScope();
+				markUseSyntheticStack();
 				return;
 			}
 			markVolatile(key);
 		}
 
 		public java.lang.String lookup(java.lang.String key) {
+			reference(key);
 			java.lang.String current = scope.get(key);
 			if(current == null)
 				return "unknown";
@@ -908,23 +932,34 @@ public class JavaTranspiler extends RegexCompiler {
 				return current;
 		}
 
-		public void markCreateSyntheticScope() {
-			createSyntheticScope = true;
+		public void markUseSyntheticStack() {
+			stackType = StackType.SyntheticScopeable;
+		}
+
+		public void markUseTypedClassStack() {
+			if(stackType == StackType.TypedLocal)
+				stackType = StackType.TypedClass;
 		}
 
 		public void markUsesArguments() {
 		}
 	}
 	public static class FunctionScopeOptimizer extends ScopeOptimizer {
-		boolean usesArguments = true;
+		boolean usesArguments;
 		final ScopeOptimizer parent;
 		FunctionScopeOptimizer(ScopeOptimizer parent) {
 			this.parent = parent;
 		}
 		
 		@Override
+		public void reference(java.lang.String key) {
+			usesArguments = usesArguments || key.equals("arguments");
+		}
+		
+		@Override
 		public void markVolatile(java.lang.String key) {
 			if(scope.containsKey(key)) {
+				reference(key);
 				if(!volati.contains(key))
 					volati.add(key);
 			} else
@@ -935,16 +970,21 @@ public class JavaTranspiler extends RegexCompiler {
 		public void update(java.lang.String key, java.lang.String newType) {
 			java.lang.String current = scope.get(key);
 			if(DEBUG) System.out.println(key + " : " + current + " : " + newType);
-			if(current == null)
+			if(current == null) {
+				reference(key);
 				return;
+			}
 			if(current.equals("any"))
 				scope.put(key, newType);
 			else if(!current.equals(newType)) {
 				scope.put(key, "unknown");
 				if(volati.contains(key))
-					markCreateSyntheticScope();
-			} else
+					markUseSyntheticStack();
+			} else {
 				parent.update(key, newType);
+				return;
+			}
+			reference(key);
 		}
 
 		@Override
@@ -965,7 +1005,7 @@ public class JavaTranspiler extends RegexCompiler {
 			
 			List<java.lang.String> types = Arrays.asList(_types);
 			if(!types.contains(current)) {
-				markCreateSyntheticScope();
+				markUseSyntheticStack();
 				return;
 			}
 			markVolatile(key);
@@ -981,9 +1021,15 @@ public class JavaTranspiler extends RegexCompiler {
 		}
 
 		@Override
-		public void markCreateSyntheticScope() {
-			createSyntheticScope = true;
-			parent.markCreateSyntheticScope();
+		public void markUseSyntheticStack() {
+			super.markUseSyntheticStack();
+			parent.markUseSyntheticStack();
+		}
+
+		@Override
+		public void markUseTypedClassStack() {
+			super.markUseTypedClassStack();
+			parent.markUseTypedClassStack();
 		}
 
 		@Override
@@ -996,6 +1042,11 @@ public class JavaTranspiler extends RegexCompiler {
 		BlockScopeOptimizer(ScopeOptimizer parent) {
 			this.parent = parent;
 		}
+		
+		@Override
+		public void reference(java.lang.String key) {
+			parent.reference(key);
+		}
 
 		@Override
 		public void var(java.lang.String key, java.lang.String type) {
@@ -1005,6 +1056,7 @@ public class JavaTranspiler extends RegexCompiler {
 		@Override
 		public void markVolatile(java.lang.String key) {
 			if(scope.containsKey(key)) {
+				reference(key);
 				if(!volati.contains(key))
 					volati.add(key);
 			} else
@@ -1019,12 +1071,13 @@ public class JavaTranspiler extends RegexCompiler {
 				parent.update(key, newType);
 				return;
 			}
+			reference(key);
 			if(current.equals("any"))
 				scope.put(key, newType);
 			else if(!current.equals(newType)) {
 				scope.put(key, "unknown");
 				if(volati.contains(key))
-					markCreateSyntheticScope();
+					markUseSyntheticStack();
 			}
 		}
 
@@ -1046,7 +1099,7 @@ public class JavaTranspiler extends RegexCompiler {
 			
 			List<java.lang.String> types = Arrays.asList(_types);
 			if(!types.contains(current)) {
-				markCreateSyntheticScope();
+				markUseSyntheticStack();
 				return;
 			}
 			markVolatile(key);
@@ -1062,9 +1115,15 @@ public class JavaTranspiler extends RegexCompiler {
 		}
 
 		@Override
-		public void markCreateSyntheticScope() {
-			createSyntheticScope = true;
-			parent.markCreateSyntheticScope();
+		public void markUseSyntheticStack() {
+			super.markUseSyntheticStack();
+			parent.markUseSyntheticStack();
+		}
+
+		@Override
+		public void markUseTypedClassStack() {
+			super.markUseTypedClassStack();
+			parent.markUseTypedClassStack();
 		}
 
 		@Override
@@ -1202,7 +1261,7 @@ public class JavaTranspiler extends RegexCompiler {
 					scopeOptimizer.scope.put("arguments", "arguments");
 					for(java.lang.String arg : ((Function)rhs).arguments) {
 						if(RESTRICTED_SCOPE_NAMES.matcher(arg).matches()) {
-							variableScope.markCreateSyntheticScope();
+							variableScope.markUseTypedClassStack();
 							return;
 						}
 						scopeOptimizer.scope.put(arg, "argument");
@@ -1212,14 +1271,18 @@ public class JavaTranspiler extends RegexCompiler {
 				} else
 					throw new CannotOptimizeUnimplemented("No implementation for optimizing set " + describe(rhs));
 			} else if(lhs instanceof ReferenceChain || lhs instanceof VariableReference || lhs instanceof IntegerReference) {
-				// IGNORED
+				scanParsedSource(lhs, variableScope);
 			} else
 				throw new CannotOptimizeUnimplemented("No implementation for optimizing set " + describe(lhs));
 		} else if(parsed instanceof OpenGroup) {
 			for(Map.Entry<?, Parsed> entry : ((OpenGroup)parsed).entries.entrySet()) {
 				scanParsedSource(entry.getValue(), variableScope);
 			}
-		} else if(parsed instanceof Reference || parsed instanceof ReferenceChain || parsed instanceof Integer || parsed instanceof Boolean ||
+		} else if(parsed instanceof Reference) {
+			variableScope.reference(((Reference)parsed).ref);
+		} else if(parsed instanceof ReferenceChain) {
+			variableScope.reference(((ReferenceChain)parsed).chain.get(0));
+		} else if(parsed instanceof Integer || parsed instanceof Boolean ||
 				parsed instanceof Number || parsed instanceof String || parsed instanceof Null || parsed instanceof Undefined) {
 			// IGNORED
 		} else if(parsed instanceof RhLh) {
@@ -1243,15 +1306,18 @@ public class JavaTranspiler extends RegexCompiler {
 	private void scanScriptSource(ScriptData script, ScopeOptimizer variableScope) {
 		scanParsedSource(script.impl, variableScope);
 		
-		for(Function function : script.functions.values()) {
-			scanScriptSource(function.impl, new FunctionScopeOptimizer(variableScope));
+		if(!script.functions.isEmpty()) {
+			variableScope.markUseTypedClassStack();
+			for(Function function : script.functions.values()) {
+				scanScriptSource(function.impl, new FunctionScopeOptimizer(variableScope));
+			}
 		}
 	}
 	private void scanScriptSource(ScriptData script) {
 		ScopeOptimizer variableScope = new ScopeOptimizer();
 		try {
 			scanScriptSource(script, variableScope);
-			script.optimizations = new MapStackOptimizations(variableScope.scope, variableScope.createSyntheticScope, variableScope instanceof FunctionScopeOptimizer ? ((FunctionScopeOptimizer)variableScope).usesArguments : false);
+			script.optimizations = new MapStackOptimizations(variableScope.scope, variableScope.stackType, variableScope instanceof FunctionScopeOptimizer ? ((FunctionScopeOptimizer)variableScope).usesArguments : false);
 		} catch(CannotOptimize ex) {
 			if(DEBUG || ex instanceof CannotOptimizeUnimplemented)
 				ex.printStackTrace(System.out);
@@ -1670,15 +1736,13 @@ public class JavaTranspiler extends RegexCompiler {
 				if(type != null) {
 					if(type.startsWith("parent"))
 						throw new RuntimeException("Should not be declaring a parent's property...");
-					if(expectedStack.createSyntheticScope()) {
+					if(expectedStack.stackType() == ScopeOptimizer.StackType.SyntheticScopeable)
 						type = "unknown";
-						sourceBuilder.append("localStack.");
-					}
 					localStack.put(set.lhs, type);
 					if(set.rhs == null)
 						continue;
 					
-					sourceBuilder.append(set.lhs);
+					sourceBuilder.append(expectedStack.getReference(set.lhs));
 					sourceBuilder.append(" = ");
 					if(type.equals("string")) {
 						if(set.rhs == null)
@@ -1890,12 +1954,10 @@ public class JavaTranspiler extends RegexCompiler {
 				if(localStack != null) {
 					java.lang.String type = localStack.get(((Reference)lhs).ref);
 					if(type != null) {
-						if(expectedStack.createSyntheticScope()) {
-							sourceBuilder.append("localStack.");
+						if(expectedStack.stackType() == ScopeOptimizer.StackType.SyntheticScopeable)
 							type = "unknown";
-						}
-						sourceBuilder.append(((Reference)lhs).ref);
 						
+						sourceBuilder.append(expectedStack.getReference(((Reference)lhs).ref));
 						sourceBuilder.append(" = ");
 						if(type.equals("string")) {
 							generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
@@ -2258,7 +2320,7 @@ public class JavaTranspiler extends RegexCompiler {
 			
 			if(localStack != null) {
 				if(ref instanceof Reference) {
-					if(expectedStack.createSyntheticScope()) {
+					if(expectedStack.stackType() == ScopeOptimizer.StackType.SyntheticScopeable) {
 						if(atTop)
 							sourceBuilder.append("plusPlusTop(global, ");
 						else if(((PlusPlus)part).right)
@@ -2279,7 +2341,7 @@ public class JavaTranspiler extends RegexCompiler {
 						sourceBuilder.append("global.wrap(");
 					if(!((PlusPlus)part).right)
 						sourceBuilder.append("++");
-					sourceBuilder.append(((Reference)ref).ref);
+					sourceBuilder.append(expectedStack.getReference(((Reference)ref).ref));
 					if(((PlusPlus)part).right)
 						sourceBuilder.append("++");
 					if(!atTop)
@@ -2541,14 +2603,14 @@ public class JavaTranspiler extends RegexCompiler {
 			sourceBuilder.appendln("}");
 		}
 		StackOptimizations opt = (StackOptimizations)script.optimizations;
-		boolean synthScope = opt != null && opt.createSyntheticScope();
-		java.lang.String stackName = synthScope ? scopeChain.toClassName("Stack") : null;
+		boolean usesStackClass = opt != null && opt.stackType() != ScopeOptimizer.StackType.TypedLocal;
+		java.lang.String stackName = usesStackClass ? scopeChain.toClassName("Stack") : null;
 		if (!scope.isGlobal()) {
 			sourceBuilder.appendln("@Override");
 			sourceBuilder.appendln("public String name() {");
 			sourceBuilder.append("\treturn \"");
-			if(script.callee != null)
-				sourceBuilder.append(script.callee.name != null ? convertStringSource(script.callee.name) : "<anonymous>");
+			if(script.callee != null && script.callee.name != null)
+				sourceBuilder.append("<anonymous>");
 			else
 				sourceBuilder.append(script.methodName != null ? convertStringSource(script.methodName) : "<anonymous>");
 			sourceBuilder.appendln("\";");
@@ -2566,14 +2628,14 @@ public class JavaTranspiler extends RegexCompiler {
 					sourceBuilder.appendln("\tbaseScope.var(\"arguments\", new Arguments(global, this, params));");
 				else {
 					localStack.put("this", "unknown");
-					if(synthScope) {
+					if(usesStackClass) {
 						for(int i=0; i<arguments.size(); i++) {
 							localStack.put(arguments.get(i), "argument");
 						}
 						if(localStack.isEmpty())
 							sourceBuilder.appendln("\tfinal Scope baseScope = extendScope(_this);");
 						else {
-							sourceBuilder.append("\t");
+							sourceBuilder.append("\tfinal ");
 							sourceBuilder.append(stackName);
 							sourceBuilder.append(" localStack = new ");
 							sourceBuilder.append(stackName);
@@ -2641,7 +2703,7 @@ public class JavaTranspiler extends RegexCompiler {
 								sourceBuilder.appendln("]);");
 							} else {
 								sourceBuilder.append("\t\t\t");
-								if(synthScope)
+								if(usesStackClass)
 									sourceBuilder.append("localStack.");
 								sourceBuilder.append(arguments.get(a));
 								sourceBuilder.append(" = params[");
@@ -2656,7 +2718,7 @@ public class JavaTranspiler extends RegexCompiler {
 								sourceBuilder.appendln("\", Undefined.INSTANCE);");
 							} else {
 								sourceBuilder.append("\t\t\t");
-								if(synthScope)
+								if(usesStackClass)
 									sourceBuilder.append("localStack.");
 								sourceBuilder.append(arguments.get(a));
 								sourceBuilder.appendln(" = Undefined.INSTANCE;");
@@ -2691,7 +2753,7 @@ public class JavaTranspiler extends RegexCompiler {
 			for (Function function : script.functions.values()) {
 				if(function.uname == null)
 					function.uname = scopeChain.toClassName(function.name);
-				if(synthScope) {
+				if(usesStackClass) {
 					sourceBuilder.append("localStack.");
 					sourceBuilder.append(function.uname);
 				} else {
@@ -2714,7 +2776,7 @@ public class JavaTranspiler extends RegexCompiler {
 			}
 		sourceBuilder.appendln("BaseFunction function;");
 		sourceBuilder.appendln("BaseObject __this;");
-		if(opt == null || synthScope) {
+		if(opt == null || usesStackClass) {
 			sourceBuilder.appendln("baseScope.enter();");
 			sourceBuilder.appendln("try {");
 			sourceBuilder.indent();
@@ -2755,7 +2817,7 @@ public class JavaTranspiler extends RegexCompiler {
 		} else {
 			sourceBuilder.appendln("return Undefined.INSTANCE;");
 		}
-		if(opt == null || synthScope) {
+		if(opt == null || usesStackClass) {
 			sourceBuilder.unindent();
 			sourceBuilder.appendln("} finally {");
 			sourceBuilder.appendln("\tbaseScope.exit();");
@@ -2764,13 +2826,15 @@ public class JavaTranspiler extends RegexCompiler {
 		sourceBuilder.unindent();
 		sourceBuilder.appendln("}");
 		
-		if(synthScope && !localStack.isEmpty()) {
+		if(usesStackClass && !localStack.isEmpty()) {
 			sourceBuilder.append("private ");
 			//if(scope.isGlobal())
 				sourceBuilder.append("static ");
 			sourceBuilder.append("final class ");
 			sourceBuilder.append(stackName);
-			sourceBuilder.appendln(" extends SyntheticScopable {");
+			if(opt.stackType() == ScopeOptimizer.StackType.SyntheticScopeable)
+				sourceBuilder.append(" extends SyntheticScopable");
+			sourceBuilder.appendln(" {");
 			sourceBuilder.indent();
 			for(java.lang.String key : localStack.keys()) {
 				if(key.equals("this"))
@@ -2781,72 +2845,74 @@ public class JavaTranspiler extends RegexCompiler {
 				sourceBuilder.appendln(";");
 			}
 
-			sourceBuilder.appendln("@Override");
-			sourceBuilder.appendln("public BaseObject get(java.lang.String key, Or<BaseObject> or) {");
-			sourceBuilder.indent();
-			boolean _else = false;
-			for(java.lang.String key : localStack.keys()) {
-				if(key.equals("this"))
-					continue;
-				if(_else)
-					sourceBuilder.append("else ");
-				else
-					_else = true;
-				sourceBuilder.append("if(key.equals(\"");
-				sourceBuilder.append(convertStringSource(key));
-				sourceBuilder.appendln("\"))");
-				sourceBuilder.append("\treturn this.");
-				sourceBuilder.append(key);
-				sourceBuilder.appendln(";");
-			}
-			sourceBuilder.appendln("return or.or(key);");
-			sourceBuilder.unindent();
-			sourceBuilder.appendln("}");
+			if(opt.stackType() == ScopeOptimizer.StackType.SyntheticScopeable) {
+				sourceBuilder.appendln("@Override");
+				sourceBuilder.appendln("public BaseObject get(java.lang.String key, Or<BaseObject> or) {");
+				sourceBuilder.indent();
+				boolean _else = false;
+				for(java.lang.String key : localStack.keys()) {
+					if(key.equals("this"))
+						continue;
+					if(_else)
+						sourceBuilder.append("else ");
+					else
+						_else = true;
+					sourceBuilder.append("if(key.equals(\"");
+					sourceBuilder.append(convertStringSource(key));
+					sourceBuilder.appendln("\"))");
+					sourceBuilder.append("\treturn this.");
+					sourceBuilder.append(key);
+					sourceBuilder.appendln(";");
+				}
+				sourceBuilder.appendln("return or.or(key);");
+				sourceBuilder.unindent();
+				sourceBuilder.appendln("}");
 
-			sourceBuilder.appendln("@Override");
-			sourceBuilder.appendln("public void set(java.lang.String key, BaseObject val, Or<Void> or) {");
-			sourceBuilder.indent();
-			_else = false;
-			for(java.lang.String key : localStack.keys()) {
-				if(key.equals("this"))
-					continue;
-				if(_else)
-					sourceBuilder.append(" else ");
-				else
-					_else = true;
-				sourceBuilder.append("if(key.equals(\"");
-				sourceBuilder.append(convertStringSource(key));
-				sourceBuilder.appendln("\")) {");
-				sourceBuilder.append("\tthis.");
-				sourceBuilder.append(key);
-				sourceBuilder.appendln(" = val;");
-				sourceBuilder.appendln("\treturn;");
-				sourceBuilder.append("}");
-			}
-			sourceBuilder.appendln();
-			sourceBuilder.appendln("or.or(key);");
-			sourceBuilder.unindent();
-			sourceBuilder.appendln("}");
+				sourceBuilder.appendln("@Override");
+				sourceBuilder.appendln("public void set(java.lang.String key, BaseObject val, Or<Void> or) {");
+				sourceBuilder.indent();
+				_else = false;
+				for(java.lang.String key : localStack.keys()) {
+					if(key.equals("this"))
+						continue;
+					if(_else)
+						sourceBuilder.append(" else ");
+					else
+						_else = true;
+					sourceBuilder.append("if(key.equals(\"");
+					sourceBuilder.append(convertStringSource(key));
+					sourceBuilder.appendln("\")) {");
+					sourceBuilder.append("\tthis.");
+					sourceBuilder.append(key);
+					sourceBuilder.appendln(" = val;");
+					sourceBuilder.appendln("\treturn;");
+					sourceBuilder.append("}");
+				}
+				sourceBuilder.appendln();
+				sourceBuilder.appendln("or.or(key);");
+				sourceBuilder.unindent();
+				sourceBuilder.appendln("}");
 
-			sourceBuilder.appendln("@Override");
-			sourceBuilder.appendln("public boolean delete(java.lang.String key, Or<Boolean> or) {");
-			sourceBuilder.indent();
-			_else = false;
-			for(java.lang.String key : localStack.keys()) {
-				if(key.equals("this"))
-					continue;
-				if(_else)
-					sourceBuilder.append("else ");
-				else
-					_else = true;
-				sourceBuilder.append("if(key.equals(\"");
-				sourceBuilder.append(convertStringSource(key));
-				sourceBuilder.appendln("\"))");
-				sourceBuilder.appendln("\treturn false;");
+				sourceBuilder.appendln("@Override");
+				sourceBuilder.appendln("public boolean delete(java.lang.String key, Or<Boolean> or) {");
+				sourceBuilder.indent();
+				_else = false;
+				for(java.lang.String key : localStack.keys()) {
+					if(key.equals("this"))
+						continue;
+					if(_else)
+						sourceBuilder.append("else ");
+					else
+						_else = true;
+					sourceBuilder.append("if(key.equals(\"");
+					sourceBuilder.append(convertStringSource(key));
+					sourceBuilder.appendln("\"))");
+					sourceBuilder.appendln("\treturn false;");
+				}
+				sourceBuilder.appendln("return or.or(key);");
+				sourceBuilder.unindent();
+				sourceBuilder.appendln("}");
 			}
-			sourceBuilder.appendln("return or.or(key);");
-			sourceBuilder.unindent();
-			sourceBuilder.appendln("}");
 
 			sourceBuilder.unindent();
 			sourceBuilder.appendln("}");
@@ -2869,11 +2935,11 @@ public class JavaTranspiler extends RegexCompiler {
 				variableScope.scope.put("arguments", "arguments");
 				for(java.lang.String arg : function.arguments) {
 					if(RESTRICTED_SCOPE_NAMES.matcher(arg).matches())
-						variableScope.markCreateSyntheticScope();
+						variableScope.markUseTypedClassStack();
 					variableScope.scope.put(arg, "argument");
 				}
 				scanScriptSource(function.impl, variableScope);
-				function.impl.optimizations = funcopt = script.optimizations == null ? new MapStackOptimizations(variableScope.scope, variableScope.createSyntheticScope, variableScope.usesArguments) : new ExtendedStackOptimizations((StackOptimizations)script.optimizations, variableScope.scope, variableScope.createSyntheticScope, variableScope.usesArguments);
+				function.impl.optimizations = funcopt = script.optimizations == null ? new MapStackOptimizations(variableScope.scope, variableScope.stackType, variableScope.usesArguments) : new ExtendedStackOptimizations((StackOptimizations)script.optimizations, variableScope.scope, variableScope.stackType, variableScope.usesArguments);
 			} catch(CannotOptimize ex) {
 				if(DEBUG || ex instanceof CannotOptimizeUnimplemented)
 					ex.printStackTrace(System.out);
@@ -2888,11 +2954,11 @@ public class JavaTranspiler extends RegexCompiler {
 			LocalStack funcLocalStack = function.impl.optimizations == null ? null : new LocalStack();
 			transpileScriptSource(sourceBuilder, funcLocalStack, function.impl, methodPrefix, fileName, scopeChain.extend(), scope.isNonGlobalFunction() ? SourceScope.SubFunction : SourceScope.Function);
 			
-			if(funcopt == null || (funcopt.createSyntheticScope() && funcLocalStack.isEmpty())) {
+			if(funcopt == null || (funcopt.stackType() != ScopeOptimizer.StackType.TypedLocal && funcLocalStack.isEmpty())) {
 				sourceBuilder.appendln("Scope extendScope(BaseObject _this) {");
 				sourceBuilder.appendln("\treturn baseScope.extend(_this);");
 				sourceBuilder.appendln("}");
-			} else if(funcopt.createSyntheticScope()) {
+			} else if(funcopt.stackType() != ScopeOptimizer.StackType.TypedLocal) {
 				sourceBuilder.appendln("Scope extendScope(BaseObject _this, Scopable stack) {");
 				sourceBuilder.appendln("\treturn baseScope.extend(_this, stack);");
 				sourceBuilder.appendln("}");
