@@ -29,6 +29,14 @@ public abstract class AbstractFunction extends GenericObject implements BaseFunc
 		if(name != null)
 			setHidden("name", String.wrap(name));
 	}
+	public AbstractFunction(BaseFunction constructor, Global global) {
+		super(constructor, global);
+		
+		prototype = createPrototype0();
+		java.lang.String name = name();
+		if(name != null)
+			setHidden("name", String.wrap(name));
+	}
 	public AbstractFunction(Global global) {
 		super(global.Function, global);
 		

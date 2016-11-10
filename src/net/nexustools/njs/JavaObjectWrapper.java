@@ -33,5 +33,13 @@ public class JavaObjectWrapper extends GenericObject {
 			return ((JavaClassWrapper)constructor).javaClass.isInstance(javaObject);
 		return super.instanceOf(constructor);
 	}
+
+	@Override
+	public boolean strictEquals(java.lang.Object obj) {
+		if(this == obj)
+			return true;
+		
+		return obj instanceof JavaObjectWrapper && ((JavaObjectWrapper)obj).javaObject == javaObject;
+	}
 	
 }

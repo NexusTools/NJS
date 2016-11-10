@@ -36,8 +36,8 @@ public class JavaClassWrapper extends AbstractFunction {
 	public final Class<?> javaClass;
 	public final java.lang.String javaClassString;
 	private final Map<Integer, List<Constructor>> constructors = new HashMap();
-	JavaClassWrapper(final Global global, final Class<?> javaClass) {
-		super(global);
+	JavaClassWrapper(final Global global, final JavaClass JavaClass, final Class<?> javaClass) {
+		super(JavaClass, global);
 		assert(javaClass != null);
 		this.javaClass = javaClass;
 		javaClassString = javaClass.getName().replace(".", "_");
@@ -62,7 +62,7 @@ public class JavaClassWrapper extends AbstractFunction {
 			if((method.getModifiers() & Modifier.STATIC) == 0)
 				continue;
 			
-			method.setAccessible(true);
+			//method.setAccessible(true);
 			List<Method> meths = methods.get(method.getName());
 			if(meths == null)
 				methods.put(method.getName(), meths = new ArrayList());
@@ -92,7 +92,7 @@ public class JavaClassWrapper extends AbstractFunction {
 		}
 		
 		for(Constructor constructor : javaClass.getDeclaredConstructors()) {
-			constructor.setAccessible(true);
+			//constructor.setAccessible(true);
 			List<Constructor> cons = constructors.get(constructor.getParameterCount());
 			if(cons == null)
 				constructors.put(constructor.getParameterCount(), cons = new ArrayList());
@@ -108,7 +108,7 @@ public class JavaClassWrapper extends AbstractFunction {
 			if((method.getModifiers() & Modifier.STATIC) != 0) 
 				continue;
 			
-			method.setAccessible(true);
+			//method.setAccessible(true);
 			List<Method> meths = methods.get(method.getName());
 			if(meths == null)
 				methods.put(method.getName(), meths = new ArrayList());
@@ -141,12 +141,12 @@ public class JavaClassWrapper extends AbstractFunction {
 			if((field.getModifiers() & Modifier.STATIC) == 0)
 				continue;
 			
-			field.setAccessible(true);
+			//field.setAccessible(true);
 			defineProperty(field.getName(), new AbstractFunction(global) {
 				@Override
 				public BaseObject call(BaseObject _this, BaseObject... params) {
 					try {
-						return global.javaToJS(field.get(null));
+						return global.javaToJS(field.get(null), field.getType());
 					} catch (IllegalArgumentException ex) {
 						throw new Error.JavaException("JavaError", ex.toString(), ex);
 					} catch (IllegalAccessException ex) {

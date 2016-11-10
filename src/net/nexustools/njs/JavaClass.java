@@ -58,7 +58,7 @@ public class JavaClass extends AbstractFunction {
 
 			@Override
 			public java.lang.String name() {
-				return super.name(); //To change body of generated methods, choose Tools | Templates.
+				return "JavaClass_getClassLoader";
 			}
 			
 		});

@@ -65,6 +65,8 @@ public class Global extends GenericObject {
 	public final Error Error;
 	public final Array Array;
 	
+	public final JavaClass JavaClass;
+	
 	public final BaseFunction NOOP;
 	
 	public final Number.Instance NaN;
@@ -134,6 +136,7 @@ public class Global extends GenericObject {
 		Boolean = new Boolean(this);
 		Error = new Error(this);
 		Array = new Array(this);
+		JavaClass = new JavaClass(this);
 		
 		NOOP = new AbstractFunction() {
 			@Override
@@ -189,7 +192,7 @@ public class Global extends GenericObject {
 					return constructor;
 			}
 		
-			JavaClassWrapper constructor = new JavaClassWrapper(this, javaClass);
+			JavaClassWrapper constructor = new JavaClassWrapper(this, JavaClass, javaClass);
 			CONSTRUCTORS.add(new WeakReference(constructor));
 			return constructor;
 		}
@@ -203,36 +206,21 @@ public class Global extends GenericObject {
 		return new Error.Instance(String, Error, Symbol.iterator, Number, "JavaError", t.toString(), Utilities.extractStack("JavaError: " + t.toString(), t));
 	}
 
-	private final List<WeakReference<JavaObjectWrapper>> WRAPS = new ArrayList();
 	public BaseObject wrap(java.lang.Object javaObject) {
 		return wrap(javaObject, null);
 	}
 	public BaseObject wrap(java.lang.Object javaObject, Class<?> desiredClass) {
-		if(javaObject == null)
-			return Undefined.INSTANCE;
-		
+		assert(javaObject != null);
 		if(desiredClass == null)
 			desiredClass = javaObject.getClass();
-		
-		synchronized(WRAPS) {
-			Iterator<WeakReference<JavaObjectWrapper>> it = WRAPS.iterator();
-			while(it.hasNext()) {
-				WeakReference<JavaObjectWrapper> ref = it.next();
-				JavaObjectWrapper wrapper = ref.get();
-				if(wrapper == null)
-					it.remove();
-				else if(wrapper.javaObject == javaObject)
-					return wrapper;
-			}
-		
-			JavaObjectWrapper wrapper = new JavaObjectWrapper(javaObject, wrap(javaObject.getClass()), this);
-			WRAPS.add(new WeakReference(wrapper));
-			return wrapper;
-		}
+		return new JavaObjectWrapper(javaObject, wrap(desiredClass), this);
 	}
 	
 	public BaseObject javaToJS(java.lang.Object javaObject) {
 		return Utilities.javaToJS(this, javaObject);
+	}
+	public BaseObject javaToJS(java.lang.Object javaObject, Class<?> desiredClass) {
+		return Utilities.javaToJS(this, javaObject, desiredClass);
 	}
 	
 }

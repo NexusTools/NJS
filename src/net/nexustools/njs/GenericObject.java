@@ -798,6 +798,11 @@ public class GenericObject extends NumberObject {
 	}
 
 	@Override
+	public boolean equals(java.lang.Object obj) {
+		return this == obj;
+	}
+
+	@Override
 	public boolean strictEquals(java.lang.Object obj) {
 		return this == obj;
 	}

@@ -71,6 +71,15 @@ public abstract class Number extends AbstractFunction {
 			return net.nexustools.njs.Number.toString(value);
 		}
 		@Override
+		public boolean toBool() {
+			return value != 0 && !Double.isNaN(value);
+		}
+		@Override
+		public java.lang.String typeOf() {
+			return _const ? "number" : "object";
+		}
+		
+		@Override
 		public boolean equals(java.lang.Object obj) {
 			if(obj == this)
 				return !Double.isNaN(value);
@@ -96,14 +105,6 @@ public abstract class Number extends AbstractFunction {
 				}
 			
 			return false;
-		}
-		@Override
-		public boolean toBool() {
-			return value != 0 && !Double.isNaN(value);
-		}
-		@Override
-		public java.lang.String typeOf() {
-			return _const ? "number" : "object";
 		}
 
 		@Override

@@ -36,7 +36,10 @@ public class Boolean extends AbstractFunction {
 			if(obj instanceof Instance)
 				return ((Instance)obj).value == value;
 			
-			return ((Number.Instance)obj).value == 1;
+			if(obj instanceof Number.Instance)
+				return (((Number.Instance)obj).value == 1) == value;
+			
+			return false;
 		}
 		@Override
 		public net.nexustools.njs.Number.Instance toNumber() {
