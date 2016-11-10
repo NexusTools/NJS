@@ -146,7 +146,7 @@ public class JavaClassWrapper extends AbstractFunction {
 				@Override
 				public BaseObject call(BaseObject _this, BaseObject... params) {
 					try {
-						return global.javaToJS(field.get(null), field.getType());
+						return Utilities.javaToJS(global, field.get(null), field.getType());
 					} catch (IllegalArgumentException ex) {
 						throw new Error.JavaException("JavaError", ex.toString(), ex);
 					} catch (IllegalAccessException ex) {

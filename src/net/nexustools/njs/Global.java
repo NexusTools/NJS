@@ -216,11 +216,4 @@ public class Global extends GenericObject {
 		return new JavaObjectWrapper(javaObject, wrap(desiredClass), this);
 	}
 	
-	public BaseObject javaToJS(java.lang.Object javaObject) {
-		return Utilities.javaToJS(this, javaObject);
-	}
-	public BaseObject javaToJS(java.lang.Object javaObject, Class<?> desiredClass) {
-		return Utilities.javaToJS(this, javaObject, desiredClass);
-	}
-	
 }

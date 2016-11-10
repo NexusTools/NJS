@@ -18,6 +18,8 @@ package net.nexustools.njs;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import sun.misc.JavaLangAccess;
+import sun.misc.SharedSecrets;
 
 /**
  *
@@ -916,48 +918,100 @@ public class Utilities {
 			this.row = row;
 		}
 	}
+	
+	public static interface StackTraceHelper {
+		public StackTraceElement get(int index);
+		public int size();
+	}
+	public static interface StackTraceHelperCreator {
+		public StackTraceHelper create();
+	}
+	public static final StackTraceHelperCreator STACK_TRACE_HELPER_CREATOR;
+	static {
+		StackTraceHelperCreator StackTraceHelperCreator;
+		try {
+			final JavaLangAccess JavaLangAccess = SharedSecrets.getJavaLangAccess();
+			StackTraceHelperCreator = new StackTraceHelperCreator() {
+				@Override
+				public StackTraceHelper create() {
+					final Throwable throwable = new Throwable();
+					return new StackTraceHelper() {
+						@Override
+						public StackTraceElement get(int index) {
+							return JavaLangAccess.getStackTraceElement(throwable, index);
+						}
+						@Override
+						public int size() {
+							return JavaLangAccess.getStackTraceDepth(throwable);
+						}
+					};
+				}
+			};
+		} catch(Throwable t) {
+			StackTraceHelperCreator = new StackTraceHelperCreator() {
+				@Override
+				public StackTraceHelper create() {
+					final StackTraceElement[] stack = new Throwable().getStackTrace();
+					return new StackTraceHelper() {
+						@Override
+						public StackTraceElement get(int index) {
+							return stack[index];
+						}
+						@Override
+						public int size() {
+							return stack.length;
+						}
+					};
+				}
+			};
+		}
+		STACK_TRACE_HELPER_CREATOR = StackTraceHelperCreator;
+	}
 
 	public static ReplacementStackTraceElement renameMethodCall(java.lang.String methodName) {
 		ReplacementStackTraceElement replacement;
-		StackTraceElement[] stack = new Throwable().getStackTrace();
+		StackTraceHelper helper = STACK_TRACE_HELPER_CREATOR.create();
 		List<StackElementReplace> list = STACK_REPLACEMENTS.get();
-		int leftPad = stack.length - 2;
+		StackTraceElement el = helper.get(2);
+		int leftPad = helper.size() - 3;
 		if (list.size() <= leftPad) {
 			while (list.size() < leftPad)
 				list.add(null);
-			list.add(new StackElementReplace(stack[1], replacement = new ReplacementStackTraceElement(methodName, stack[1].getFileName(), stack[1].getLineNumber(), 0)));
+			list.add(new StackElementReplace(el, replacement = new ReplacementStackTraceElement(methodName, el.getFileName(), el.getLineNumber(), 0)));
 		} else
-			list.set(leftPad, new StackElementReplace(stack[1], replacement = new ReplacementStackTraceElement(methodName, stack[1].getFileName(), stack[1].getLineNumber(), 0)));
+			list.set(leftPad, new StackElementReplace(el, replacement = new ReplacementStackTraceElement(methodName, el.getFileName(), el.getLineNumber(), 0)));
 		STACK_POSITION.set(leftPad);
 		return replacement;
 	}
 
 	public static ReplacementStackTraceElement mapCall(java.lang.String methodName, java.lang.String fileName, Map<Integer, FilePosition> SOURCE_MAP) {
 		ReplacementStackTraceElement replacement;
-		StackTraceElement[] stack = new Throwable().getStackTrace();
+		StackTraceHelper helper = STACK_TRACE_HELPER_CREATOR.create();
 		List<StackElementReplace> list = STACK_REPLACEMENTS.get();
-		int leftPad = stack.length - 2;
+		StackTraceElement el = helper.get(2);
+		int leftPad = helper.size() - 3;
 		if (list.size() <= leftPad) {
 			while (list.size() < leftPad)
 				list.add(null);
-			list.add(new StackElementReplace(stack[1], replacement = new ReplacementStackTraceElement(methodName, fileName, SOURCE_MAP)));
+			list.add(new StackElementReplace(el, replacement = new ReplacementStackTraceElement(methodName, fileName, SOURCE_MAP)));
 		} else
-			list.set(leftPad, new StackElementReplace(stack[1], replacement = new ReplacementStackTraceElement(methodName, fileName, SOURCE_MAP)));
+			list.set(leftPad, new StackElementReplace(el, replacement = new ReplacementStackTraceElement(methodName, fileName, SOURCE_MAP)));
 		STACK_POSITION.set(leftPad);
 		return replacement;
 	}
 
 	public static ReplacementStackTraceElement renameCall(java.lang.String methodName, java.lang.String fileName, int rows, int columns) {
 		ReplacementStackTraceElement replacement;
-		StackTraceElement[] stack = new Throwable().getStackTrace();
+		StackTraceHelper helper = STACK_TRACE_HELPER_CREATOR.create();
 		List<StackElementReplace> list = STACK_REPLACEMENTS.get();
-		int leftPad = stack.length - 2;
+		StackTraceElement el = helper.get(2);
+		int leftPad = helper.size() - 3;
 		if (list.size() <= leftPad) {
 			while (list.size() < leftPad)
 				list.add(null);
-			list.add(new StackElementReplace(stack[1], replacement = new ReplacementStackTraceElement(methodName, fileName, rows, columns)));
+			list.add(new StackElementReplace(el, replacement = new ReplacementStackTraceElement(methodName, fileName, rows, columns)));
 		} else
-			list.set(leftPad, new StackElementReplace(stack[1], replacement = new ReplacementStackTraceElement(methodName, fileName, rows, columns)));
+			list.set(leftPad, new StackElementReplace(el, replacement = new ReplacementStackTraceElement(methodName, fileName, rows, columns)));
 		STACK_POSITION.set(leftPad);
 		return replacement;
 	}
