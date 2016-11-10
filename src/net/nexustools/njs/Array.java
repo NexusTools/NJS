@@ -249,7 +249,7 @@ public class Array extends AbstractFunction {
 				if(length < 1)
 					return new GenericArray(global);
 				
-				List<BaseObject> copy = new ArrayList();
+				List<BaseObject> copy = new ArrayList(length);
 				BaseFunction filter = (BaseFunction)params[0];
 				for(int i=0; i<length; i++) {
 					BaseObject value = _this.get(i);

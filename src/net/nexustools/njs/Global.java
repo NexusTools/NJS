@@ -205,8 +205,14 @@ public class Global extends GenericObject {
 
 	private final List<WeakReference<JavaObjectWrapper>> WRAPS = new ArrayList();
 	public BaseObject wrap(java.lang.Object javaObject) {
+		return wrap(javaObject, null);
+	}
+	public BaseObject wrap(java.lang.Object javaObject, Class<?> desiredClass) {
 		if(javaObject == null)
 			return Undefined.INSTANCE;
+		
+		if(desiredClass == null)
+			desiredClass = javaObject.getClass();
 		
 		synchronized(WRAPS) {
 			Iterator<WeakReference<JavaObjectWrapper>> it = WRAPS.iterator();

@@ -479,6 +479,9 @@ public class Utilities {
 	}
 
 	public static BaseObject javaToJS(Global global, java.lang.Object javaObject) {
+		return javaToJS(global, javaObject, null);
+	}
+	public static BaseObject javaToJS(Global global, java.lang.Object javaObject, Class<?> desiredClass) {
 		if (javaObject == null) {
 			return Null.INSTANCE;
 		}
@@ -519,7 +522,7 @@ public class Utilities {
 
 			throw new RuntimeException("Cannot convert array of " + javaClass.getComponentType() + " to JSBaseObject");
 		} else {
-			return global.wrap(javaObject);
+			return global.wrap(javaObject, desiredClass);
 		}
 	}
 

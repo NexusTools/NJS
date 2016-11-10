@@ -100,11 +100,8 @@ public class JavaClassWrapper extends AbstractFunction {
 		}
 		
 		GenericObject prototype = (GenericObject)prototype();
-		if(superClass != null) {
-			JavaClassWrapper superConstructor = global.wrap(superClass);
-			prototype.__proto__ = superConstructor.prototype();
-			//__proto__ = superConstructor;
-		}
+		if(superClass != null)
+			prototype.__proto__ = global.wrap(superClass).prototype();
 		
 		methods.clear();
 		for(final Method method : javaClass.getMethods()) {
@@ -218,7 +215,7 @@ public class JavaClassWrapper extends AbstractFunction {
 
 		if(bestConstructor != null)
 			try {
-				return Utilities.javaToJS(global, bestConstructor.newInstance(bestConversion));
+				return Utilities.javaToJS(global, bestConstructor.newInstance(bestConversion), javaClass);
 			} catch (IllegalAccessException ex) {
 				throw new Error.JavaException("JavaError", "Illegal access", ex);
 			} catch (InstantiationException ex) {
@@ -281,7 +278,7 @@ public class JavaClassWrapper extends AbstractFunction {
 
 		if(bestMethod != null)
 			try {
-				return Utilities.javaToJS(global, bestMethod.invoke(__this, bestConversion));
+				return Utilities.javaToJS(global, bestMethod.invoke(__this, bestConversion), bestMethod.getReturnType());
 			} catch (IllegalAccessException ex) {
 				throw new Error.JavaException("JavaError", "Illegal access", ex);
 			} catch (IllegalArgumentException ex) {
