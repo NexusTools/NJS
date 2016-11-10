@@ -278,16 +278,16 @@ public class JavaTranspiler extends RegexCompiler {
 					java.lang.String type = localStack.get(((Reference)part).ref);
 					if(type != null) {
 						if(type.equals("string")) {
-							sourceBuilder.append(((Reference)part).ref);
+							sourceBuilder.append(expectedStack.getReference(((Reference)part).ref));
 							return;
 						} else if(type.equals("number")) {
 							sourceBuilder.append("net.nexustools.njs.Number.toString(");
-							sourceBuilder.append(((Reference)part).ref);
+							sourceBuilder.append(expectedStack.getReference(((Reference)part).ref));
 							sourceBuilder.append(")");
 							return;
 						} else if(type.equals("boolean")) {
 							sourceBuilder.append("(");
-							sourceBuilder.append(((Reference)part).ref);
+							sourceBuilder.append(expectedStack.getReference(((Reference)part).ref));
 							sourceBuilder.append(" ? \"true\" : \"false\")");
 							return;
 						}
@@ -361,13 +361,13 @@ public class JavaTranspiler extends RegexCompiler {
 					java.lang.String type = localStack.get(((Reference)part).ref);
 					if(type != null) {
 						if(type.equals("number")) {
-							sourceBuilder.append(((Reference)part).ref);
+							sourceBuilder.append(expectedStack.getReference(((Reference)part).ref));
 							return;
 						}
 						if(type.equals("string")) {
 							try {
 								Double.valueOf(((Reference)part).ref);
-								sourceBuilder.append(((Reference)part).ref);
+								sourceBuilder.append(expectedStack.getReference(((Reference)part).ref));
 								if(!((Reference)part).ref.contains("."))
 									sourceBuilder.append(".0");
 							} catch(NumberFormatException ex) {
@@ -450,7 +450,7 @@ public class JavaTranspiler extends RegexCompiler {
 						java.lang.String type = localStack.get(((Reference)part).ref);
 						if(type != null && type.equals("number")) {
 							sourceBuilder.append("(int)");
-							sourceBuilder.append(((Reference)part).ref);
+							sourceBuilder.append(expectedStack.getReference(((Reference)part).ref));
 							return;
 						}
 					} else
@@ -747,16 +747,16 @@ public class JavaTranspiler extends RegexCompiler {
 					java.lang.String type = localStack.get(((Reference)part).ref);
 					if(type != null) {
 						if(type.equals("boolean")) {
-							sourceBuilder.append(((Reference)part).ref);
+							sourceBuilder.append(expectedStack.getReference(((Reference)part).ref));
 							return;
 						} else if(type.equals("string")) {
 							sourceBuilder.append("!");
-							sourceBuilder.append(((Reference)part).ref);
+							sourceBuilder.append(expectedStack.getReference(((Reference)part).ref));
 							sourceBuilder.append(".isEmpty()");
 							return;
 						} else if(type.equals("number")) {
 							sourceBuilder.append("(");
-							sourceBuilder.append(((Reference)part).ref);
+							sourceBuilder.append(expectedStack.getReference(((Reference)part).ref));
 							sourceBuilder.append(" != 0)");
 							return;
 						}
@@ -2376,7 +2376,7 @@ public class JavaTranspiler extends RegexCompiler {
 					if(!atTop)
 						sourceBuilder.append("global.wrap(");
 					
-					sourceBuilder.append(((Reference)ref).ref);
+					sourceBuilder.append(expectedStack.getReference(((Reference)ref).ref));
 					sourceBuilder.append(" += ");
 					generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
 					if(!atTop)
@@ -2407,7 +2407,7 @@ public class JavaTranspiler extends RegexCompiler {
 						sourceBuilder.append("global.wrap(");
 					if(!((MinusMinus)part).right)
 						sourceBuilder.append("--");
-					sourceBuilder.append(((Reference)ref).ref);
+					sourceBuilder.append(expectedStack.getReference(((Reference)ref).ref));
 					if(((MinusMinus)part).right)
 						sourceBuilder.append("--");
 					if(!atTop)
@@ -2541,7 +2541,7 @@ public class JavaTranspiler extends RegexCompiler {
 							} else if(type.equals("string")) {
 								transpileParsedSource(sourceBuilder, ((VariableReference)part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
 								sourceBuilder.append(".get(");
-								sourceBuilder.append(((Reference)ref).ref);
+								sourceBuilder.append(expectedStack.getReference(((Reference)ref).ref));
 								sourceBuilder.append(")");
 								return;
 							}
@@ -2629,9 +2629,8 @@ public class JavaTranspiler extends RegexCompiler {
 				else {
 					localStack.put("this", "unknown");
 					if(usesStackClass) {
-						for(int i=0; i<arguments.size(); i++) {
+						for(int i=0; i<arguments.size(); i++) 
 							localStack.put(arguments.get(i), "argument");
-						}
 						if(localStack.isEmpty())
 							sourceBuilder.appendln("\tfinal Scope baseScope = extendScope(_this);");
 						else {
@@ -2640,7 +2639,10 @@ public class JavaTranspiler extends RegexCompiler {
 							sourceBuilder.append(" localStack = new ");
 							sourceBuilder.append(stackName);
 							sourceBuilder.appendln("();");
-							sourceBuilder.appendln("\tfinal Scope baseScope = extendScope(_this, localStack);");
+							if(opt.stackType() == ScopeOptimizer.StackType.TypedClass)
+								sourceBuilder.appendln("\tfinal Scope baseScope = extendScope(_this);");
+							else
+								sourceBuilder.appendln("\tfinal Scope baseScope = extendScope(_this, localStack);");
 						}
 						if(!arguments.contains("arguments") && opt.usesArguments()) {
 							sourceBuilder.appendln("\tlocalStack.arguments = new Arguments(global, this, params);");
@@ -2840,7 +2842,23 @@ public class JavaTranspiler extends RegexCompiler {
 				if(key.equals("this"))
 					continue;
 				
-				sourceBuilder.append("BaseObject ");
+				if(opt.stackType() == ScopeOptimizer.StackType.TypedClass) {
+					java.lang.String type = localStack.get(key);
+					if(type.equals("string"))
+						sourceBuilder.append("String");
+					else if(type.equals("boolean"))
+						sourceBuilder.append("boolean");
+					else if(type.equals("number"))
+						sourceBuilder.append("double");
+					else if(type.equals("array"))
+						sourceBuilder.append("GenericArray");
+					else if(type.equals("object"))
+						sourceBuilder.append("GenericObject");
+					else
+						sourceBuilder.append("BaseObject");
+				} else
+					sourceBuilder.append("BaseObject");
+				sourceBuilder.append(" ");
 				sourceBuilder.append(key);
 				sourceBuilder.appendln(";");
 			}
@@ -2954,7 +2972,7 @@ public class JavaTranspiler extends RegexCompiler {
 			LocalStack funcLocalStack = function.impl.optimizations == null ? null : new LocalStack();
 			transpileScriptSource(sourceBuilder, funcLocalStack, function.impl, methodPrefix, fileName, scopeChain.extend(), scope.isNonGlobalFunction() ? SourceScope.SubFunction : SourceScope.Function);
 			
-			if(funcopt == null || (funcopt.stackType() != ScopeOptimizer.StackType.TypedLocal && funcLocalStack.isEmpty())) {
+			if(funcopt == null || (funcopt.stackType() != ScopeOptimizer.StackType.TypedLocal && (funcopt.stackType() == ScopeOptimizer.StackType.TypedClass || funcLocalStack.isEmpty()))) {
 				sourceBuilder.appendln("Scope extendScope(BaseObject _this) {");
 				sourceBuilder.appendln("\treturn baseScope.extend(_this);");
 				sourceBuilder.appendln("}");

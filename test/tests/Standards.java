@@ -66,6 +66,11 @@ public class Standards {
 		test("main");
 	}
 	
+	@Test
+	public void scopeName() {
+		test("scopeName");
+	}
+	
 	/*@Test
 	public void let() {
 		test("let");
