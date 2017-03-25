@@ -30,70 +30,75 @@ import org.junit.Test;
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public class Standards {
-	
-	Compiler[] compilers;
-	
-	@Before
-	public void setUp() {
-		compilers = new Compiler[]{
-			new JavaTranspiler(),
-			new RuntimeCompiler()
-		};
-	}
-	
-	@After
-	public void tearDown() {
-		compilers = null;
-	}
-	
-	@Test
-	public void inheritance() {
-		test("inheritance");
-	}
-	
-	@Test
-	public void __proto__() {
-		test("__proto__");
-	}
-	
-	@Test
-	public void valueOf() {
-		test("valueOf");
-	}
-	
-	@Test
-	public void main() {
-		test("main");
-	}
-	
-	@Test
-	public void scopeName() {
-		test("scopeName");
-	}
-	
-	/*@Test
-	public void let() {
-		test("let");
-	}*/
 
-	public void test(java.lang.String name) {
-		for(Compiler compiler : compilers) {
-			try {
-				compiler.compile(new InputStreamReader(Standards.class.getResourceAsStream("/tests/standards/" + name + ".js")), name + ".js", false).exec(Utilities.createExtendedGlobal(), null);
-			} catch(net.nexustools.njs.Error.ConvertedException re) {
-				((net.nexustools.njs.Error.ConvertedException)re).printOriginalStackTrace();
-				re.printStackTrace();
-				throw re;
-			} catch(java.lang.RuntimeException re) {
-				re.printStackTrace();
-				System.err.println(Utilities.extractStack(re.toString(), re));
-				throw re;
-			} catch(java.lang.Error e) {
-				e.printStackTrace();
-				System.err.println(Utilities.extractStack(e.toString(), e));
-				throw e;
-			}
-		}
-	}
-	
+    Compiler[] compilers;
+
+    @Before
+    public void setUp() {
+        compilers = new Compiler[]{
+            new JavaTranspiler(),
+            new RuntimeCompiler()
+        };
+    }
+
+    @After
+    public void tearDown() {
+        compilers = null;
+    }
+
+    @Test
+    public void inheritance() {
+        test("inheritance");
+    }
+
+    @Test
+    public void __proto__() {
+        test("__proto__");
+    }
+
+    @Test
+    public void valueOf() {
+        test("valueOf");
+    }
+
+    @Test
+    public void main() {
+        test("main");
+    }
+
+    @Test
+    public void scopeName() {
+        test("scopeName");
+    }
+
+    @Test
+    public void _this() {
+        test("this");
+    }
+
+    /*@Test
+    public void let() {
+        test("let");
+    }*/
+    
+    public void test(java.lang.String name) {
+        for (Compiler compiler : compilers) {
+            try {
+                compiler.compile(new InputStreamReader(Standards.class.getResourceAsStream("/tests/standards/" + name + ".js")), name + ".js", false).exec(Utilities.createExtendedGlobal(), null);
+            } catch (net.nexustools.njs.Error.ConvertedException re) {
+                ((net.nexustools.njs.Error.ConvertedException) re).printOriginalStackTrace();
+                re.printStackTrace();
+                throw re;
+            } catch (java.lang.RuntimeException re) {
+                re.printStackTrace();
+                System.err.println(Utilities.extractStack(re.toString(), re));
+                throw re;
+            } catch (java.lang.Error e) {
+                e.printStackTrace();
+                System.err.println(Utilities.extractStack(e.toString(), e));
+                throw e;
+            }
+        }
+    }
+
 }

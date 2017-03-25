@@ -28,6 +28,7 @@ import org.junit.runners.Suite;
 	Comparisons.class,
 	MathOperations.class,
 	Standards.class,
+	Eval.class,
 	
 	Object.class,
 	Function.class,
@@ -36,6 +37,6 @@ import org.junit.runners.Suite;
 	JSON.class,
 	
 	Extended.class,
-	Eval.class})
+	JavaClass.class})
 public class Everything {
 }

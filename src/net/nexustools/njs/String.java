@@ -143,6 +143,16 @@ public abstract class String extends AbstractFunction {
 				return "String_prototype_toString";
 			}
 		});
+		setHidden("fromCharCode", new AbstractFunction(global) {
+			@Override
+			public BaseObject call(BaseObject _this, BaseObject... params) {
+				return wrap(java.lang.String.valueOf((char)params[0].toInt()));
+			}
+			@Override
+			public java.lang.String name() {
+				return "String_prototype_fromCharCode";
+			}
+		});
 		prototype.setHidden("toUpperCase", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {

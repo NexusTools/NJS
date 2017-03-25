@@ -145,7 +145,10 @@ public abstract class Number extends AbstractFunction {
 		prototype.setHidden("toString", new AbstractFunction(global) {
 			@Override
 			public BaseObject call(BaseObject _this, BaseObject... params) {
-				return global.wrap(Number.toString(((Instance)_this).value));
+				int radix;
+				if(params.length == 0 || (radix = params[0].toInt()) == 10)
+					return global.wrap(Number.toString(((Instance)_this).value));
+				return global.wrap(Long.toUnsignedString(((Instance)_this).toLong(), radix));
 			}
 		});
 	}

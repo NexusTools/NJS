@@ -51,6 +51,12 @@ public interface ArrayStorage<O> {
 				return new double[size];
 			}
 		};
+		public static final BufferStorage<float[]> FLOAT = new BufferStorage<float[]>() {
+			@Override
+			public float[] create(int size) {
+				return new float[size];
+			}
+		};
 		private final Map<Integer, List<O>> storage = new HashMap();
 		public O createOrReuse(int size) {
 			synchronized(storage) {

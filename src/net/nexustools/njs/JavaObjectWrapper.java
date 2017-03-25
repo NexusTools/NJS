@@ -15,31 +15,40 @@
  */
 package net.nexustools.njs;
 
+import javafx.scene.Node;
+
 /**
  *
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public class JavaObjectWrapper extends GenericObject {
 
-	public final java.lang.Object javaObject;
-	JavaObjectWrapper(java.lang.Object javaObject, JavaClassWrapper constructor, Global global) {
-		super(constructor, global);
-		this.javaObject = javaObject;
-	}
+    public static <O> O unwrap(BaseObject view, Class<O> target) {
+        return target.cast(((JavaObjectWrapper)view).javaObject);
+    }
 
-	@Override
-	public boolean instanceOf(BaseFunction constructor) {
-		if(constructor instanceof JavaClassWrapper)
-			return ((JavaClassWrapper)constructor).javaClass.isInstance(javaObject);
-		return super.instanceOf(constructor);
-	}
+    public final java.lang.Object javaObject;
 
-	@Override
-	public boolean strictEquals(java.lang.Object obj) {
-		if(this == obj)
-			return true;
-		
-		return obj instanceof JavaObjectWrapper && ((JavaObjectWrapper)obj).javaObject == javaObject;
-	}
-	
+    JavaObjectWrapper(java.lang.Object javaObject, JavaClassWrapper constructor, Global global) {
+        super(constructor, global);
+        this.javaObject = javaObject;
+    }
+
+    @Override
+    public boolean instanceOf(BaseFunction constructor) {
+        if (constructor instanceof JavaClassWrapper) {
+            return ((JavaClassWrapper) constructor).javaClass.isInstance(javaObject);
+        }
+        return super.instanceOf(constructor);
+    }
+
+    @Override
+    public boolean strictEquals(java.lang.Object obj) {
+        if (this == obj) {
+            return true;
+        }
+
+        return obj instanceof JavaObjectWrapper && ((JavaObjectWrapper) obj).javaObject == javaObject;
+    }
+
 }

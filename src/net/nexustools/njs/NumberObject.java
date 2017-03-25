@@ -20,56 +20,57 @@ package net.nexustools.njs;
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public abstract class NumberObject implements BaseObject {
-	
-	Number Number;
-	public NumberObject(Number Number) {
-		this.Number = Number;
-	}
 
-	@Override
-	public byte toByte() {
-		return toNumber().toByte();
-	}
+    Number Number;
 
-	@Override
-	public short toShort() {
-		return toNumber().toShort();
-	}
+    public NumberObject(Number Number) {
+        this.Number = Number;
+    }
 
-	@Override
-	public int toInt() {
-		return toNumber().toInt();
-	}
+    @Override
+    public byte toByte() {
+        return toNumber().toByte();
+    }
 
-	@Override
-	public long toLong() {
-		return toNumber().toLong();
-	}
+    @Override
+    public short toShort() {
+        return toNumber().toShort();
+    }
 
-	@Override
-	public Number.Instance toNumber() {
-		double num;
-		try {
-			num = Double.valueOf(toString());
-		} catch(NumberFormatException ex) {
-			num = Double.NaN;
-		}
-		try {
-			return Number.wrap(num);
-		} catch(NullPointerException ex) {
-			System.err.println(getClass());
-			throw ex;
-		}
-	}
+    @Override
+    public int toInt() {
+        return toNumber().toInt();
+    }
 
-	@Override
-	public double toDouble() {
-		return toNumber().toDouble();
-	}
+    @Override
+    public long toLong() {
+        return toNumber().toLong();
+    }
 
-	@Override
-	public float toFloat() {
-		return toNumber().toFloat();
-	}
-	
+    @Override
+    public Number.Instance toNumber() {
+        double num;
+        try {
+            num = Double.valueOf(toString());
+        } catch (NumberFormatException ex) {
+            num = Double.NaN;
+        }
+        try {
+            return Number.wrap(num);
+        } catch (NullPointerException ex) {
+            System.err.println(getClass());
+            throw ex;
+        }
+    }
+
+    @Override
+    public double toDouble() {
+        return toNumber().toDouble();
+    }
+
+    @Override
+    public float toFloat() {
+        return toNumber().toFloat();
+    }
+
 }

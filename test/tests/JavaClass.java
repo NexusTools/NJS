@@ -16,6 +16,7 @@
 package tests;
 
 import java.io.InputStreamReader;
+
 import net.nexustools.njs.Utilities;
 import net.nexustools.njs.compiler.Compiler;
 import net.nexustools.njs.compiler.JavaTranspiler;
@@ -29,7 +30,7 @@ import org.junit.Test;
  *
  * @author Katelyn Slater <kate@nexustools.com>
  */
-public class Extended {
+public class JavaClass {
 
     Compiler[] compilers;
 
@@ -47,22 +48,10 @@ public class Extended {
     }
 
     @Test
-    public void byte__() {
-        test("byte[]");
-    }
-
-    @Test
-    public void java() {
-        test("java");
-    }
-
-    public void test(java.lang.String name) {
+    public void test() {
         for (Compiler compiler : compilers) {
             try {
-                compiler.compile(new InputStreamReader(Extended.class.getResourceAsStream("/tests/extended/" + name + ".js")), name + ".js", false).exec(Utilities.createExtendedGlobal(), null);
-            } catch (net.nexustools.njs.Error.ConvertedException re) {
-                re.printStackTrace();
-                throw re;
+                compiler.compile(new InputStreamReader(JavaClass.class.getResourceAsStream("/tests/javaclass.js")), "javaclass.js", false).exec(Utilities.createExtendedGlobal(compiler), null);
             } catch (java.lang.RuntimeException re) {
                 System.err.println(Utilities.extractStack(re.toString(), re));
                 throw re;
