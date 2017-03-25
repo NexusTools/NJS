@@ -1,5 +1,5 @@
 NexusTools JavaScript
----------------------
+=====================
 
 This is a Java library which implements -almost all- ES5 functionality and some ES6.
 
@@ -10,3 +10,6 @@ It contains 2 compilers:
 It is also possible to use this library to generate Java sources out of your JavaScript and include only the bare runtime without any compiler functionality.
 This would hopefully allow you to include your generated sources in projects where runtime compilation is not allowed but you can still use Java.
 
+License
+-------
+This project is licensed under the LGPLv3.
