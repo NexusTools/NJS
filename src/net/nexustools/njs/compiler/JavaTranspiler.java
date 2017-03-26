@@ -114,7 +114,7 @@ public class JavaTranspiler extends RegexCompiler {
         } else if (argument instanceof Rh) {
             scanParsedSource(((Rh) argument).rhs, variableScope);
         } else if (argument instanceof Function) {
-            scanScriptSource(((Function) argument).impl);
+            scanScriptSource(((Function) argument).impl, new FunctionScopeOptimizer(variableScope));
         } else {
             throw new CannotOptimizeUnimplemented("Unhandled argument: " + describe(argument));
         }
@@ -1274,6 +1274,7 @@ public class JavaTranspiler extends RegexCompiler {
             for (Parsed argument : ((Call) parsed).arguments) {
                 scanArgument(argument, variableScope);
             }
+            variableScope.markUseSyntheticStack();
         } else if (parsed instanceof If) {
             scanParsedSource(((If) parsed).condition, variableScope);
             if (((If) parsed).simpleimpl != null) {
@@ -1353,7 +1354,7 @@ public class JavaTranspiler extends RegexCompiler {
         } else if (parsed instanceof PlusEq) {
             Parsed ref = ((PlusEq) parsed).lhs;
             Parsed rhs = ((PlusEq) parsed).rhs;
-            if (rhs.isNumber() || (rhs instanceof Reference && variableScope.isTyped(((Reference) rhs).ref, "number"))) {
+            if ((rhs.isNumber() || (rhs instanceof Reference && variableScope.isTyped(((Reference) rhs).ref, "number")))) {
                 if (ref instanceof Reference) {
                     variableScope.update(((Reference) ref).ref, "number");
                 } else {
@@ -1377,33 +1378,23 @@ public class JavaTranspiler extends RegexCompiler {
 
             //variableScope.update(, NUMBER_REG);
         } else if (parsed instanceof Set) {
+            Parsed rhs = ((Set) parsed).rhs;
             Parsed lhs = ((Set) parsed).lhs;
 
             if (lhs instanceof Reference) {
-                Parsed rhs = ((Set) parsed).rhs;
                 if (rhs instanceof BaseReferency) {
                     if (rhs instanceof Reference) {
                         variableScope.update(((Reference) lhs).ref, variableScope.lookup(((Reference) rhs).ref));
                     } else {
                         variableScope.update(((Reference) lhs).ref, rhs.primaryType());
                     }
-                } else if (rhs instanceof Function) {
-                    FunctionScopeOptimizer scopeOptimizer = new FunctionScopeOptimizer(variableScope);
-                    scopeOptimizer.scope.put("arguments", "arguments");
-                    for (java.lang.String arg : ((Function) rhs).arguments) {
-                        if (RESTRICTED_SCOPE_NAMES.matcher(arg).matches()) {
-                            variableScope.markUseTypedClassStack();
-                            return;
-                        }
-                        scopeOptimizer.scope.put(arg, "argument");
-                    }
-
-                    scanScriptSource(((Function) rhs).impl, scopeOptimizer);
-                } else {
-                    throw new CannotOptimizeUnimplemented("No implementation for optimizing set " + describe(rhs));
-                }
+                    if(DEBUG)
+                        System.out.println("Updated " + ((Reference) lhs).ref + " to be " + variableScope.lookup(((Reference) lhs).ref) + " based on " + rhs);
+                } else
+                    scanParsedSource(rhs, variableScope);
             } else if (lhs instanceof ReferenceChain || lhs instanceof VariableReference || lhs instanceof IntegerReference) {
                 scanParsedSource(lhs, variableScope);
+                scanParsedSource(rhs, variableScope);
             } else {
                 throw new CannotOptimizeUnimplemented("No implementation for optimizing set " + describe(lhs));
             }
@@ -1424,7 +1415,17 @@ public class JavaTranspiler extends RegexCompiler {
         } else if (parsed instanceof Rh) {
             scanParsedSource(((Rh) parsed).rhs, variableScope);
         } else if (parsed instanceof Function) {
-            scanScriptSource(((Function) parsed).impl, new FunctionScopeOptimizer(variableScope));
+            FunctionScopeOptimizer scopeOptimizer = new FunctionScopeOptimizer(variableScope);
+            scopeOptimizer.scope.put("arguments", "arguments");
+            for (java.lang.String arg : ((Function) parsed).arguments) {
+                if (RESTRICTED_SCOPE_NAMES.matcher(arg).matches()) {
+                    variableScope.markUseTypedClassStack();
+                    return;
+                }
+                scopeOptimizer.scope.put(arg, "argument");
+            }
+
+            scanScriptSource(((Function) parsed).impl, scopeOptimizer);
         } else if(parsed instanceof IntegerReference) {
             scanParsedSource(((IntegerReference) parsed).lhs, variableScope);
         } else {
@@ -1532,8 +1533,7 @@ public class JavaTranspiler extends RegexCompiler {
             return;
         } else if (part instanceof Call) {
             Parsed reference = ((Call) part).reference;
-            while (reference instanceof OpenBracket) // unwrap
-            {
+            while (reference instanceof OpenBracket) {// unwrap
                 reference = ((OpenBracket) reference).contents;
             }
 
