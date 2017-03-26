@@ -1763,6 +1763,11 @@ public class RuntimeCompiler extends RegexCompiler {
                 public java.lang.String source() {
                     return script.source;
                 }
+
+                @Override
+                public BaseObject exec(Global global) {
+                    return exec(global, null);
+                }
             };
         }
 
@@ -1779,7 +1784,7 @@ public class RuntimeCompiler extends RegexCompiler {
                 @Override
                 public BaseObject exec(Global global, Scope scope) {
                     if (scope == null) {
-                        scope = new Scope.Extended(global);
+                        scope = new Scope(global);
                     }
 
                     scope.enter();
@@ -1814,6 +1819,11 @@ public class RuntimeCompiler extends RegexCompiler {
                 public java.lang.String source() {
                     return script.source;
                 }
+
+                @Override
+                public BaseObject exec(Global global) {
+                    return exec(global, null);
+                }
             };
         }
 
@@ -1845,6 +1855,11 @@ public class RuntimeCompiler extends RegexCompiler {
                 @Override
                 public java.lang.String source() {
                     return script.source;
+                }
+
+                @Override
+                public BaseObject exec(Global global) {
+                    return exec(global, null);
                 }
             };
         }
@@ -1888,6 +1903,11 @@ public class RuntimeCompiler extends RegexCompiler {
                     public java.lang.String source() {
                         return script.source;
                     }
+
+                    @Override
+                    public BaseObject exec(Global global) {
+                        return exec(global, null);
+                    }
                 };
 
             case 3:
@@ -1925,6 +1945,11 @@ public class RuntimeCompiler extends RegexCompiler {
                     @Override
                     public java.lang.String source() {
                         return script.source;
+                    }
+
+                    @Override
+                    public BaseObject exec(Global global) {
+                        return exec(global, null);
                     }
                 };
 
@@ -1964,6 +1989,11 @@ public class RuntimeCompiler extends RegexCompiler {
                     @Override
                     public java.lang.String source() {
                         return script.source;
+                    }
+
+                    @Override
+                    public BaseObject exec(Global global) {
+                        return exec(global, null);
                     }
                 };
         }

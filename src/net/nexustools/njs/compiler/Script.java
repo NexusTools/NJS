@@ -24,6 +24,7 @@ import net.nexustools.njs.Scope;
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public interface Script {
+	public BaseObject exec(Global global);
 	public BaseObject exec(Global global, Scope scope);
 	public java.lang.String source();
 }

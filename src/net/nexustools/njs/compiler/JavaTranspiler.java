@@ -82,7 +82,6 @@ public class JavaTranspiler extends RegexCompiler {
                 variableScope.assertTyped(((Reference) argument).ref, "number", "boolean", "object", "array", "arguments");
             } else if (argument instanceof Call) {
                 scanParsedSource(argument, variableScope);
-                variableScope.markUseSyntheticStack();
             } else if (argument instanceof RhLh) {
                 if (argument instanceof Set) {
                     scanArgument(((RhLh) argument).lhs, variableScope);
@@ -117,7 +116,7 @@ public class JavaTranspiler extends RegexCompiler {
         } else if (argument instanceof Rh) {
             scanParsedSource(((Rh) argument).rhs, variableScope);
         } else if (argument instanceof Function) {
-            scanScriptSource(((Function) argument).impl, new FunctionScopeOptimizer(variableScope));
+            scanParsedSource(argument, variableScope);
         } else {
             throw new CannotOptimizeUnimplemented("Unhandled argument: " + describe(argument));
         }
@@ -994,7 +993,8 @@ public class JavaTranspiler extends RegexCompiler {
             }
         }
 
-        public void reference(java.lang.String key) {
+        public boolean reference(java.lang.String key) {
+            return scope.containsKey(key);
         }
 
         public boolean isTyped(java.lang.String key, java.lang.String type) {
@@ -1021,8 +1021,11 @@ public class JavaTranspiler extends RegexCompiler {
             }
         }
 
-        public void markUseSyntheticStack() {
+        public boolean markUseSyntheticStack() {
+            if(stackType == StackType.SyntheticScopeable)
+                return false;
             stackType = StackType.SyntheticScopeable;
+            return true;
         }
 
         public void markUseTypedClassStack() {
@@ -1045,8 +1048,14 @@ public class JavaTranspiler extends RegexCompiler {
         }
 
         @Override
-        public void reference(java.lang.String key) {
+        public boolean reference(java.lang.String key) {
             usesArguments = usesArguments || key.equals("arguments");
+            if(!scope.containsKey(key)) {
+                if(parent.reference(key))
+                    parent.markUseSyntheticStack();
+                return false;
+            } else
+                return true;
         }
 
         @Override
@@ -1121,18 +1130,6 @@ public class JavaTranspiler extends RegexCompiler {
         }
 
         @Override
-        public void markUseSyntheticStack() {
-            super.markUseSyntheticStack();
-            parent.markUseSyntheticStack();
-        }
-
-        @Override
-        public void markUseTypedClassStack() {
-            super.markUseTypedClassStack();
-            parent.markUseTypedClassStack();
-        }
-
-        @Override
         public void markUsesArguments() {
             usesArguments = true;
         }
@@ -1147,8 +1144,13 @@ public class JavaTranspiler extends RegexCompiler {
         }
 
         @Override
-        public void reference(java.lang.String key) {
-            parent.reference(key);
+        public boolean reference(java.lang.String key) {
+            if(!scope.containsKey(key)) {
+                if(parent.reference(key))
+                    parent.markUseSyntheticStack();
+                return false;
+            } else
+                return true;
         }
 
         @Override
@@ -1225,9 +1227,9 @@ public class JavaTranspiler extends RegexCompiler {
         }
 
         @Override
-        public void markUseSyntheticStack() {
-            super.markUseSyntheticStack();
-            parent.markUseSyntheticStack();
+        public boolean markUseSyntheticStack() {
+            return super.markUseSyntheticStack() ||
+                    parent.markUseSyntheticStack();
         }
 
         @Override
@@ -1274,10 +1276,10 @@ public class JavaTranspiler extends RegexCompiler {
                 }
             }
         } else if (parsed instanceof Call) {
+            scanParsedSource(((Call)parsed).reference, variableScope);
             for (Parsed argument : ((Call) parsed).arguments) {
                 scanArgument(argument, variableScope);
             }
-            variableScope.markUseSyntheticStack();
         } else if (parsed instanceof If) {
             scanParsedSource(((If) parsed).condition, variableScope);
             if (((If) parsed).simpleimpl != null) {
@@ -1393,8 +1395,10 @@ public class JavaTranspiler extends RegexCompiler {
                     }
                     if(DEBUG)
                         System.out.println("Updated " + ((Reference) lhs).ref + " to be " + variableScope.lookup(((Reference) lhs).ref) + " based on " + rhs);
-                } else
+                } else {
+                    variableScope.reference(((Reference) lhs).ref);
                     scanParsedSource(rhs, variableScope);
+                }
             } else if (lhs instanceof ReferenceChain || lhs instanceof VariableReference || lhs instanceof IntegerReference) {
                 scanParsedSource(lhs, variableScope);
                 scanParsedSource(rhs, variableScope);
@@ -1422,13 +1426,21 @@ public class JavaTranspiler extends RegexCompiler {
             scopeOptimizer.scope.put("arguments", "arguments");
             for (java.lang.String arg : ((Function) parsed).arguments) {
                 if (RESTRICTED_SCOPE_NAMES.matcher(arg).matches()) {
-                    variableScope.markUseTypedClassStack();
+                    scopeOptimizer.markUseTypedClassStack();
                     return;
                 }
                 scopeOptimizer.scope.put(arg, "argument");
             }
-
-            scanScriptSource(((Function) parsed).impl, scopeOptimizer);
+            
+            try {
+                scanScriptSource(((Function) parsed).impl, scopeOptimizer);
+                ((Function) parsed).impl.optimizations = new MapStackOptimizations(scopeOptimizer.scope, scopeOptimizer.stackType, scopeOptimizer.usesArguments);
+            } catch (CannotOptimize ex) {
+                if (DEBUG || ex instanceof CannotOptimizeUnimplemented) {
+                    ex.printStackTrace(System.out);
+                }
+                variableScope.markUseSyntheticStack();
+            }
         } else if(parsed instanceof IntegerReference) {
             scanParsedSource(((IntegerReference) parsed).lhs, variableScope);
         } else if(parsed instanceof Fork) {
@@ -1459,19 +1471,7 @@ public class JavaTranspiler extends RegexCompiler {
         if (!script.functions.isEmpty()) {
             variableScope.markUseTypedClassStack();
             for (Function function : script.functions.values()) {
-                scanScriptSource(function.impl, new FunctionScopeOptimizer(variableScope));
-            }
-        }
-    }
-
-    private void scanScriptSource(ScriptData script) {
-        ScopeOptimizer variableScope = new ScopeOptimizer();
-        try {
-            scanScriptSource(script, variableScope);
-            script.optimizations = new MapStackOptimizations(variableScope.scope, variableScope.stackType, variableScope instanceof FunctionScopeOptimizer ? ((FunctionScopeOptimizer) variableScope).usesArguments : false);
-        } catch (CannotOptimize ex) {
-            if (DEBUG || ex instanceof CannotOptimizeUnimplemented) {
-                ex.printStackTrace(System.out);
+                scanParsedSource(function, variableScope);
             }
         }
     }
@@ -3201,23 +3201,8 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.appendln(" extends CompiledFunction {");
             sourceBuilder.indent();
             sourceBuilder.appendln("private final Scope baseScope;");
-            StackOptimizations funcopt = null;
-            FunctionScopeOptimizer variableScope = new FunctionScopeOptimizer(new ScopeOptimizer());
-            try {
-                variableScope.scope.put("arguments", "arguments");
-                for (java.lang.String arg : function.arguments) {
-                    if (RESTRICTED_SCOPE_NAMES.matcher(arg).matches()) {
-                        variableScope.markUseTypedClassStack();
-                    }
-                    variableScope.scope.put(arg, "argument");
-                }
-                scanScriptSource(function.impl, variableScope);
-                function.impl.optimizations = funcopt = script.optimizations == null ? new MapStackOptimizations(variableScope.scope, variableScope.stackType, variableScope.usesArguments) : new ExtendedStackOptimizations((StackOptimizations) script.optimizations, variableScope.scope, variableScope.stackType, variableScope.usesArguments);
-            } catch (CannotOptimize ex) {
-                if (DEBUG || ex instanceof CannotOptimizeUnimplemented) {
-                    ex.printStackTrace(System.out);
-                }
-            }
+            StackOptimizations funcopt = (StackOptimizations)function.impl.optimizations;
+            
             sourceBuilder.append("private ");
             sourceBuilder.append(functionName);
             sourceBuilder.appendln("(Global global, Scope scope) {");
@@ -3308,7 +3293,15 @@ public class JavaTranspiler extends RegexCompiler {
 
         try {
             if (inFunction) {
-                scanScriptSource(script);
+                ScopeOptimizer variableScope = new ScopeOptimizer();
+                try {
+                    scanScriptSource(script, variableScope);
+                    script.optimizations = new MapStackOptimizations(variableScope.scope, variableScope.stackType, variableScope instanceof FunctionScopeOptimizer ? ((FunctionScopeOptimizer) variableScope).usesArguments : false);
+                } catch (CannotOptimize ex) {
+                    if (DEBUG || ex instanceof CannotOptimizeUnimplemented) {
+                        ex.printStackTrace(System.out);
+                    }
+                }
             }
             transpileScriptSource(sourceBuilder, script.optimizations == null ? null : new LocalStack(), script, script.methodName, fileName, BASE_CLASS_NAME_SCOPE_CHAIN.extend(), inFunction ? SourceScope.GlobalFunction : SourceScope.GlobalScript);
         } catch (RuntimeException t) {

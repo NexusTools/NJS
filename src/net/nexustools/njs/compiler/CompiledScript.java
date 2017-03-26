@@ -20,6 +20,7 @@ import net.nexustools.njs.BaseObject;
 import net.nexustools.njs.Global;
 import net.nexustools.njs.Utilities;
 import net.nexustools.njs.Scopable;
+import net.nexustools.njs.Scope;
 
 /**
  *
@@ -74,7 +75,7 @@ public abstract class CompiledScript implements Script {
             try {
                 function = (BaseFunction) _this.get(key);
             } catch (ClassCastException ex) {
-                throw new net.nexustools.njs.Error.JavaException("ReferenceError", source + " is not a function");
+                throw new net.nexustools.njs.Error.JavaException("ReferenceError", source + " is not a function", ex);
             }
             return function.call(_this, params);
         }
@@ -238,5 +239,7 @@ public abstract class CompiledScript implements Script {
 
         return lhs.toDouble() <= rhs.toDouble();
     }
+    
+    
 
 }
