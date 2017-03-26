@@ -64,7 +64,7 @@ public class SourceBuilder {
 
     @Override
     public java.lang.String toString() {
-        return builder.toString(); //To change body of generated methods, choose Tools | Templates.
+        return builder.toString();
     }
 
     public void appendLicense() {

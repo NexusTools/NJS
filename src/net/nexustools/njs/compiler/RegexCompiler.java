@@ -397,6 +397,8 @@ public abstract class RegexCompiler implements Compiler {
                 return new ShiftLeft(this);
             } else if (part instanceof DoubleShiftRight) {
                 return new DoubleShiftRight(this);
+            } else if (part instanceof Fork) {
+                return new Fork(this);
             }
             return super.transformFallback(part);
         }
@@ -849,12 +851,83 @@ public abstract class RegexCompiler implements Compiler {
             return 19;
         }
     }
+    
+    public static class MultiBracket extends Referency {
+        
+        boolean closed;
+        Parsed currentPart;
+        List<Parsed> parts = new ArrayList();
+        public MultiBracket(Parsed part) {
+            parts.add(part.finish());
+        }
+
+        @Override
+        public java.lang.String toSource() {
+            StringBuilder source = new StringBuilder("(");
+            for(Parsed parsed : parts) {
+                if(source.length() > 1)
+                    source.append(", ");
+                source.append(parsed.toSimpleSource());
+            }
+            if(currentPart != null) {
+                if(source.length() > 1)
+                    source.append(", ");
+                source.append(currentPart.toSimpleSource());
+            }
+            source.append(')');
+            return source.toString();
+        }
+        
+        @Override
+        public Parsed transform(Parsed part) {
+            if (closed) {
+                if (part instanceof SemiColon) {
+                    throw new CompleteException(part);
+                }
+
+                return super.transform(part);
+            }
+
+            if (currentPart == null) {
+                if(part instanceof CloseBracket)
+                    closed = true;
+                else
+                    currentPart = part;
+            } else {
+                if (!currentPart.isIncomplete()) {
+                    if (part instanceof CloseBracket) {
+                        parts.add(currentPart.finish());
+                        currentPart = null;
+                        closed = true;
+                        return this;
+                    }
+                    if (part instanceof Comma) {
+                        parts.add(currentPart.finish());
+                        currentPart = null;
+                        return this;
+                    }
+                }
+                try {
+                    currentPart = currentPart.transform(part);
+                } catch (CompleteException ex) {
+                    throw new Error.JavaException("SyntaxError", "CompleteException thrown when not needed: " + ex.part, ex);
+                }
+            }
+
+            return this;
+        }
+
+        @Override
+        public int precedence() {
+            return 20;
+        }
+        
+    }
 
     public static class OpenBracket extends Referency {
 
         Parsed contents;
         boolean closed;
-        List<java.lang.String> chain = new ArrayList();
 
         public OpenBracket() {
         }
@@ -863,13 +936,6 @@ public abstract class RegexCompiler implements Compiler {
         public java.lang.String toSource() {
             StringBuilder builder = new StringBuilder("(");
             builder.append(unparsed(contents));
-            if (closed) {
-                builder.append(')');
-                if (!chain.isEmpty()) {
-                    builder.append('.');
-                    join(chain, '.', builder);
-                }
-            }
             return builder.toString();
         }
 
@@ -894,6 +960,9 @@ public abstract class RegexCompiler implements Compiler {
                         closed = true;
                         return this;
                     }
+                    if (part instanceof Comma) {
+                        return new MultiBracket(contents);
+                    }
                 }
                 try {
                     contents = contents.transform(part);
@@ -917,7 +986,7 @@ public abstract class RegexCompiler implements Compiler {
 
         public Parsed finish() {
             contents = contents.finish();
-            if ((contents instanceof Reference || contents instanceof ReferenceChain) && chain.isEmpty()) {
+            if ((contents instanceof Reference || contents instanceof ReferenceChain)) {
                 return contents;
             }
             return this;
@@ -2485,6 +2554,16 @@ public abstract class RegexCompiler implements Compiler {
                 return new Minus(this, new Number(-((Number) part).value));
             } else if (part instanceof Integer && ((Integer) part).value < 0) {
                 return new Minus(this, new Number(-((Integer) part).value));
+            } else if (part instanceof Fork) {
+                if (precedence < ((BaseReferency) part).precedence()) {
+                    rhs = rhs.transform(part);
+                    return this;
+                }
+                if (useRhs) {
+                    rhs = new Fork(rhs);
+                    return this;
+                }
+                return new Fork(this);
             } else {
                 return transformFallback(part);
             }
@@ -2495,7 +2574,8 @@ public abstract class RegexCompiler implements Compiler {
                 throw new CompleteException(part);
             }
 
-            throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + describe(this));
+            rhs = rhs.transform(part);
+            return this;
         }
 
     }
@@ -3663,6 +3743,84 @@ public abstract class RegexCompiler implements Compiler {
         }
     }
 
+    public static class Fork extends Referency {
+        public enum State {
+            None,
+            InSuccess,
+            InFailure,
+            Complete
+        }
+        
+        Parsed condition, success, failure;
+        State state;
+        public Fork() {
+            state = State.None;
+        }
+        public Fork(Parsed condition) {
+            this.condition = condition;
+            state = State.InSuccess;
+        }
+
+        @Override
+        public java.lang.String toSource() {
+            return condition + " ? " + success + " : " + failure;
+        }
+
+        @Override
+        public Parsed transform(Parsed part) {
+            switch(state) {
+                case InSuccess:
+                    if(success == null)
+                        success = part;
+                    else {
+                        if(part instanceof Colon)
+                            state = State.InFailure;
+                        else
+                            success = success.transform(part);
+                    }
+                    break;
+                case InFailure:
+                    if(failure == null)
+                        failure = part;
+                    else {
+                        if(part instanceof SemiColon)
+                            state = State.Complete;
+                        else
+                            try {
+                                // TODO: Handle precedence on myself and children here...
+                                failure = failure.transform(part);
+                            } catch(CompleteException ex) {
+                                state = State.Complete;
+                            }
+                    }
+                    break;
+                default:
+                    return super.transform(part);
+            }
+            return this;
+        }
+
+        @Override
+        public boolean isIncomplete() {
+            return !(state == State.Complete || (state == State.InFailure && failure != null && !failure.isIncomplete()));
+        }
+
+        @Override
+        public Parsed finish() {
+            condition = condition.finish();
+            success = success.finish();
+            failure = failure.finish();
+            return super.finish();
+        }
+        
+        
+
+        @Override
+        public int precedence() {
+            return 4;
+        }
+    }
+
     public static class RegEx extends Referency {
 
         final java.lang.String pattern, flags;
@@ -3928,6 +4086,7 @@ public abstract class RegexCompiler implements Compiler {
     public static final Pattern SHIFTRIGHT = Pattern.compile("^\\>\\>");
     public static final Pattern SHIFTLEFT = Pattern.compile("^\\<\\<");
     public static final Pattern DBLSHIFTRIGHT = Pattern.compile("^\\>\\>\\>");
+    public static final Pattern FORKSTART = Pattern.compile("^\\?");
     public static final Pattern PLUSEQ = Pattern.compile("^\\+=");
     public static final Pattern SEMICOLON = Pattern.compile("^;");
     public static final Pattern NOTEQUALS = Pattern.compile("^!=");
@@ -4255,7 +4414,7 @@ public abstract class RegexCompiler implements Compiler {
     public static class ScriptParser extends RegexParser {
 
         public ScriptParser() {
-            super(DBLSHIFTRIGHT, SHIFTLEFT, SHIFTRIGHT, NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, NUMBER, VARIABLE, VARIABLEGET, SINGLELINE_COMMENT, MULTILINE_COMMENT, DIVIDE, WHITESPACE, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, REGEX);
+            super(DBLSHIFTRIGHT, SHIFTLEFT, SHIFTRIGHT, NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, NUMBER, VARIABLE, VARIABLEGET, SINGLELINE_COMMENT, MULTILINE_COMMENT, DIVIDE, WHITESPACE, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, REGEX, FORKSTART);
         }
 
         @Override
@@ -4358,6 +4517,10 @@ public abstract class RegexCompiler implements Compiler {
 
             if (pattern == REGEX) {
                 throw new PartExchange(new RegEx(matcher.group(1), matcher.group(2)), matcher.group().length());
+            }
+
+            if (pattern == FORKSTART) {
+                throw new PartExchange(new Fork(), matcher.group().length());
             }
 
             if (pattern == NOT) {

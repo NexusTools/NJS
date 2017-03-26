@@ -103,6 +103,9 @@ public class JavaTranspiler extends RegexCompiler {
             } else if (argument instanceof RightReference || argument instanceof ReferenceChain) {
                 variableScope.markUseSyntheticStack();
                 scanParsedSource(argument, variableScope);
+            } else if(argument instanceof New) {
+                for(Parsed arg : ((New)argument).arguments)
+                    scanParsedSource(arg, variableScope);
             } else if(argument instanceof String) {
                 variableScope.markUseSyntheticStack();
             } else {
@@ -1428,6 +1431,13 @@ public class JavaTranspiler extends RegexCompiler {
             scanScriptSource(((Function) parsed).impl, scopeOptimizer);
         } else if(parsed instanceof IntegerReference) {
             scanParsedSource(((IntegerReference) parsed).lhs, variableScope);
+        } else if(parsed instanceof Fork) {
+            scanArgument(((Fork)parsed).condition, variableScope);
+            scanParsedSource(((Fork)parsed).success, variableScope);
+            scanParsedSource(((Fork)parsed).failure, variableScope);
+        } else if(parsed instanceof MultiBracket) {
+            for(Parsed part : ((MultiBracket)parsed).parts)
+                scanParsedSource(part, variableScope);
         } else {
             throw new CannotOptimizeUnimplemented("Unhandled " + describe(parsed));
         }
@@ -1691,7 +1701,7 @@ public class JavaTranspiler extends RegexCompiler {
                     sourceBuilder.append(source);
                     sourceBuilder.appendln(" is not a function\");");
                     sourceBuilder.appendln("}");
-                    sourceBuilder.append("function.call(Undefined.INSTANCE");
+                    sourceBuilder.append("function.call(_this");
                 } else {
                     sourceBuilder.append("callTop(");
                     sourceBuilder.append("\"");
@@ -1699,7 +1709,7 @@ public class JavaTranspiler extends RegexCompiler {
                     sourceBuilder.append("\", ");
                     transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
                     sourceBuilder.append(", ");
-                    sourceBuilder.append("Undefined.INSTANCE");
+                    sourceBuilder.append("_this");
                 }
                 for (Parsed arg : ((Call) part).arguments) {
                     sourceBuilder.append(", ");
@@ -1710,7 +1720,7 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append("((BaseFunction)");
                 transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
                 sourceBuilder.append(").call(");
-                sourceBuilder.append("Undefined.INSTANCE");
+                sourceBuilder.append("_this");
                 for (Parsed arg : ((Call) part).arguments) {
                     sourceBuilder.append(", ");
                     transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
@@ -1946,11 +1956,11 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.append(")");
             return;
         } else if (part instanceof AndAnd) {
-            sourceBuilder.append("(andAnd(");
+            sourceBuilder.append("andAnd(");
             transpileParsedSource(sourceBuilder, ((AndAnd) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
             sourceBuilder.append(", ");
             transpileParsedSource(sourceBuilder, ((AndAnd) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
-            sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
+            sourceBuilder.append(")");
             return;
         } else if (part instanceof Equals) {
             sourceBuilder.append("(");
@@ -2050,9 +2060,9 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.append(")");
             return;
         } else if (part instanceof Not) {
-            sourceBuilder.append("global.wrap(!");
+            sourceBuilder.append("(");
             generateBooleanSource(sourceBuilder, ((Not) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
-            sourceBuilder.append(")");
+            sourceBuilder.append("? global.Boolean.FALSE : global.Boolean.TRUE)");
             return;
         } else if (part instanceof OpenArray) {
             boolean first = true;
@@ -2747,6 +2757,27 @@ public class JavaTranspiler extends RegexCompiler {
             transpileParsedSource(sourceBuilder, ((VariableReference) part).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
             sourceBuilder.append(")");
             return;
+        } else if (part instanceof Fork) {
+            sourceBuilder.append("(");
+            generateBooleanSource(sourceBuilder, ((Fork) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
+            sourceBuilder.append(" ? (");
+            transpileParsedSource(sourceBuilder, ((Fork) part).success, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
+            sourceBuilder.append(") : (");
+            transpileParsedSource(sourceBuilder, ((Fork) part).failure, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
+            sourceBuilder.append("))");
+            return;
+        } else if (part instanceof MultiBracket) {
+            boolean first = true;
+            sourceBuilder.append("CompiledScript.last(");
+            for(Parsed _part : ((MultiBracket)part).parts) {
+                if(first)
+                    first = false;
+                else
+                    sourceBuilder.append(", ");
+                transpileParsedSource(sourceBuilder, _part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
+            }
+            sourceBuilder.append(")");
+            return;
         } else if (part instanceof Boolean) {
             sourceBuilder.append("global.Boolean.");
             if (((Boolean) part).value) {
@@ -2944,6 +2975,7 @@ public class JavaTranspiler extends RegexCompiler {
             } else {
                 sourceBuilder.appendln("public BaseObject exec(Global global, Scope scope) {");
                 sourceBuilder.appendln("\tfinal Scope baseScope = scope == null ? new Scope(global) : scope;");
+                sourceBuilder.appendln("\tfinal BaseObject _this = global;");
             }
         }
         sourceBuilder.indent();
