@@ -26,16 +26,18 @@ public abstract class AbstractFunction extends GenericObject implements BaseFunc
     public AbstractFunction(Global global, java.lang.String name) {
         super(global.Function, global);
 
-        prototype = createPrototype0();
+        prototype = new GenericObject(global);
+        ((GenericObject) prototype).setHidden("constructor", this);
         if (name != null) {
             setHidden("name", String.wrap(name));
         }
     }
 
     public AbstractFunction(BaseFunction constructor, Global global) {
-        super(constructor, global);
+        super(global.Function, global);
 
-        prototype = createPrototype0();
+        prototype = new GenericObject(constructor.prototype(), global);
+        ((GenericObject) prototype).setHidden("constructor", this);
         java.lang.String name = name();
         if (name != null) {
             setHidden("name", String.wrap(name));
@@ -45,7 +47,8 @@ public abstract class AbstractFunction extends GenericObject implements BaseFunc
     public AbstractFunction(Global global) {
         super(global.Function, global);
 
-        prototype = createPrototype0();
+        prototype = new GenericObject(global);
+        ((GenericObject) prototype).setHidden("constructor", this);
         java.lang.String name = name();
         if (name != null) {
             setHidden("name", String.wrap(name));
@@ -55,27 +58,11 @@ public abstract class AbstractFunction extends GenericObject implements BaseFunc
     protected AbstractFunction() {
     }
 
-    public final BaseObject createPrototype0() {
-        GenericObject prototype;
-        if (__proto__ instanceof GenericObject) {
-            prototype = new GenericObject(((BaseFunction) ((GenericObject) __proto__).getDirectly("constructor")).prototype(), iterator, String, Number);
-        } else {
-            prototype = new GenericObject(((BaseFunction) __proto__.get("constructor")).prototype(), iterator, String, Number);
-        }
-        prototype.setHidden("constructor", this);
-        return prototype;
-    }
-
     @Override
-    public final BaseObject createPrototype() {
-        GenericObject prototype;
-        if (__proto__ instanceof GenericObject) {
-            prototype = new GenericObject(((BaseFunction) ((GenericObject) __proto__).getDirectly("constructor")).prototype(), iterator, String, Number);
-        } else {
-            prototype = new GenericObject(((BaseFunction) __proto__.get("constructor")).prototype(), iterator, String, Number);
-        }
-        prototype.__proto__ = prototype();
-        return prototype;
+    public final BaseObject construct() {
+        GenericObject _new = new GenericObject(prototype(), iterator, String, Number);
+        _new.setHidden("constructor", this);
+        return _new;
     }
 
     @Override

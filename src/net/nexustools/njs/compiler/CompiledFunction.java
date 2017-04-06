@@ -25,18 +25,19 @@ import net.nexustools.njs.Global;
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public abstract class CompiledFunction extends AbstractFunction {
-	
-	public final Global global;
-	public CompiledFunction(Global global) {
-		super(global);
-		this.global = global;
-	}
 
-	@Override
-	public BaseObject construct(BaseObject... params) {
-		BaseObject _this = createPrototype();
-		call(_this, params);
-		return _this;
-	}
-	
+    public final Global global;
+
+    public CompiledFunction(Global global) {
+        super(global);
+        this.global = global;
+    }
+
+    @Override
+    public BaseObject construct(BaseObject... params) {
+        BaseObject _this = construct();
+        call(_this, params);
+        return _this;
+    }
+
 }

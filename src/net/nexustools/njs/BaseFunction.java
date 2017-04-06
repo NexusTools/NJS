@@ -20,12 +20,20 @@ package net.nexustools.njs;
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public interface BaseFunction extends BaseObject {
-	public java.lang.String name();
-	public java.lang.String source();
-	public java.lang.String arguments();
-	public BaseObject call(BaseObject _this, BaseObject... params);
-	public BaseObject construct(BaseObject... params);
-	public void setPrototype(BaseObject prototype);
-	public BaseObject createPrototype();
-	public BaseObject prototype();
+
+    public java.lang.String name();
+
+    public java.lang.String source();
+
+    public java.lang.String arguments();
+
+    public BaseObject call(BaseObject _this, BaseObject... params);
+
+    public BaseObject construct(BaseObject... params);
+
+    public void setPrototype(BaseObject prototype);
+
+    public BaseObject construct();
+
+    public BaseObject prototype();
 }

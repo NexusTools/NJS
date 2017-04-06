@@ -31,8 +31,7 @@ public class Function extends AbstractFunction {
     }
 
     public void initPrototypeFunctions(final Global global) {
-        GenericObject prototype = (GenericObject) prototype();
-        prototype.defineProperty("name", new AbstractFunction(global) {
+        ((GenericObject) prototype).defineProperty("name", new AbstractFunction(global) {
             @Override
             public BaseObject call(BaseObject _this, BaseObject... params) {
                 if(_this instanceof BaseFunction)
@@ -40,7 +39,7 @@ public class Function extends AbstractFunction {
                 return Undefined.INSTANCE;
             }
         }, global.NOOP);
-        prototype.defineProperty("prototype", new AbstractFunction(global) {
+        ((GenericObject) prototype).defineProperty("prototype", new AbstractFunction(global) {
             @Override
             public BaseObject call(BaseObject _this, BaseObject... params) {
                 if(_this instanceof BaseFunction)
@@ -55,44 +54,7 @@ public class Function extends AbstractFunction {
                 return Undefined.INSTANCE;
             }
         });
-        prototype.setHidden("toString", new AbstractFunction(global) {
-            @Override
-            public BaseObject call(BaseObject _this, BaseObject... params) {
-                ReplacementStackTraceElement el = Utilities.renameMethodCall("toString");
-                try {
-                    if (_this instanceof BaseFunction) {
-                        StringBuilder builder = new StringBuilder("function");
-                        java.lang.String name = ((BaseFunction) _this).name();
-                        if (name != null && !name.startsWith("<")) {
-                            builder.append(' ');
-                            builder.append(name);
-                        }
-                        builder.append('(');
-                        builder.append(((BaseFunction) _this).arguments());
-                        builder.append("){");
-                        java.lang.String source = ((BaseFunction) _this).source();
-                        if (source.indexOf('\n') > -1) {
-                            builder.append(source);
-                        } else {
-                            builder.append(' ');
-                            builder.append(source);
-                            builder.append(' ');
-                        }
-                        builder.append('}');
-                        return global.wrap(builder.toString());
-                    }
-                    throw new Error.JavaException("TypeError", "this is not instance of Function");
-                } finally {
-                    el.finishCall();
-                }
-            }
-
-            @Override
-            public java.lang.String toString() {
-                return "Function_prototype_toString";
-            }
-        });
-        prototype.setHidden("bind", new AbstractFunction(global) {
+        ((GenericObject) prototype).setHidden("bind", new AbstractFunction(global) {
             @Override
             public BaseObject call(BaseObject _this, BaseObject... params) {
                 return new BoundFunction(global, params[0], (BaseFunction) _this);
@@ -103,7 +65,7 @@ public class Function extends AbstractFunction {
                 return "Function_prototype_bind";
             }
         });
-        prototype.setHidden("apply", new AbstractFunction(global) {
+        ((GenericObject) prototype).setHidden("apply", new AbstractFunction(global) {
             @Override
             public BaseObject call(BaseObject _this, BaseObject... params) {
                 BaseObject __this;
@@ -136,7 +98,7 @@ public class Function extends AbstractFunction {
                 return "Function_prototype_apply";
             }
         });
-        prototype.setHidden("call", new AbstractFunction(global) {
+        ((GenericObject) prototype).setHidden("call", new AbstractFunction(global) {
             @Override
             public BaseObject call(BaseObject _this, BaseObject... params) {
                 ReplacementStackTraceElement el = Utilities.renameMethodCall("Function.prototype.call");

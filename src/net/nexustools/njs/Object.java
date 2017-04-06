@@ -106,10 +106,15 @@ public class Object extends AbstractFunction {
         final String.Instance _objectArguments = global.wrap("[object Arguments]");
         final String.Instance _objectGlobal = global.wrap("[object Global]");
         final String.Instance _objectObject = global.wrap("[object Object]");
-        final Map<BaseFunction, String.Instance> constructorNameMap = new HashMap();
+        //final Map<BaseFunction, String.Instance> constructorNameMap = new HashMap();
 
-        GenericObject prototype = (GenericObject) prototype();
-        prototype.defineProperty("__proto__", new AbstractFunction(global) {
+        ((GenericObject) prototype).setHidden("hasOwnProperty", new AbstractFunction(global) {
+            @Override
+            public BaseObject call(BaseObject _this, BaseObject... params) {
+                return global.wrap(_this.hasOwnProperty(params[0].toString()));
+            }
+        });
+        ((GenericObject) prototype).defineProperty("__proto__", new AbstractFunction(global) {
             @Override
             public BaseObject call(BaseObject _this, BaseObject... params) {
                 return _this.prototypeOf();
@@ -117,11 +122,12 @@ public class Object extends AbstractFunction {
         }, new AbstractFunction(global) {
             @Override
             public BaseObject call(BaseObject _this, BaseObject... params) {
+                System.out.println("Setting prototype of " + _this + " to " + params[0]);
                 _this.setPrototypeOf(params[0]);
                 return Undefined.INSTANCE;
             }
         });
-        prototype.setHidden("toString", new AbstractFunction(global) {
+        ((GenericObject) prototype).setHidden("toString", new AbstractFunction(global) {
             @Override
             public BaseObject call(BaseObject _this, BaseObject... params) {
                 if (_this == null || _this instanceof Null) {
@@ -136,6 +142,27 @@ public class Object extends AbstractFunction {
                 if (_this instanceof Global) {
                     return _objectGlobal;
                 }
+                if (_this instanceof BaseFunction) {
+                    StringBuilder builder = new StringBuilder("function");
+                    java.lang.String name = ((BaseFunction) _this).name();
+                    if (name != null && !name.startsWith("<")) {
+                        builder.append(' ');
+                        builder.append(name);
+                    }
+                    builder.append('(');
+                    builder.append(((BaseFunction) _this).arguments());
+                    builder.append("){");
+                    java.lang.String source = ((BaseFunction) _this).source();
+                    if (source.indexOf('\n') > -1) {
+                        builder.append(source);
+                    } else {
+                        builder.append(' ');
+                        builder.append(source);
+                        builder.append(' ');
+                    }
+                    builder.append('}');
+                    return String.wrap(builder.toString());
+                }
 
                 return _objectObject;
             }
@@ -145,7 +172,7 @@ public class Object extends AbstractFunction {
                 return "Object_prototype_toString";
             }
         });
-        prototype.setHidden("__defineGetter__", new AbstractFunction(global) {
+        ((GenericObject) prototype).setHidden("__defineGetter__", new AbstractFunction(global) {
             @Override
             public BaseObject call(BaseObject _this, BaseObject... params) {
                 _this.defineGetter(params[0].toString(), (BaseFunction) params[1]);
@@ -157,7 +184,7 @@ public class Object extends AbstractFunction {
                 return "Object_prototype_valueOf";
             }
         });
-        prototype.setHidden("__defineSetter__", new AbstractFunction(global) {
+        ((GenericObject) prototype).setHidden("__defineSetter__", new AbstractFunction(global) {
             @Override
             public BaseObject call(BaseObject _this, BaseObject... params) {
                 _this.defineSetter(params[0].toString(), (BaseFunction) params[1]);

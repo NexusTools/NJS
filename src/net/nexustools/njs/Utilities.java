@@ -1118,4 +1118,19 @@ public class Utilities {
         return b;
     }
 
+    public static boolean isNullOrUndefined(BaseObject val) {
+        return val == null || val == Null.INSTANCE || val == Undefined.INSTANCE;
+    }
+    
+    public static double getFiniteDoubleOrZero(BaseObject val) {
+        if(val == null)
+            return 0;
+        
+        double _val = val.toDouble();
+        if(Double.isFinite(_val))
+            return _val;
+        
+        return 0;
+    }
+
 }

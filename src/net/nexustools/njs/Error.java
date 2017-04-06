@@ -110,20 +110,24 @@ public class Error extends AbstractFunction implements BaseFunction {
         }
 
         public void printStackTrace(Appendable a) {
+            printStackTrace(this, a);
+        }
+
+        public static void printStackTrace(Throwable t, Appendable a) {
             Set<Throwable> dejaVu = Collections.newSetFromMap(new IdentityHashMap<Throwable, java.lang.Boolean>());
-            dejaVu.add(this);
+            dejaVu.add(t);
 
             try {
-                StackTraceElement[] enclosing = Utilities.convertStackTrace(getStackTrace());
-                a.append(toString());
+                StackTraceElement[] enclosing = Utilities.convertStackTrace(t.getStackTrace());
+                a.append(t.toString());
                 for (int i = 0; i < enclosing.length; i++) {
                     a.append("\n\tat " + toString(enclosing[i]));
                 }
-                for (Throwable supressed : getSuppressed()) {
+                for (Throwable supressed : t.getSuppressed()) {
                     a.append("\nSuppressed ");
                     printStackTrace(a, supressed, enclosing, dejaVu);
                 }
-                Throwable cause = getCause();
+                Throwable cause = t.getCause();
                 if (cause != null) {
                     a.append("\nCaused by ");
                     printStackTrace(a, cause, enclosing, dejaVu);
@@ -168,6 +172,14 @@ public class Error extends AbstractFunction implements BaseFunction {
     public static class JavaException extends ConvertedException {
 
         public final java.lang.String type;
+
+        public JavaException(java.lang.String message) {
+            this("Error", message);
+        }
+
+        public JavaException(java.lang.String message, Throwable cause) {
+            this("Error", message, cause);
+        }
 
         public JavaException(java.lang.String type, java.lang.String message) {
             super(message);

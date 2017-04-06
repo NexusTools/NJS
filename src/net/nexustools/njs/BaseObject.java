@@ -162,6 +162,16 @@ public interface BaseObject extends Scopable, Iterable<BaseObject> {
             this.enumerable = enumerable;
         }
 
+        public ExtendedProperty(BaseFunction getter, BaseFunction setter) {
+            this(getter, setter, true);
+        }
+
+        public ExtendedProperty(BaseFunction getter, BaseFunction setter, boolean enumerable) {
+            this.enumerable = enumerable;
+            this.setter = setter;
+            this.getter = getter;
+        }
+
         @Override
         public final BaseObject get() {
             assert (getter == null);
