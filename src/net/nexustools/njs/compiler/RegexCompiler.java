@@ -25,6 +25,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.nexustools.njs.Error;
@@ -524,6 +526,21 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
+        public Parsed transform(Parsed part) {
+            if (part instanceof Lambda) {
+                Function function = new Function();
+                function.arguments.add(ref);
+                function.name = function.uname = "<lambda>";
+                function.type = Function.Type.Lambda;
+                function.state = Function.State.InLambda;
+                function.storage = new LambdaReturn(function);
+                return function;
+            }
+
+            return super.transform(part);
+        }
+
+        @Override
         public Referency extend(DirectReference reference) {
             ReferenceChain chain = new ReferenceChain();
             chain.chain.add(ref);
@@ -741,7 +758,7 @@ public abstract class RegexCompiler implements Compiler {
         public java.lang.String toSource() {
             StringBuilder builder = new StringBuilder(reference.toString());
             builder.append('(');
-            builder.append(join(arguments, '.'));
+            builder.append(join(arguments, ','));
             if (closed) {
                 builder.append(')');
             }
@@ -792,6 +809,23 @@ public abstract class RegexCompiler implements Compiler {
         public boolean isIncomplete() {
             return rhs != null && rhs.isIncomplete();
         }
+    }
+
+    public static class LambdaReturn extends Return {
+        
+        public final Function function;
+        public LambdaReturn(Function function) {
+            this.function = function;
+        }
+
+        @Override
+        public Parsed transform(Parsed part) {
+            if(rhs == null && part instanceof OpenGroup)
+                throw new ParseFunction(function);
+            
+            return super.transform(part);
+        }
+        
     }
 
     public static class Delete extends Rh {
@@ -995,6 +1029,16 @@ public abstract class RegexCompiler implements Compiler {
                 if (part instanceof SemiColon) {
                     throw new CompleteException(part);
                 }
+                if (part instanceof Lambda) {
+                    Function function = new Function();
+                    for(Parsed _part : parts)
+                        function.arguments.add(((Reference)_part).ref);
+                    function.name = function.uname = "<lambda>";
+                    function.type = Function.Type.Lambda;
+                    function.state = Function.State.InLambda;
+                    function.storage = new LambdaReturn(function);
+                    return function;
+                }
 
                 return super.transform(part);
             }
@@ -1029,6 +1073,11 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
+        public boolean isIncomplete() {
+            return !closed;
+        }
+
+        @Override
         public int precedence() {
             return 20;
         }
@@ -1055,6 +1104,15 @@ public abstract class RegexCompiler implements Compiler {
             if (closed) {
                 if (part instanceof SemiColon) {
                     throw new CompleteException(part);
+                }
+                if(part instanceof Lambda) {
+                    Function function = new Function();
+                    function.arguments.add(((Reference)contents).ref);
+                    function.name = function.uname = "<lambda>";
+                    function.type = Function.Type.Lambda;
+                    function.state = Function.State.InLambda;
+                    function.storage = new LambdaReturn(function);
+                    return function;
                 }
 
                 return super.transform(part);
@@ -2072,20 +2130,29 @@ public abstract class RegexCompiler implements Compiler {
 
     public static class Function extends Parsed {
 
+        public static enum Type {
+            Standard,
+            Generator,
+            Lambda
+        }
         public static enum State {
             BeforeName,
             BeforeArguments,
             InArguments,
+            WaitingForVarArg,
+            HasVarArg,
             BeforeBody,
             InBody,
-            Complete
+            Complete,
+            InLambda
         }
 
+        Type type;
         Parsed call;
-        boolean isYieldable;
+        Parsed storage;
         java.lang.String name;
         java.lang.String uname;
-        Parsed currentArgumentPart;
+        java.lang.String vararg;
         List<java.lang.String> arguments = new ArrayList();
         State state = State.BeforeName;
         java.lang.String source;
@@ -2093,42 +2160,79 @@ public abstract class RegexCompiler implements Compiler {
 
         public Function() {
         }
+        
+        public boolean isLambda() {
+            return type == Type.Lambda;
+        }
 
         @Override
         public java.lang.String toSource() {
-            StringBuilder builder = new StringBuilder("function");
-            if (isYieldable) {
-                builder.append('*');
-            }
-            if (name != null) {
-                builder.append(' ');
-                builder.append(name);
-            }
-            builder.append('(');
-            join(arguments, ',', builder);
-            builder.append("){");
-            if (impl == null) {
-                builder.append("<unparsed>");
+            StringBuilder builder;
+            if(type == Type.Lambda) {
+                builder = new StringBuilder("(");
+                join(arguments, ',', builder);
+                builder.append(") => ");
+                if (impl == null) {
+                    if(storage == null)
+                        builder.append("<unparsed>");
+                    else
+                        builder.append(storage);
+                } else {
+                    join(Arrays.asList(impl), ';', builder);
+                }
             } else {
-                join(Arrays.asList(impl), ';', builder);
+                builder = new StringBuilder("function");
+                if (type == Type.Generator) {
+                    builder.append('*');
+                }
+                if (name != null) {
+                    builder.append(' ');
+                    builder.append(name);
+                }
+                builder.append('(');
+                join(arguments, ',', builder);
+                builder.append("){");
+                if (impl == null) {
+                    builder.append("<unparsed>");
+                } else {
+                    join(Arrays.asList(impl), ';', builder);
+                }
+                builder.append("}");
             }
-            builder.append("}");
             return builder.toString();
         }
 
         @Override
         public java.lang.String toSimpleSource() {
-            StringBuilder builder = new StringBuilder("function");
-            if (isYieldable) {
-                builder.append('*');
+            StringBuilder builder;
+            if(type == Type.Lambda) {
+                builder = new StringBuilder("(");
+                join(arguments, ',', builder);
+                builder.append(") => ");
+                if (impl == null) {
+                    builder.append("<unparsed>");
+                } else {
+                    builder.append("...");
+                }
+            } else {
+                builder = new StringBuilder("function");
+                if (type == Type.Generator) {
+                    builder.append('*');
+                }
+                if (name != null) {
+                    builder.append(' ');
+                    builder.append(name);
+                }
+                builder.append('(');
+                join(arguments, ',', builder);
+                builder.append("){");
+                if (impl == null) {
+                    builder.append("<unparsed>");
+                } else {
+                    builder.append("...");
+                }
+                builder.append("}");
             }
-            if (name != null) {
-                builder.append(' ');
-                builder.append(name);
-            }
-            builder.append('(');
-            join(arguments, ',', builder);
-            builder.append("){ ... }");
             return builder.toString();
         }
 
@@ -2141,7 +2245,7 @@ public abstract class RegexCompiler implements Compiler {
             switch (state) {
                 case BeforeName:
                     if (part instanceof Multiply) {
-                        isYieldable = true;
+                        type = Type.Generator;
                         return this;
                     }
                     if (part instanceof Reference) {
@@ -2155,24 +2259,40 @@ public abstract class RegexCompiler implements Compiler {
                         return this;
                     }
                     break;
+                    
+                case WaitingForVarArg:
+                    vararg = ((Reference) part).ref;
+                    state = State.HasVarArg;
+                    return this;
+                    
+                case HasVarArg:
+                    if (part instanceof CloseBracket) {
+                        state = State.BeforeBody;
+                        return this;
+                    }
+                    break;
 
                 case InArguments:
-                    if (currentArgumentPart == null) {
+                    if (storage == null) {
+                        if(part instanceof VarArgs) {
+                            state = State.WaitingForVarArg;
+                            return this;
+                        }
                         if (part instanceof CloseBracket) {
                             state = State.BeforeBody;
                             return this;
                         }
-                        currentArgumentPart = part;
+                        storage = part;
                     } else {
                         if (part instanceof CloseBracket) {
-                            arguments.add(((Reference) currentArgumentPart).ref);
-                            currentArgumentPart = null;
+                            arguments.add(((Reference) storage).ref);
+                            storage = null;
                             state = State.BeforeBody;
                             return this;
                         }
                         if (part instanceof Comma) {
-                            arguments.add(((Reference) currentArgumentPart).ref);
-                            currentArgumentPart = null;
+                            arguments.add(((Reference) storage).ref);
+                            storage = null;
                             return this;
                         }
                     }
@@ -2193,6 +2313,10 @@ public abstract class RegexCompiler implements Compiler {
                     if(part instanceof OpenBracket)
                         return new Call(part, this);
                     throw new CompleteException(part);
+                    
+                case InLambda:
+                    storage = storage.transform(part);
+                    return this;
             }
 
             throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSimpleSource() + " (" + state + ')');
@@ -2205,10 +2329,20 @@ public abstract class RegexCompiler implements Compiler {
 
         @Override
         public boolean isIncomplete() {
+            if(state == State.InLambda)
+                return storage == null || storage.isIncomplete();
             return state != State.Complete;
         }
 
+        @Override
         public Parsed finish() {
+            if(state == State.InLambda) {
+                storage = storage.finish();
+                impl = new ScriptData(new Parsed[]{storage}, toSource(), storage.rows, storage.columns);
+                impl.methodName = "<lambda>";
+                impl.callee = this;
+                storage = null;
+            }
             return this;
         }
     }
@@ -4293,27 +4427,46 @@ public abstract class RegexCompiler implements Compiler {
 
     public static class Let extends Var {
     }
+    
+    public static class VarArgs extends Helper {
+
+        @Override
+        public java.lang.String toSource() {
+            return "...";
+        }
+        
+    }
+    
+    public static class Lambda extends Helper {
+
+        @Override
+        public java.lang.String toSource() {
+            return "=>";
+        }
+        
+    }
 
     public static class String extends PrimitiveReferency implements StringReferency {
 
         private static final Pattern HEX_ESCAPED = Pattern.compile("\\\\x([a-fA-F0-9]{2})");
         public final java.lang.String string;
-
-        public String(java.lang.String string) {
-            assert (string != null);
+        
+        public static java.lang.String decode(java.lang.String string) {
             string = string.replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t").replace("\\\"", "\"").replace("\\\\", "\\");
             
             Matcher matcher;
             while((matcher = HEX_ESCAPED.matcher(string)).find()) {
-                System.out.println();
-                
-                
                 string = string.substring(0, matcher.regionStart())
                         + (char)(int)java.lang.Integer.valueOf(matcher.group(1), 16)
                         + string.substring(matcher.regionEnd());
             }
             
-            this.string = string;
+            return string;
+        }
+
+        public String(java.lang.String string) {
+            assert (string != null);
+            this.string = decode(string);
         }
 
         @Override
@@ -4342,6 +4495,74 @@ public abstract class RegexCompiler implements Compiler {
             } catch (NumberFormatException ex) {
                 return false;
             }
+        }
+
+        @Override
+        public int precedence() {
+            return -1;
+        }
+
+    }
+    
+    public static class TemplateLiteral extends PrimitiveReferency implements StringReferency {
+        private static java.lang.String decode(java.lang.String string) {
+            return String.decode(string.replace("\\`", "`"));
+        }
+        public final Object[] parts;
+
+        public TemplateLiteral(java.lang.String string, RegexParser parser) {
+            assert (string != null);
+            int pos = 0, index;
+            
+            List data = new ArrayList();
+            while((index = string.indexOf("${", pos)) > -1) {
+                if(index > pos)
+                    data.add(decode(string.substring(pos, index)));
+                
+                int end = string.indexOf("}", index);
+                if(end == -1)
+                    break;
+                
+                try {
+                    ScriptData parsed = parser.parse(new ParserReader(new StringReader(string.substring(index+2, end))));
+                    assert(parsed.impl.length == 1);
+                    data.add(parsed.impl[0].finish());
+                } catch (IOException ex) {
+                    throw new RuntimeException(ex);
+                }
+                pos = end+1;
+            }
+            if(pos < string.length())
+                data.add(decode(string.substring(pos)));
+            
+            parts = data.toArray();
+        }
+
+        @Override
+        public Parsed transform(Parsed part) {
+            if (part instanceof In)
+                return new In(this);
+            
+            return super.transform(part);
+        }
+        
+        @Override
+        public java.lang.String toSource() {
+            StringBuilder builder = new StringBuilder("`");
+            for(java.lang.Object part : parts)
+                if(part instanceof Parsed) {
+                    builder.append("${");
+                    builder.append(part);
+                    builder.append("}");
+                } else
+                    builder.append(part);
+            builder.append("`");
+            return builder.toString();
+        }
+
+        @Override
+        public boolean isNumber() {
+            return false;
         }
 
         @Override
@@ -4414,8 +4635,11 @@ public abstract class RegexCompiler implements Compiler {
     public static final java.lang.String VARIABLE_NAME = "[_$a-zA-Z\\xA0-\\uFFFF][_$a-zA-Z0-9\\xA0-\\uFFFF]*";
     public static final Pattern MULTILINE_COMMENT = Pattern.compile("^(\\/\\*(?:(?!\\*\\/).|[\\n\\r])*\\*\\/)");
     public static final Pattern SINGLELINE_COMMENT = Pattern.compile("^(\\/\\/[^\\n\\r]*([\\n\\r]+|$))");
-    public static final Pattern REGEX = Pattern.compile("^/(([^/\\n]||\\\\/)*)/([gi]*)");
+    public static final Pattern REGEX = Pattern.compile("^/((|\\\\/|[^/\\n])*)/([gi]*)");
     public static final Pattern STRING = Pattern.compile("^" + STRING_REG);
+    public static final Pattern TEMPLATE_LITERAL = Pattern.compile("^`((\\\\`|[^`])+)`");
+    public static final Pattern VARARGS = Pattern.compile("^\\.\\.\\.");
+    public static final Pattern LAMBDA = Pattern.compile("^=>");
     public static final Pattern NUMBERGET = Pattern.compile("^\\[(" + NUMBER_REG + ")\\]");
     public static final Pattern STRINGGET = Pattern.compile("^\\[" + STRING_REG + "\\]");
     public static final Pattern VAR = Pattern.compile("^var\\s+(" + VARIABLE_NAME + ")(\\s*,\\s*" + VARIABLE_NAME + ")*");
@@ -4822,7 +5046,7 @@ public abstract class RegexCompiler implements Compiler {
     public static class ScriptParser extends RegexParser {
 
         public ScriptParser() {
-            super(SINGLELINE_COMMENT, MULTILINE_COMMENT, REGEX, DBLSHIFTRIGHTEQ, SHIFTLEFTEQ, SHIFTRIGHTEQ, DBLSHIFTRIGHT, SHIFTLEFT, SHIFTRIGHT, NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, ANDEQUAL, OREQUAL, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MINUSEQ, DIVIDEEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, HEX, NUMBER, VARIABLE, VARIABLEGET, DIVIDE, WHITESPACE, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, FORKSTART);
+            super(SINGLELINE_COMMENT, MULTILINE_COMMENT, LAMBDA, REGEX, DBLSHIFTRIGHTEQ, SHIFTLEFTEQ, SHIFTRIGHTEQ, DBLSHIFTRIGHT, SHIFTLEFT, SHIFTRIGHT, NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, ANDEQUAL, OREQUAL, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MINUSEQ, DIVIDEEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, HEX, NUMBER, VARIABLE, VARIABLEGET, DIVIDE, WHITESPACE, TEMPLATE_LITERAL, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, FORKSTART, VARARGS);
         }
 
         @Override
@@ -4830,9 +5054,19 @@ public abstract class RegexCompiler implements Compiler {
             if (pattern == WHITESPACE || pattern == MULTILINE_COMMENT || pattern == SINGLELINE_COMMENT) {
                 return; // Ignored
             }
+            if (pattern == LAMBDA) {
+                throw new PartExchange(new Lambda(), matcher.group().length());
+            }
+            if (pattern == VARARGS) {
+                throw new PartExchange(new VarArgs(), matcher.group().length());
+            }
             if (pattern == STRING) {
                 java.lang.String string = matcher.group(1);
                 throw new PartExchange(new String(string.substring(1, string.length() - 1)), matcher.group().length());
+            }
+            if (pattern == TEMPLATE_LITERAL) {
+                java.lang.String string = matcher.group(1);
+                throw new PartExchange(new TemplateLiteral(string, this), matcher.group().length());
             }
             if (pattern == HEX) {
                 try {

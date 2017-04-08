@@ -31,54 +31,64 @@ import org.junit.Test;
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public class Function {
-	
-	Compiler[] compilers;
-	
-	@Before
-	public void setUp() {
-		compilers = new Compiler[]{
-			new JavaTranspiler(),
-			new RuntimeCompiler()
-		};
-	}
-	
-	@After
-	public void tearDown() {
-		compilers = null;
-	}
-	
-	@Test
-	public void construct() {
-		test("construct");
-	}
-	
-	@Test
-	public void apply() {
-		test("apply");
-	}
-	
-	@Test
-	public void bind() {
-		test("bind");
-	}
-	
-	@Test
-	public void call() {
-		test("call");
-	}
-	
-	public void test(java.lang.String name) {
-		for(Compiler compiler : compilers) {
-			try {
-				compiler.compile(new InputStreamReader(Function.class.getResourceAsStream("/tests/function/" + name + ".js")), name + ".js", false).exec(Utilities.createExtendedGlobal(compiler), null);
-			} catch(java.lang.RuntimeException re) {
-				System.err.println(Utilities.extractStack(re.toString(), re));
-				throw re;
-			} catch(java.lang.Error e) {
-				System.err.println(Utilities.extractStack(e.toString(), e));
-				throw e;
-			}
-		}
-	}
-	
+
+    Compiler[] compilers;
+
+    @Before
+    public void setUp() {
+        compilers = new Compiler[]{
+            new JavaTranspiler(),
+            new RuntimeCompiler()
+        };
+    }
+
+    @After
+    public void tearDown() {
+        compilers = null;
+    }
+
+    @Test
+    public void construct() {
+        test("construct");
+    }
+
+    @Test
+    public void apply() {
+        test("apply");
+    }
+
+    @Test
+    public void bind() {
+        test("bind");
+    }
+
+    @Test
+    public void call() {
+        test("call");
+    }
+
+    @Test
+    public void lambda() {
+        test("lambda");
+    }
+
+    @Test
+    public void varargs() {
+        test("varargs");
+    }
+
+    public void test(java.lang.String name) {
+        for (Compiler compiler : compilers) {
+            try {
+                compiler.compile(new InputStreamReader(Function.class.getResourceAsStream("/tests/function/" + name + ".js")), name + ".js", false).exec(Utilities.createExtendedGlobal(compiler), null);
+            } catch (java.lang.RuntimeException re) {
+                System.err.println(Utilities.extractStack(re.toString(), re));
+                throw re;
+            } catch (java.lang.Error e) {
+                System.err.println(Utilities.extractStack(e.toString(), e));
+                throw e;
+            }
+        }
+    }
+
 }

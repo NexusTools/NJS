@@ -52,6 +52,11 @@ public class String {
         test("construct");
     }
 
+    @Test
+    public void templateLiteral() {
+        test("template-literal");
+    }
+
     public void test(java.lang.String name) {
         for (Compiler compiler : compilers) {
             try {

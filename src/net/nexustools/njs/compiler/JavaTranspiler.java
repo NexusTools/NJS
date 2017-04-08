@@ -290,6 +290,23 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.append("\"");
             sourceBuilder.append(convertStringSource(((String) part).string));
             sourceBuilder.append("\"");
+        } else if (part instanceof TemplateLiteral) {
+            sourceBuilder.append("(");
+            boolean first = true;
+            for(java.lang.Object _part : ((TemplateLiteral)part).parts) {
+                if(first)
+                    first = false;
+                else
+                    sourceBuilder.append(" + ");
+                if(_part instanceof Parsed)
+                    generateStringSource(sourceBuilder, (Parsed)_part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
+                else {
+                    sourceBuilder.append("\"");
+                    sourceBuilder.append(convertStringSource(_part.toString()));
+                    sourceBuilder.append("\"");
+                }
+            }
+            sourceBuilder.append(")");
         } else if (part instanceof Plus && ((Plus) part).isStringReferenceChain()) {
             generateStringSource(sourceBuilder, ((Plus) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
             sourceBuilder.append(" + ");
@@ -1469,6 +1486,14 @@ public class JavaTranspiler extends RegexCompiler {
                 }
                 scopeOptimizer.scope.put(arg, "argument");
             }
+            java.lang.String arg = ((Function)parsed).vararg;
+            if(arg != null) {
+                if (RESTRICTED_SCOPE_NAMES.matcher(arg).matches()) {
+                    scopeOptimizer.markUseTypedClassStack();
+                    return;
+                }
+                scopeOptimizer.scope.put(arg, "argument");
+            }
             
             try {
                 scanScriptSource(((Function) parsed).impl, scopeOptimizer);
@@ -1959,7 +1984,10 @@ public class JavaTranspiler extends RegexCompiler {
 
             sourceBuilder.append("new ");
             sourceBuilder.append(name);
-            sourceBuilder.append("(global, ");
+            sourceBuilder.append("(");
+            if(((Function)part).isLambda())
+                sourceBuilder.append("_this, ");
+            sourceBuilder.append("global, ");
             sourceBuilder.append(baseScope);
             sourceBuilder.append(")");
             return false;
@@ -3083,6 +3111,24 @@ public class JavaTranspiler extends RegexCompiler {
         } else if (part instanceof Undefined) {
             sourceBuilder.append("Undefined.INSTANCE");
             return false;
+        } else if (part instanceof TemplateLiteral) {
+            sourceBuilder.append("global.wrap(");
+            boolean first = true;
+            for(java.lang.Object _part : ((TemplateLiteral)part).parts) {
+                if(first)
+                    first = false;
+                else
+                    sourceBuilder.append(" + ");
+                if(_part instanceof Parsed)
+                    generateStringSource(sourceBuilder, (Parsed)_part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
+                else {
+                    sourceBuilder.append("\"");
+                    sourceBuilder.append(convertStringSource(_part.toString()));
+                    sourceBuilder.append("\"");
+                }
+            }
+            sourceBuilder.append(")");
+            return false;
         } else if (part instanceof In) {
             sourceBuilder.append("(");
             transpileParsedSource(sourceBuilder, ((In)part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
@@ -3096,6 +3142,7 @@ public class JavaTranspiler extends RegexCompiler {
     }
 
     private static enum SourceScope {
+        LambdaFunction,
         GlobalFunction,
         GlobalScript,
         SubFunction,
@@ -3106,7 +3153,11 @@ public class JavaTranspiler extends RegexCompiler {
         }
 
         private boolean isFunction() {
-            return this == GlobalFunction || this == SubFunction || this == Function;
+            return this == GlobalFunction || this == SubFunction || this == Function || this == LambdaFunction;
+        }
+
+        private boolean isLambda() {
+            return this == LambdaFunction;
         }
 
         private boolean isGlobal() {
@@ -3134,8 +3185,9 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.appendln("@Override");
             sourceBuilder.appendln("public String name() {");
             sourceBuilder.append("\treturn \"");
+            boolean isLambda = script.callee != null && script.callee.isLambda();
             if (script.callee != null && script.callee.name != null) {
-                sourceBuilder.append("<anonymous>");
+                sourceBuilder.append(isLambda ? "<lambda>" : "<anonymous>");
             } else {
                 sourceBuilder.append(script.methodName != null ? convertStringSource(script.methodName) : "<anonymous>");
             }
@@ -3143,21 +3195,32 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.appendln("}");
 
             sourceBuilder.appendln("@Override");
-            sourceBuilder.appendln("public BaseObject call(BaseObject _this, BaseObject... params) {");
+            sourceBuilder.append("public BaseObject call(BaseObject ");
+            if(isLambda)
+                sourceBuilder.append("__lambda_ignored__");
+            else
+                sourceBuilder.append("_this");
+            sourceBuilder.appendln(", BaseObject... params) {");
             if (opt == null) {
-                sourceBuilder.appendln("\tfinal Scope baseScope = extendScope(_this);");
+                sourceBuilder.append("\tfinal Scope baseScope = extendScope(");
+                if(!isLambda)
+                    sourceBuilder.append("_this");
+                sourceBuilder.appendln(");");
             }
             if (script.callee != null) {
                 methodPrefix = extendMethodChain(methodPrefix, script.callee.name);
                 List<java.lang.String> arguments = script.callee.arguments;
+                java.lang.String vararg = script.callee.vararg;
                 if (opt == null) {
                     sourceBuilder.appendln("\tbaseScope.var(\"arguments\", new Arguments(global, this, params));");
                 } else {
-                    localStack.put("this", "unknown");
+                    localStack.put("this", "this");
                     if (usesStackClass) {
                         for (int i = 0; i < arguments.size(); i++) {
                             localStack.put(arguments.get(i), "argument");
                         }
+                        if(vararg != null)
+                            localStack.put(vararg, "argument");
                         if (localStack.isEmpty()) {
                             sourceBuilder.appendln("\tfinal Scope baseScope = extendScope(_this);");
                         } else {
@@ -3186,6 +3249,12 @@ public class JavaTranspiler extends RegexCompiler {
                             sourceBuilder.append(arguments.get(i));
                             sourceBuilder.appendln(";");
                             localStack.put(arguments.get(i), "argument");
+                        }
+                        if(vararg != null) {
+                            sourceBuilder.append("\tBaseObject ");
+                            sourceBuilder.append(vararg);
+                            sourceBuilder.appendln(";");
+                            localStack.put(vararg, "argument");
                         }
                         for (java.lang.String key : opt.keys()) {
                             if (key.equals("arguments")) {
@@ -3217,10 +3286,12 @@ public class JavaTranspiler extends RegexCompiler {
                 }
                 if (!arguments.isEmpty()) {
                     sourceBuilder.appendln("\tswitch(params.length) {");
-                    for (int i = 0; i <= arguments.size(); i++) {
+                    int argsize = arguments.size();
+                    for (int i = 0; i <= argsize; i++) {
                         int a = 0;
                         sourceBuilder.append("\t\t");
-                        if (i == arguments.size()) {
+                        boolean _default = i == argsize;
+                        if (_default) {
                             sourceBuilder.append("default");
                         } else {
                             sourceBuilder.append("case ");
@@ -3245,7 +3316,7 @@ public class JavaTranspiler extends RegexCompiler {
                                 sourceBuilder.appendln("];");
                             }
                         }
-                        for (; a < arguments.size(); a++) {
+                        for (; a < argsize; a++) {
                             if (script.optimizations == null) {
                                 sourceBuilder.append("\t\t\tbaseScope.var(\"");
                                 sourceBuilder.append(convertStringSource(arguments.get(a)));
@@ -3259,9 +3330,55 @@ public class JavaTranspiler extends RegexCompiler {
                                 sourceBuilder.appendln(" = Undefined.INSTANCE;");
                             }
                         }
+                        if(vararg != null) {
+                            if(_default) {
+                                if (script.optimizations == null) {
+                                    sourceBuilder.append("\t\t\tbaseScope.var(\"");
+                                    sourceBuilder.append(convertStringSource(vararg));
+                                    sourceBuilder.append("\", new GenericArray(global, params, ");
+                                    sourceBuilder.append(java.lang.String.valueOf(argsize));
+                                    sourceBuilder.appendln("));");
+                                } else {
+                                    sourceBuilder.append("\t\t\t");
+                                    if (usesStackClass) {
+                                        sourceBuilder.append("localStack.");
+                                    }
+                                    sourceBuilder.append(vararg);
+                                    sourceBuilder.append(" = new GenericArray(global, params, ");
+                                    sourceBuilder.append(java.lang.String.valueOf(argsize));
+                                    sourceBuilder.appendln("));");
+                                }
+                            } else {
+                                if (script.optimizations == null) {
+                                    sourceBuilder.append("\t\t\tbaseScope.var(\"");
+                                    sourceBuilder.append(convertStringSource(vararg));
+                                    sourceBuilder.appendln("\", new GenericArray(global));");
+                                } else {
+                                    sourceBuilder.append("\t\t\t");
+                                    if (usesStackClass) {
+                                        sourceBuilder.append("localStack.");
+                                    }
+                                    sourceBuilder.append(vararg);
+                                    sourceBuilder.appendln(" = new GenericArray(global);");
+                                }
+                            }
+                        }
                         sourceBuilder.appendln("\t\t\tbreak;");
                     }
                     sourceBuilder.appendln("\t}");
+                } else if(vararg != null) {
+                    if (script.optimizations == null) {
+                        sourceBuilder.append("\tbaseScope.var(\"");
+                        sourceBuilder.append(convertStringSource(vararg));
+                        sourceBuilder.append("\", new GenericArray(global, params));");
+                    } else {
+                        sourceBuilder.append("\t");
+                        if (usesStackClass) {
+                            sourceBuilder.append("localStack.");
+                        }
+                        sourceBuilder.append(vararg);
+                        sourceBuilder.append(" = new GenericArray(global, params);");
+                    }
                 }
             } else {
                 methodPrefix = extendMethodChain(methodPrefix, script.methodName);
@@ -3303,7 +3420,10 @@ public class JavaTranspiler extends RegexCompiler {
                 }
                 sourceBuilder.append(" = new ");
                 sourceBuilder.append(function.uname);
-                sourceBuilder.appendln("(global, baseScope);");
+                sourceBuilder.appendln("(");
+                if(function.isLambda())
+                    sourceBuilder.append("_this, ");
+                sourceBuilder.append("global, baseScope);");
                 localStack.put(function.name, "function");
             }
         } else {
@@ -3503,15 +3623,23 @@ public class JavaTranspiler extends RegexCompiler {
                 function.uname = scopeChain.toClassName(function.name);
             }
             sourceBuilder.append(functionName = function.uname);
-            sourceBuilder.appendln(" extends CompiledFunction {");
+            sourceBuilder.append(" extends Compiled");
+            sourceBuilder.append(function.isLambda() ? "Lambda" : "Function");
+            sourceBuilder.appendln(" {");
             sourceBuilder.indent();
             sourceBuilder.appendln("private final Scope baseScope;");
-            StackOptimizations funcopt = (StackOptimizations)function.impl.optimizations;
+            StackOptimizations funcopt = function.impl == null ? null : (StackOptimizations)function.impl.optimizations;
             
             sourceBuilder.append("private ");
             sourceBuilder.append(functionName);
-            sourceBuilder.appendln("(Global global, Scope scope) {");
-            sourceBuilder.appendln("\tsuper(global);");
+            sourceBuilder.append("(");
+            if(function.isLambda())
+                sourceBuilder.append("BaseObject _this, ");
+            sourceBuilder.appendln("Global global, Scope scope) {");
+            sourceBuilder.append("\tsuper(");
+            if(function.isLambda())
+                sourceBuilder.append("_this, ");
+            sourceBuilder.appendln("global);");
             sourceBuilder.appendln("\tbaseScope = scope;");
             sourceBuilder.appendln("}");
 
@@ -3519,11 +3647,17 @@ public class JavaTranspiler extends RegexCompiler {
             transpileScriptSource(sourceBuilder, funcLocalStack, function.impl, methodPrefix, fileName, scopeChain.extend(), scope.isNonGlobalFunction() ? SourceScope.SubFunction : SourceScope.Function);
 
             if (funcopt == null || (funcopt.stackType() != ScopeOptimizer.StackType.TypedLocal && (funcopt.stackType() == ScopeOptimizer.StackType.TypedClass || funcLocalStack.isEmpty()))) {
-                sourceBuilder.appendln("Scope extendScope(BaseObject _this) {");
+                sourceBuilder.append("Scope extendScope(");
+                if(!function.isLambda())
+                    sourceBuilder.append("BaseObject _this");
+                sourceBuilder.appendln(") {");
                 sourceBuilder.appendln("\treturn baseScope.extend(_this);");
                 sourceBuilder.appendln("}");
             } else if (funcopt.stackType() != ScopeOptimizer.StackType.TypedLocal) {
-                sourceBuilder.appendln("Scope extendScope(BaseObject _this, Scopable stack) {");
+                sourceBuilder.appendln("Scope extendScope(");
+                if(!function.isLambda())
+                    sourceBuilder.append("BaseObject _this, ");
+                sourceBuilder.appendln("Scopable stack) {");
                 sourceBuilder.appendln("\treturn baseScope.extend(_this, stack);");
                 sourceBuilder.appendln("}");
             }
@@ -3533,7 +3667,6 @@ public class JavaTranspiler extends RegexCompiler {
         }
 
         if (addDebugging) {
-
             sourceBuilder.append("public");
             //if(scope != SourceScope.SubFunction)
             sourceBuilder.append(" static");
@@ -3569,6 +3702,7 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.appendln();
         }
         sourceBuilder.appendln("import net.nexustools.njs.compiler.CompiledScript;");
+        sourceBuilder.appendln("import net.nexustools.njs.compiler.CompiledLambda;");
         sourceBuilder.appendln("import net.nexustools.njs.compiler.CompiledFunction;");
         sourceBuilder.appendln("import net.nexustools.njs.compiler.SyntheticScopable;");
         sourceBuilder.appendln();

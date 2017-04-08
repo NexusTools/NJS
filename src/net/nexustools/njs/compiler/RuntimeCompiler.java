@@ -461,6 +461,24 @@ public class RuntimeCompiler extends RegexCompiler {
                     return new ValueReferenceable(global.wrap(string), rows, columns);
                 }
             };
+        } else if (object instanceof TemplateLiteral) {
+            final java.lang.Object[] parts = ((TemplateLiteral) object).parts;
+            for(int i=0; i<parts.length; i++)
+                if(parts[i] instanceof Parsed)
+                    parts[i] = compile(data, (Parsed)parts[i]);
+            return new Impl() {
+                @Override
+                public Referencable run(Global global, Scope scope) {
+                    StringBuilder builder = new StringBuilder();
+                    for(java.lang.Object part : parts) {
+                        if(part instanceof Impl)
+                            builder.append(((Impl)part).run(global, scope).get().toString());
+                        else
+                            builder.append(part.toString());
+                    }
+                    return new ValueReferenceable(global.wrap(builder.toString()), rows, columns);
+                }
+            };
         } else if (object instanceof Reference) {
             final java.lang.String ref = ((Reference) object).ref;
             return new Impl() {
@@ -1037,6 +1055,7 @@ public class RuntimeCompiler extends RegexCompiler {
             final java.lang.String[] args = ((Function) object).arguments.toArray(new java.lang.String[((Function) object).arguments.size()]);
             final java.lang.String name = ((Function) object).name == null ? "<anonymous>" : ((Function) object).name;
             final java.lang.String source = ((Function) object).source;
+            final java.lang.String vararg = ((Function) object).vararg;
 
             StringBuilder argBuilder = new StringBuilder();
             Iterator<java.lang.String> it = ((Function) object).arguments.iterator();
@@ -1055,7 +1074,6 @@ public class RuntimeCompiler extends RegexCompiler {
             } finally {
                 methodNameStack.remove(methodNameStack.size() - 1);
             }
-            final java.lang.String stackName = methodNameStack.isEmpty() ? name : join(methodNameStack, '.') + '.' + name;
             return new Impl() {
                 @Override
                 public Referencable run(final Global global, final Scope scope) {
@@ -1071,6 +1089,12 @@ public class RuntimeCompiler extends RegexCompiler {
                             }
                             for (; i < args.length; i++) {
                                 s.var(args[i]);
+                            }
+                            if(vararg != null) {
+                                if(params.length > args.length)
+                                    s.var(vararg, new GenericArray(global, params, args.length));
+                                else
+                                    s.var(vararg, new GenericArray(global));
                             }
                             s.var("callee", this);
                             return impl.exec(global, s);

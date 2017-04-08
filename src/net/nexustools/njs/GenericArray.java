@@ -20,6 +20,17 @@ package net.nexustools.njs;
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public class GenericArray extends AbstractArray<BaseObject[]> {
+    public static BaseObject[] copy(BaseObject[] data, int pos, int len) {
+        if(len == 0)
+            return EMPTY;
+        
+        if(pos == 0)
+            return data;
+        
+        BaseObject[] dat = new BaseObject[len];
+        System.arraycopy(data, pos, dat, 0, len);
+        return dat;
+    }
 
     private static final BaseObject[] EMPTY = new BaseObject[0];
 
@@ -45,6 +56,18 @@ public class GenericArray extends AbstractArray<BaseObject[]> {
 
     public GenericArray(Global global, Array Array, BaseObject[] storage) {
         super(global, Array, true, storage);
+    }
+
+    public GenericArray(Global global, BaseObject[] storage) {
+        super(global, global.Array, true, storage);
+    }
+
+    public GenericArray(Global global, BaseObject[] storage, int pos) {
+        this(global, storage, pos, storage.length-pos);
+    }
+
+    public GenericArray(Global global, BaseObject[] storage, int pos, int len) {
+        super(global, global.Array, true, copy(storage, pos, len));
     }
 
     @Override
