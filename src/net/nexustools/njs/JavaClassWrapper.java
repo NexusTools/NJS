@@ -160,7 +160,7 @@ public class JavaClassWrapper extends AbstractFunction {
                 @Override
                 public BaseObject call(BaseObject _this, BaseObject... params) {
                     try {
-                        return Utilities.javaToJS(global, field.get(((JavaObjectWrapper)_this).javaObject), field.getType());
+                        return Utilities.javaToJS(global, field.get(JavaObjectWrapper.unwrap(global, _this)), field.getType());
                     } catch (IllegalArgumentException ex) {
                         throw new Error.JavaException("JavaError", ex.toString(), ex);
                     } catch (IllegalAccessException ex) {
@@ -171,7 +171,7 @@ public class JavaClassWrapper extends AbstractFunction {
                 @Override
                 public BaseObject call(BaseObject _this, BaseObject... params) {
                     try {
-                        field.set(((JavaObjectWrapper)_this).javaObject, Utilities.jsToJava(params[0], field.getType()));
+                        field.set(JavaObjectWrapper.unwrap(global, _this), Utilities.jsToJava(global, params[0], field.getType()));
                         return Undefined.INSTANCE;
                     } catch (IllegalArgumentException ex) {
                         throw new Error.JavaException("JavaError", ex.toString(), ex);
@@ -203,7 +203,7 @@ public class JavaClassWrapper extends AbstractFunction {
                 @Override
                 public BaseObject call(BaseObject _this, BaseObject... params) {
                     try {
-                        field.set(null, Utilities.jsToJava(params[0], field.getType()));
+                        field.set(null, Utilities.jsToJava(global, params[0], field.getType()));
                         return Undefined.INSTANCE;
                     } catch (IllegalArgumentException ex) {
                         throw new Error.JavaException("JavaError", ex.toString(), ex);
@@ -219,6 +219,10 @@ public class JavaClassWrapper extends AbstractFunction {
 
     @Override
     public BaseObject construct(BaseObject... params) {
+        return Utilities.javaToJS(global, construct0(params), javaClass);
+    }
+    
+    private java.lang.Object construct0(BaseObject... params) {
         java.lang.Object[] bestConversion = null;
         Constructor bestConstructor = null;
 
@@ -236,7 +240,7 @@ public class JavaClassWrapper extends AbstractFunction {
                     Class[] types = constructor.getParameterTypes();
                     for (int i = 0; i < params.length; i++) {
                         try {
-                            converted[i] = Utilities.jsToJava(params[i], types[i], convertAccuracy);
+                            converted[i] = Utilities.jsToJava(global, params[i], types[i], convertAccuracy);
                             if (DEBUG) {
                                 System.out.println(types[i] + ": " + convertAccuracy.accuracy);
                             }
@@ -272,7 +276,7 @@ public class JavaClassWrapper extends AbstractFunction {
 
         if (bestConstructor != null) {
             try {
-                return Utilities.javaToJS(global, bestConstructor.newInstance(bestConversion), javaClass);
+                return bestConstructor.newInstance(bestConversion);
             } catch (IllegalAccessException ex) {
                 throw new Error.JavaException("JavaError", "Illegal access", ex);
             } catch (InstantiationException ex) {
@@ -294,7 +298,7 @@ public class JavaClassWrapper extends AbstractFunction {
     }
 
     private BaseObject callBestMethod(BaseObject _this, BaseObject[] params, Map<Integer, List<Method>> byLength) {
-        java.lang.Object __this = _this == null ? null : ((JavaObjectWrapper) _this).javaObject;
+        java.lang.Object __this = _this == null ? null : JavaObjectWrapper.unwrap(global, _this);
 
         Method bestMethod = null;
         java.lang.Object[] bestConversion = null;
@@ -312,7 +316,7 @@ public class JavaClassWrapper extends AbstractFunction {
                     Class[] types = method.getParameterTypes();
                     for (int i = 0; i < params.length; i++) {
                         try {
-                            converted[i] = Utilities.jsToJava(params[i], types[i], convertAccuracy);
+                            converted[i] = Utilities.jsToJava(global, params[i], types[i], convertAccuracy);
                             conversionAccuracy += convertAccuracy.accuracy;
                         } catch (UnsupportedOperationException ex) {
                             if (DEBUG) {
@@ -367,7 +371,8 @@ public class JavaClassWrapper extends AbstractFunction {
 
     @Override
     public BaseObject call(BaseObject _this, BaseObject... params) {
-        throw new Error.JavaException("Error", "You must call new on Java Classes");
+        _this.set(global.java_object, new JavaObjectHolder(construct0(params)));
+        return _this;
     }
 
     @Override

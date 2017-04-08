@@ -253,11 +253,11 @@ public class Utilities {
     }
     private static final ConversionAccuracy DONT_CARE_ABOUT_ACCURACY = new ConversionAccuracy();
 
-    public static java.lang.Object jsToJava(final BaseObject jsObject, Class<?> desiredClass) {
-        return jsToJava(jsObject, desiredClass, DONT_CARE_ABOUT_ACCURACY);
+    public static java.lang.Object jsToJava(Global global, final BaseObject jsObject, Class<?> desiredClass) {
+        return jsToJava(global, jsObject, desiredClass, DONT_CARE_ABOUT_ACCURACY);
     }
 
-    public static java.lang.Object jsToJava(final BaseObject jsObject, Class<?> desiredClass, ConversionAccuracy accuracy) {
+    public static java.lang.Object jsToJava(Global global, final BaseObject jsObject, Class<?> desiredClass, ConversionAccuracy accuracy) {
         if (isUndefined(jsObject)) {
             return null;
         }
@@ -514,7 +514,7 @@ public class Utilities {
 
         if (jsObject instanceof JavaObjectWrapper && desiredClass.isInstance(((JavaObjectWrapper) jsObject).javaObject)) {
             accuracy.accuracy = 1;
-            return ((JavaObjectWrapper) jsObject).javaObject;
+            return JavaObjectWrapper.unwrap(global, jsObject);
         }
         
         synchronized(CONVERTERS) {

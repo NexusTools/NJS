@@ -40,7 +40,7 @@ public class JavaClass extends AbstractFunction {
                         }
                     case 3:
                         try {
-                            return global.wrap(Class.forName(params[0].toString(), params[1].toBool(), (ClassLoader) Utilities.jsToJava(params[2], ClassLoader.class)));
+                            return global.wrap(Class.forName(params[0].toString(), params[1].toBool(), (ClassLoader) Utilities.jsToJava(global, params[2], ClassLoader.class)));
                         } catch (ClassNotFoundException ex) {
                             throw new Error.JavaException("JavaError", ex.toString(), ex);
                         }

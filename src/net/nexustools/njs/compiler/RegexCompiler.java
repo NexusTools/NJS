@@ -4414,7 +4414,7 @@ public abstract class RegexCompiler implements Compiler {
     public static final java.lang.String VARIABLE_NAME = "[_$a-zA-Z\\xA0-\\uFFFF][_$a-zA-Z0-9\\xA0-\\uFFFF]*";
     public static final Pattern MULTILINE_COMMENT = Pattern.compile("^(\\/\\*(?:(?!\\*\\/).|[\\n\\r])*\\*\\/)");
     public static final Pattern SINGLELINE_COMMENT = Pattern.compile("^(\\/\\/[^\\n\\r]*([\\n\\r]+|$))");
-    public static final Pattern REGEX = Pattern.compile("^/([^/\\s]*)/([gi]*)");
+    public static final Pattern REGEX = Pattern.compile("^/(([^/\\n]||\\\\/)*)/([gi]*)");
     public static final Pattern STRING = Pattern.compile("^" + STRING_REG);
     public static final Pattern NUMBERGET = Pattern.compile("^\\[(" + NUMBER_REG + ")\\]");
     public static final Pattern STRINGGET = Pattern.compile("^\\[" + STRING_REG + "\\]");

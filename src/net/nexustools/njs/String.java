@@ -15,6 +15,9 @@
  */
 package net.nexustools.njs;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  *
  * @author Katelyn Slater <kate@nexustools.com>
@@ -117,17 +120,6 @@ public abstract class String extends AbstractFunction {
     protected void initPrototypeFunctions(Global global) {
         this.global = global;
         GenericObject prototype = (GenericObject) prototype();
-        prototype.setHidden("match", new AbstractFunction(global) {
-            @Override
-            public BaseObject call(BaseObject _this, BaseObject... params) {
-                return _this;
-            }
-
-            @Override
-            public java.lang.String name() {
-                return "String_prototype_match";
-            }
-        });
         prototype.setHidden("substring", new AbstractFunction(global) {
             @Override
             public BaseObject call(BaseObject _this, BaseObject... params) {
@@ -141,6 +133,27 @@ public abstract class String extends AbstractFunction {
             @Override
             public java.lang.String name() {
                 return "String_prototype_substring";
+            }
+        });
+        prototype.setHidden("match", new AbstractFunction(global) {
+            @Override
+            public BaseObject call(BaseObject _this, BaseObject... params) {
+                Pattern pattern;
+                try {
+                    pattern = (Pattern)((JavaObjectHolder)params[0].get(String.this.global.RegEx.pattern)).javaObject;
+                } catch(ClassCastException ex) {
+                    pattern = Pattern.compile(params[0].toString());
+                }
+                
+                Matcher matcher = pattern.matcher(_this.toString());
+                if(matcher.matches()) {
+                    GenericArray array = new GenericArray(String.this.global, matcher.groupCount()+1);
+                    for(int i=0; i<=matcher.groupCount(); i++)
+                        array.put0(i, String.this.wrap(matcher.group(i)));
+                    System.out.println(array);
+                    return array;
+                } else
+                    return Null.INSTANCE;
             }
         });
         prototype.setHidden("indexOf", new AbstractFunction(global) {

@@ -20,52 +20,60 @@ package net.nexustools.njs;
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public class GenericArray extends AbstractArray<BaseObject[]> {
-	private static final BaseObject[] EMPTY = new BaseObject[0];
-	public GenericArray(Global global) {
-		this(global, global.Array, EMPTY);
-	}
-	public GenericArray(Global global, java.lang.Object[] array) {
-		this(global, global.Array, Utilities.convertArray(global, array));
-	}
-	public GenericArray(Global global, int len) {
-		this(global, global.Array, new BaseObject[len]);
-	}
-	public GenericArray(Global global, Array Array) {
-		this(global, Array, EMPTY);
-	}
-	public GenericArray(Global global, Array Array, int len) {
-		super(global, Array, true, new BaseObject[len]);
-	}
-	public GenericArray(Global global, Array Array, BaseObject[] storage) {
-		super(global, Array, true, storage);
-	}
 
-	@Override
-	protected void put0(int index, BaseObject obj) throws ArrayIndexOutOfBoundsException {
-		arrayStorage[index] = obj;
-	}
+    private static final BaseObject[] EMPTY = new BaseObject[0];
 
-	@Override
-	protected void copy(BaseObject[] source, BaseObject[] dest, int len) {
-		System.arraycopy(source, 0, dest, 0, len);
-	}
+    public GenericArray(Global global) {
+        this(global, global.Array, EMPTY);
+    }
 
-	@Override
-	protected int storageSize() {
-		return arrayStorage.length;
-	}
+    public GenericArray(Global global, java.lang.Object[] array) {
+        this(global, global.Array, Utilities.convertArray(global, array));
+    }
 
-	@Override
-	protected BaseObject[] createStorage(int len) {
-		return new BaseObject[len];
-	}
+    public GenericArray(Global global, int len) {
+        this(global, global.Array, new BaseObject[len]);
+    }
 
-	@Override
-	protected void releaseStorage(BaseObject[] storage) {}
+    public GenericArray(Global global, Array Array) {
+        this(global, Array, EMPTY);
+    }
 
-	@Override
-	protected BaseObject get0(int index) throws ArrayIndexOutOfBoundsException {
-		return arrayStorage[index];
-	}
-	
+    public GenericArray(Global global, Array Array, int len) {
+        super(global, Array, true, new BaseObject[len]);
+    }
+
+    public GenericArray(Global global, Array Array, BaseObject[] storage) {
+        super(global, Array, true, storage);
+    }
+
+    @Override
+    protected void put0(int index, BaseObject obj) throws ArrayIndexOutOfBoundsException {
+        arrayStorage[index] = obj;
+    }
+
+    @Override
+    protected void copy(BaseObject[] source, BaseObject[] dest, int len) {
+        System.arraycopy(source, 0, dest, 0, len);
+    }
+
+    @Override
+    protected int storageSize() {
+        return arrayStorage.length;
+    }
+
+    @Override
+    protected BaseObject[] createStorage(int len) {
+        return new BaseObject[len];
+    }
+
+    @Override
+    protected void releaseStorage(BaseObject[] storage) {
+    }
+
+    @Override
+    protected BaseObject get0(int index) throws ArrayIndexOutOfBoundsException {
+        return arrayStorage[index];
+    }
+
 }

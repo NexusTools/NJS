@@ -72,6 +72,11 @@ public class Standards {
     }
 
     @Test
+    public void regex() {
+        test("regex");
+    }
+
+    @Test
     public void _this() {
         test("this");
     }

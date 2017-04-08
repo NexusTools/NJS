@@ -3048,7 +3048,11 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.append("))");
             return false;
         } else if(part instanceof RegEx) {
-            sourceBuilder.append("/* TODO: RegEx */");
+            sourceBuilder.append("global.RegEx.create(\"");
+            sourceBuilder.append(convertStringSource(((RegEx)part).pattern));
+            sourceBuilder.append("\", \"");
+            sourceBuilder.append(convertStringSource(((RegEx)part).flags));
+            sourceBuilder.append("\")");
             return false;
         } else if(part instanceof Switch) {
             sourceBuilder.append("/* TODO: SWITCHES */");

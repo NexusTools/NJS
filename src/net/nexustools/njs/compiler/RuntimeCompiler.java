@@ -611,12 +611,13 @@ public class RuntimeCompiler extends RegexCompiler {
                         @Override
                         public Referencable run(Global global, Scope scope) {
                             Referencable ref = reference.run(global, scope);
+                            BaseObject val = ref.get();
                             BaseFunction func;
                             try {
-                                func = ((BaseFunction) ref.get());
+                                func = ((BaseFunction) val);
                             } catch (Exception ex) {
                                 if (ref instanceof KnownReferenceable) {
-                                    throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable) ref).source() + " is not a function");
+                                    throw new net.nexustools.njs.Error.JavaException("TypeError", ((KnownReferenceable) ref).source() + " is not a function, it is a " + val.typeOf());
                                 }
                                 throw new net.nexustools.njs.Error.JavaException("TypeError", "is not a function");
                             }
@@ -1802,11 +1803,12 @@ public class RuntimeCompiler extends RegexCompiler {
                 };
             }
         } else if (object instanceof RegEx) {
-            final Pattern pattern = Pattern.compile(((RegEx) object).pattern);
+            final java.lang.String pattern = ((RegEx) object).pattern;
+            final java.lang.String flags = ((RegEx) object).flags;
             return new Impl() {
                 @Override
                 public Referencable run(Global global, Scope scope) {
-                    return new ValueReferenceable(global.wrap(pattern), rows, columns);
+                    return new ValueReferenceable(global.RegEx.create(pattern, flags), rows, columns);
                 }
             };
         } else if (object instanceof Undefined) {

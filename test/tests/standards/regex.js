@@ -15,12 +15,9 @@
  */
 
 var Assert = importClass("org.junit.Assert");
+var System = importClass("java.lang.System");
 
-function test() {
-    var _this = 23;
-    var blockScope = 77;
-
-    return _this - blockScope;
-}
-
-Assert.assertTrue(test() === -54);
+var reg = /^\[object (.+)\]$/;
+Assert.assertTrue(reg.test("[object Test]"));
+Assert.assertTrue('"[object Test]".match(reg)[1] === "Test"', "[object Test]".match(reg)[1] === "Test");
+Assert.assertTrue('"[object Test]".match(reg).length === 2', "[object Test]".match(reg).length === 2);

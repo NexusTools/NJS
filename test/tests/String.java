@@ -31,39 +31,39 @@ import org.junit.Test;
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public class String {
-	
-	Compiler[] compilers;
-	
-	@Before
-	public void setUp() {
-		compilers = new Compiler[]{
-			new JavaTranspiler(),
-			new RuntimeCompiler()
-		};
-	}
-	
-	@After
-	public void tearDown() {
-		compilers = null;
-	}
-	
-	@Test
-	public void construct() {
-		test("construct");
-	}
-	
-	public void test(java.lang.String name) {
-		for(Compiler compiler : compilers) {
-			try {
-				compiler.compile(new InputStreamReader(String.class.getResourceAsStream("/tests/string/" + name + ".js")), name + ".js", false).exec(Utilities.createExtendedGlobal(), null);
-			} catch(java.lang.RuntimeException re) {
-				System.err.println(Utilities.extractStack(re.toString(), re));
-				throw re;
-			} catch(java.lang.Error e) {
-				System.err.println(Utilities.extractStack(e.toString(), e));
-				throw e;
-			}
-		}
-	}
-	
+
+    Compiler[] compilers;
+
+    @Before
+    public void setUp() {
+        compilers = new Compiler[]{
+            new JavaTranspiler(),
+            new RuntimeCompiler()
+        };
+    }
+
+    @After
+    public void tearDown() {
+        compilers = null;
+    }
+
+    @Test
+    public void construct() {
+        test("construct");
+    }
+
+    public void test(java.lang.String name) {
+        for (Compiler compiler : compilers) {
+            try {
+                compiler.compile(new InputStreamReader(String.class.getResourceAsStream("/tests/string/" + name + ".js")), name + ".js", false).exec(Utilities.createExtendedGlobal(), null);
+            } catch (java.lang.RuntimeException re) {
+                System.err.println(Utilities.extractStack(re.toString(), re));
+                throw re;
+            } catch (java.lang.Error e) {
+                System.err.println(Utilities.extractStack(e.toString(), e));
+                throw e;
+            }
+        }
+    }
+
 }

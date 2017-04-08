@@ -23,8 +23,10 @@ import javafx.scene.Node;
  */
 public class JavaObjectWrapper extends GenericObject {
 
-    public static <O> O unwrap(BaseObject view) {
-        return (O)((JavaObjectWrapper)view).javaObject;
+    public static <O> O unwrap(Global global, BaseObject view) {
+        if(view instanceof JavaObjectWrapper)
+            return (O)((JavaObjectWrapper)view).javaObject;
+        return (O)((JavaObjectHolder)view.get(global.java_object)).javaObject;
     }
 
     public final java.lang.Object javaObject;

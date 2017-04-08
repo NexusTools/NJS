@@ -66,6 +66,7 @@ public class Global extends GenericObject {
     public final Symbol Symbol;
     public final Error Error;
     public final Array Array;
+    public final RegEx RegEx;
 
     public final JavaClass JavaClass;
 
@@ -77,6 +78,8 @@ public class Global extends GenericObject {
     public final Number.Instance PositiveInfinity;
     public final Number.Instance NegativeInfinity;
     public final Number.Instance Zero;
+    
+    public final Symbol.Instance java_object;
 
     public Global() {
         this(createCompiler());
@@ -119,6 +122,9 @@ public class Global extends GenericObject {
         SymbolPrototype.setHidden("constructor", Symbol);
         SymbolPrototype.__proto__ = ObjectPrototype;
         Symbol.setPrototype(SymbolPrototype);
+        Symbol.iterator.__proto__ = SymbolPrototype;
+        Symbol.unscopables.__proto__ = SymbolPrototype;
+        java_object = Symbol.create("java_object");
         Number.initConstants();
 
         ObjectPrototype.String = NumberPrototype.String = Object.String = String;
@@ -143,6 +149,7 @@ public class Global extends GenericObject {
         Boolean = new Boolean(this);
         Error = new Error(this);
         Array = new Array(this);
+        RegEx = new RegEx(this);
         JavaClass = new JavaClass(this);
 
         NOOP = new AbstractFunction() {
