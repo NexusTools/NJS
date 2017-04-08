@@ -1107,7 +1107,8 @@ public abstract class RegexCompiler implements Compiler {
                 }
                 if(part instanceof Lambda) {
                     Function function = new Function();
-                    function.arguments.add(((Reference)contents).ref);
+                    if(contents != null)
+                        function.arguments.add(((Reference)contents).ref);
                     function.name = function.uname = "<lambda>";
                     function.type = Function.Type.Lambda;
                     function.state = Function.State.InLambda;
@@ -1926,6 +1927,17 @@ public abstract class RegexCompiler implements Compiler {
                         state = State.ReadingValue;
                         return this;
                     }
+                    if (part instanceof Comma) {
+                        entries.put(currentEntryKey, new Reference(currentEntryKey));
+                        state = State.NeedKey;
+                        return this;
+                    }
+                    if (part instanceof CloseGroup) {
+                        entries.put(currentEntryKey, new Reference(currentEntryKey));
+                        state = State.Complete;
+                        return this;
+                    }
+                    break;
 
                 case ReadingValue:
                     if (currentEntry == null) {
@@ -4254,11 +4266,13 @@ public abstract class RegexCompiler implements Compiler {
             else if(part instanceof Comma) {
                 names.put(currentKey, currentValue == null ? currentKey : currentValue);
                 currentKey = currentValue = null;
-            } else if(part instanceof CloseArray && array)
+            } else if(part instanceof CloseArray && array) {
+                names.put(currentKey, currentValue == null ? currentKey : currentValue);
                 closed = true;
-            else if(part instanceof CloseGroup && !array)
+            } else if(part instanceof CloseGroup && !array) {
+                names.put(currentKey, currentValue == null ? currentKey : currentValue);
                 closed = true;
-            else
+            } else
                 throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + describe(this));
             return this;
         }

@@ -81,10 +81,15 @@ public class Standards {
         test("this");
     }
 
-    /*@Test
+    @Test
+    public void group() {
+        test("group");
+    }
+
+    @Test
     public void let() {
         test("let");
-    }*/
+    }
     
     public void test(java.lang.String name) {
         for (Compiler compiler : compilers) {

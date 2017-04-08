@@ -197,7 +197,11 @@ public class Scope implements Scopable {
     }
 
     public final void let(java.lang.String key, BaseObject val) {
-        ((BlockScopeable) scopeables[0]).let(key, val);
+        try {
+            ((BlockScopeable) scopeables[0]).let(key, val);
+        } catch(ClassCastException ex) {
+            ((Scopable) scopeables[0]).set(key, val);
+        }
     }
     
     public final void multivar(BaseObject root, java.lang.String... keys) {

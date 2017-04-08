@@ -15,10 +15,23 @@
  */
 
 var Assert = importClass("org.junit.Assert");
-var System = importClass("java.lang.System");
 
-if (true) {
-    let cheese = 23;
-}
+var a = 23;
+var b = 24;
+var c = 25;
 
-Assert.assertTrue(typeof cheese === "undefined");
+var group = {a, b, c};
+Assert.assertTrue(group.a == a);
+Assert.assertTrue(group.b == b);
+Assert.assertTrue(group.c == c);
+
+group = {a:c, b, c:a};
+Assert.assertTrue(group.a == c);
+Assert.assertTrue(group.b == b);
+Assert.assertTrue(group.c == a);
+
+
+var {a:_a,b:_b,c:_c} = group;
+Assert.assertTrue(_a == group.a);
+Assert.assertTrue(_b == group.b);
+Assert.assertTrue(_c == group.c);
