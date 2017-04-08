@@ -31,5 +31,5 @@ Assert.assertTrue(test(55, function() {
 }, {
 	value: 4.5
 }) === 146.66666666666666);
-test = new Function("return eval(\"new Error()\").stack");
+test = new Function("return eval(\"(new Error())\").stack");
 System.out.println(test());

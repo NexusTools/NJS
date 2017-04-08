@@ -36,6 +36,13 @@ Assert.assertTrue(check(77, val => {
     return val;
 }));
 
+System.out.println(val => val);
+System.out.println((() => {
+    return val => val;
+}));
+System.out.println((() => {
+    return val => val;
+})());
 Assert.assertTrue(check(77, (() => {
     return val => val;
 })()));

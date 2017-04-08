@@ -2480,8 +2480,6 @@ public abstract class RegexCompiler implements Compiler {
                     break;
 
                 case Complete:
-                    if(part instanceof OpenBracket)
-                        return new Call(part, this);
                     return super.transform(part);
                     
                 case InLambda:

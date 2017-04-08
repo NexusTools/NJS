@@ -1815,6 +1815,40 @@ public class RuntimeCompiler extends RegexCompiler {
                     }
                 };
             }
+        } else if (object instanceof Do) {
+            final Impl condition = compile(data, ((Do) object).condition);
+            if (((Do) object).simpleimpl != null) {
+                final Impl impl = compile(data, ((Do) object).simpleimpl);
+                return new Impl() {
+                    @Override
+                    public Referencable run(Global global, Scope scope) {
+                        do {
+                            Referencable ret = impl.run(global, scope);
+                            if (ret instanceof Return) {
+                                return ret;
+                            }
+                            ret.get();
+                        } while(condition.run(global, scope).get().toBool());
+
+                        return UNDEFINED_REFERENCE;
+                    }
+                };
+            } else {
+                final Script impl = compileScript(((Do) object).impl, data.fileName, ScriptType.Block);
+                return new Impl() {
+                    @Override
+                    public Referencable run(Global global, Scope scope) {
+                        do {
+                            BaseObject ret = impl.exec(global, scope);
+                            if (ret != null) {
+                                return new Return(ret, rows, columns);
+                            }
+                        } while (condition.run(global, scope).get().toBool());
+
+                        return UNDEFINED_REFERENCE;
+                    }
+                };
+            }
         } else if (object instanceof RegEx) {
             final java.lang.String pattern = ((RegEx) object).pattern;
             final java.lang.String flags = ((RegEx) object).flags;

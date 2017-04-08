@@ -1797,10 +1797,41 @@ public class JavaTranspiler extends RegexCompiler {
                     sourceBuilder.append(")");
                     return false;
                 } else if(reference instanceof VariableReference) {
-                    sourceBuilder.append("Utilities.get(");
-                    transpileParsedSource(sourceBuilder, ((VariableReference)reference).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
-                    sourceBuilder.append(", ");
-                    transpileParsedSource(sourceBuilder, ((VariableReference)reference).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
+                    if (atTop) {
+                        sourceBuilder.append("__this = ");
+                        transpileParsedSource(sourceBuilder, ((VariableReference)reference).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
+                        sourceBuilder.appendln(";");
+                        if (addDebugging) {
+                            sourceBuilder.appendln("try {");
+                            sourceBuilder.indent();
+                        }
+                        sourceBuilder.append("function = (BaseFunction)Utilities.get(__this, ");
+                        transpileParsedSource(sourceBuilder, ((VariableReference)reference).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
+                        sourceBuilder.appendln(");");
+                        if (addDebugging) {
+                            sourceBuilder.unindent();
+                            sourceBuilder.appendln("} catch(ClassCastException ex) {");
+                            sourceBuilder.append("\tthrow new net.nexustools.njs.Error.JavaException(\"ReferenceError\", \"");
+                            sourceBuilder.append(convertStringSource(source));
+                            sourceBuilder.appendln(" is not a function\");");
+                            sourceBuilder.appendln("}");
+                        }
+                        sourceBuilder.append("function.call(__this");
+                    } else {
+                        sourceBuilder.append("callTopDynamic(");
+                        if (addDebugging) {
+                            sourceBuilder.append("\"");
+                            sourceBuilder.append(convertStringSource(source));
+                            sourceBuilder.append("\", ");
+                        }
+                        transpileParsedSource(sourceBuilder, ((VariableReference)reference).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
+                        sourceBuilder.append(", ");
+                        transpileParsedSource(sourceBuilder, ((VariableReference)reference).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
+                    }
+                    for (Parsed arg : ((Call) part).arguments) {
+                        sourceBuilder.append(", ");
+                        transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
+                    }
                     sourceBuilder.append(")");
                     return false;
                 } else if(reference instanceof Function) {
@@ -1820,13 +1851,18 @@ public class JavaTranspiler extends RegexCompiler {
                     ((Function) reference).uname = name;
                     functionMap.put(name, (Function) reference);
 
-                    sourceBuilder.append("new ");
+                    sourceBuilder.append("(new ");
                     sourceBuilder.append(name);
                     sourceBuilder.append("(");
                     if(((Function)reference).isLambda())
                         sourceBuilder.append("_this, ");
                     sourceBuilder.append("global, ");
                     sourceBuilder.append(baseScope);
+                    sourceBuilder.append(")).call(_this");
+                    for (Parsed arg : ((Call) part).arguments) {
+                        sourceBuilder.append(", ");
+                        transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
+                    }
                     sourceBuilder.append(")");
                     return false;
                 }

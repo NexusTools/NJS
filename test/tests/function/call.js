@@ -18,9 +18,9 @@ var Assert = importClass("org.junit.Assert");
 var System = importClass("java.lang.System");
 
 function hornets(a, b, c) {
-	return [
-		this, a, b, c, arguments.length
-	];
+    return [
+        this, a, b, c, arguments.length
+    ];
 }
 
 Assert.assertTrue(hornets.call(null, 12, 23, 24, 52)[0] === null);
