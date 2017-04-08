@@ -189,19 +189,19 @@ public class JavaTranspiler extends RegexCompiler {
 
     private static class MapStackOptimizations implements StackOptimizations {
 
-        private final boolean usesArguments;
+        private final boolean usesArgumentsOrHasLet;
         private final ScopeOptimizer.StackType stackType;
         private final Map<java.lang.String, java.lang.String> map;
 
         public MapStackOptimizations(Map<java.lang.String, java.lang.String> map, ScopeOptimizer.StackType stackType, boolean usesArguments) {
-            this.usesArguments = usesArguments;
+            this.usesArgumentsOrHasLet = usesArguments;
             this.stackType = stackType;
             this.map = map;
         }
 
         @Override
         public boolean usesArguments() {
-            return usesArguments;
+            return usesArgumentsOrHasLet;
         }
 
         @Override
@@ -510,7 +510,7 @@ public class JavaTranspiler extends RegexCompiler {
                             return;
                         }
                     } else {
-                        throw new UnsupportedOperationException("Cannot compile optimized long : " + describe(part));
+                        throw new CannotOptimizeUnimplemented("Cannot compile optimized long : " + describe(part));
                     }
                 }
             }
@@ -649,7 +649,7 @@ public class JavaTranspiler extends RegexCompiler {
                     sourceBuilder.appendln(" else {");
                 }
                 sourceBuilder.indent();
-                generateBlockSource(sourceBuilder, els.impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
+                hasReturn = generateBlockSource(sourceBuilder, els.impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap) && hasReturn;
                 sourceBuilder.unindent();
                 sourceBuilder.append("}");
             }
@@ -1172,9 +1172,17 @@ public class JavaTranspiler extends RegexCompiler {
     public static class BlockScopeOptimizer extends ScopeOptimizer {
 
         final ScopeOptimizer parent;
+        boolean hasLet;
 
         BlockScopeOptimizer(ScopeOptimizer parent) {
             this.parent = parent;
+        }
+
+        @Override
+        public void let(java.lang.String key, java.lang.String type) {
+            hasLet = true;
+            super.var(key, type);
+            parent.markUseSyntheticStack();
         }
 
         @Override
@@ -1333,7 +1341,9 @@ public class JavaTranspiler extends RegexCompiler {
             if (((If) parsed).simpleimpl != null) {
                 scanParsedSource(((If) parsed).simpleimpl, variableScope);
             } else {
-                scanScriptSource(((If) parsed).impl, new BlockScopeOptimizer(variableScope));
+                BlockScopeOptimizer blockScopeOptimizer = new BlockScopeOptimizer(variableScope);
+                scanScriptSource(((If) parsed).impl, blockScopeOptimizer);
+                ((If) parsed).impl.optimizations = new MapStackOptimizations(blockScopeOptimizer.scope, blockScopeOptimizer.stackType, blockScopeOptimizer.hasLet);
             }
 
             Else el = ((If) parsed).el;
@@ -1344,7 +1354,9 @@ public class JavaTranspiler extends RegexCompiler {
                 if (el.simpleimpl != null) {
                     scanParsedSource(el.simpleimpl, variableScope);
                 } else {
-                    scanScriptSource(el.impl, new BlockScopeOptimizer(variableScope));
+                    BlockScopeOptimizer blockScopeOptimizer = new BlockScopeOptimizer(variableScope);
+                    scanScriptSource(el.impl, blockScopeOptimizer);
+                    el.impl.optimizations = new MapStackOptimizations(blockScopeOptimizer.scope, blockScopeOptimizer.stackType, blockScopeOptimizer.hasLet);
                 }
                 if (el instanceof ElseIf) {
                     el = ((ElseIf) el).el;
@@ -1365,17 +1377,22 @@ public class JavaTranspiler extends RegexCompiler {
                 scanParsedSource(((For) parsed).simpleimpl, forScope);
             } else {
                 scanScriptSource(((For) parsed).impl, forScope);
+                ((For) parsed).impl.optimizations = new MapStackOptimizations(forScope.scope, forScope.stackType, forScope.hasLet);
             }
         } else if (parsed instanceof While) {
             scanParsedSource(((While) parsed).condition, variableScope);
             if (((While) parsed).simpleimpl != null) {
                 scanParsedSource(((While) parsed).simpleimpl, variableScope);
             } else {
-                scanScriptSource(((While) parsed).impl, new BlockScopeOptimizer(variableScope));
+                BlockScopeOptimizer blockScope = new BlockScopeOptimizer(variableScope);
+                scanScriptSource(((While) parsed).impl, blockScope);
+                ((While) parsed).impl.optimizations = new MapStackOptimizations(blockScope.scope, blockScope.stackType, blockScope.hasLet);
             }
         } else if (parsed instanceof Do) {
             scanParsedSource(((Do) parsed).condition, variableScope);
-            scanScriptSource(((Do) parsed).impl, new BlockScopeOptimizer(variableScope));
+            BlockScopeOptimizer blockScope = new BlockScopeOptimizer(variableScope);
+            scanScriptSource(((Do) parsed).impl, blockScope);
+            ((Do) parsed).impl.optimizations = new MapStackOptimizations(blockScope.scope, blockScope.stackType, blockScope.hasLet);
         } else if (parsed instanceof Try) {
             scanScriptSource(((Try) parsed).impl, variableScope);
             if (((Try) parsed).c != null) {
@@ -1516,7 +1533,7 @@ public class JavaTranspiler extends RegexCompiler {
                 scanScriptSource(((Function) parsed).impl, scopeOptimizer);
                 ((Function) parsed).impl.optimizations = new MapStackOptimizations(scopeOptimizer.scope, scopeOptimizer.stackType, scopeOptimizer.usesArguments);
             } catch (CannotOptimize ex) {
-                if (DEBUG || ex instanceof CannotOptimizeUnimplemented) {
+                if (ex instanceof CannotOptimizeUnimplemented) {
                     ex.printStackTrace(System.out);
                 }
                 variableScope.markUseSyntheticStack();
@@ -1617,20 +1634,18 @@ public class JavaTranspiler extends RegexCompiler {
         if(blockDat == null)
             return false;
         
-        boolean breaks = false;
+        boolean hasReturn = false;
         for (Parsed part : blockDat.impl) {
             if (addDebugging) {
                 addSourceMapEntry(sourceBuilder, sourceMap, part);
             }
-            transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap, true);
+            hasReturn = transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap, true) || hasReturn;
             if(!(part instanceof Block))
                 sourceBuilder.appendln(";");
             else
                 sourceBuilder.appendln();
-            if(part instanceof Break)
-                breaks = true;
         }
-        return breaks;
+        return hasReturn;
     }
 
     protected boolean transpileParsedSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap) {
@@ -2513,12 +2528,13 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.appendln("}");
             return hasReturn;
         } else if (part instanceof If) {
+            boolean hasReturn;
             if (((If) part).simpleimpl != null) {
                 sourceBuilder.append("if(");
                 generateBooleanSource(sourceBuilder, ((If) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
                 sourceBuilder.appendln(") {");
                 sourceBuilder.indent();
-                transpileParsedSource(sourceBuilder, ((If) part).simpleimpl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap, true);
+                hasReturn = transpileParsedSource(sourceBuilder, ((If) part).simpleimpl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap, true);
                 if(!(((If) part).simpleimpl instanceof Block))
                     sourceBuilder.appendln(";");
                 else
@@ -2526,10 +2542,9 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.unindent();
                 sourceBuilder.append("}");
 
-                return generateIfBlockSource(sourceBuilder, ((If) part).el, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
+                return generateIfBlockSource(sourceBuilder, ((If) part).el, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap) && hasReturn;
             }
 
-            boolean hasReturn;
             sourceBuilder.append("if(");
             generateBooleanSource(sourceBuilder, ((If) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
             sourceBuilder.appendln(") {");
@@ -2811,7 +2826,7 @@ public class JavaTranspiler extends RegexCompiler {
                             sourceBuilder.append(convertStringSource(((Reference) ref).ref));
                             sourceBuilder.append("\", localStack");
                         } else {
-                            throw new UnsupportedOperationException("Cannot compile optimized ++: " + describe(ref));
+                            throw new CannotOptimizeUnimplemented("Cannot compile optimized ++: " + describe(ref));
                         }
                         sourceBuilder.append(")");
                         return false;
@@ -3230,7 +3245,7 @@ public class JavaTranspiler extends RegexCompiler {
                             }
                         }
                     } else {
-                        throw new UnsupportedOperationException("Cannot compile optimized: " + describe(ref));
+                        throw new CannotOptimizeUnimplemented("Cannot compile optimized: " + describe(ref));
                     }
                 }
             }
@@ -3309,6 +3324,9 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.append(".in(");
             generateStringSource(sourceBuilder, ((In)part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, scopeChain, sourceMap);
             sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
+            return false;
+        } else if(part instanceof Break) {
+            sourceBuilder.append("break");
             return false;
         }
 
@@ -3621,7 +3639,7 @@ public class JavaTranspiler extends RegexCompiler {
         if (scope.isFunction()) {
             boolean hasReturn;
             int last = script.impl.length-1;
-            if(last > -1 && !(script.impl[last] instanceof Return) && !(script.impl[last] instanceof Block)) {
+            if(last > -1 && !(script.impl[last] instanceof Return) && !(script.impl[last] instanceof Block) && !(script.impl[last] instanceof Throw)) {
                 script.impl[last] = new Return(script.impl[last]);
                 hasReturn = true;
             } else
@@ -3643,7 +3661,7 @@ public class JavaTranspiler extends RegexCompiler {
         } else if (script.impl.length > 0) {
             boolean hasReturn, atTop = true;
             int last = script.impl.length-1;
-            if(last > -1 && !(script.impl[last] instanceof Return) && !(script.impl[last] instanceof Block)) {
+            if(last > -1 && !(script.impl[last] instanceof Return) && !(script.impl[last] instanceof Block) && !(script.impl[last] instanceof Throw)) {
                 hasReturn = true;
                 script.impl[last] = new Return(script.impl[last]);
             } else

@@ -905,6 +905,18 @@ public abstract class RegexCompiler implements Compiler {
         public Parsed finish() {
             return this;
         }
+
+        @Override
+        public boolean isIncomplete() {
+            return false;
+        }
+
+        @Override
+        public boolean isStandalone() {
+            return true;
+        }
+        
+        
         
     }
 
