@@ -82,6 +82,11 @@ public class Standards {
     }
 
     @Test
+    public void numbers() {
+        test("numbers");
+    }
+
+    @Test
     public void group() {
         test("group");
     }

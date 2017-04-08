@@ -377,8 +377,8 @@ public abstract class RegexCompiler implements Compiler {
                 return new OrOr(this);
             } else if (part instanceof Number && ((Number) part).value < 0) {
                 return new Minus(this, new Number(-((Number) part).value));
-            } else if (part instanceof Integer && ((Integer) part).value < 0) {
-                return new Minus(this, new Number(-((Integer) part).value));
+            } else if (part instanceof Long && ((Long) part).value < 0) {
+                return new Minus(this, new Number(-((Long) part).value));
             } else if (part instanceof RegEx) {
                 throw new Reparse(((RegEx)part).pattern + "/" + ((RegEx)part).flags, new Divide());
             } else {
@@ -897,7 +897,7 @@ public abstract class RegexCompiler implements Compiler {
         @Override
         public Parsed transform(Parsed part) {
             if(ref == null) {
-                if(part instanceof String || part instanceof Integer || part instanceof Undefined || part instanceof Null)
+                if(part instanceof String || part instanceof Long || part instanceof Undefined || part instanceof Null)
                     ref = part;
                 else
                     throw new Error.JavaException("SyntaxError", "Only strings and integers supported for switch case, encountered " + describe(part));
@@ -2816,8 +2816,8 @@ public abstract class RegexCompiler implements Compiler {
                 return new OrOr(this);
             } else if (part instanceof Number && ((Number) part).value < 0) {
                 return new Minus(this, new Number(-((Number) part).value));
-            } else if (part instanceof Integer && ((Integer) part).value < 0) {
-                return new Minus(this, new Number(-((Integer) part).value));
+            } else if (part instanceof Long && ((Long) part).value < 0) {
+                return new Minus(this, new Number(-((Long) part).value));
             } else if (part instanceof Fork) {
                 if (precedence < ((BaseReferency) part).precedence()) {
                     rhs = rhs.transform(part);
@@ -3093,8 +3093,8 @@ public abstract class RegexCompiler implements Compiler {
                 return new OrOr(this);
             } else if (part instanceof Number && ((Number) part).value < 0) {
                 return new Minus(this, new Number(-((Number) part).value));
-            } else if (part instanceof Integer && ((Integer) part).value < 0) {
-                return new Minus(this, new Number(-((Integer) part).value));
+            } else if (part instanceof Long && ((Long) part).value < 0) {
+                return new Minus(this, new Number(-((Long) part).value));
             } else {
                 return transformFallback(part);
             }
@@ -4586,11 +4586,11 @@ public abstract class RegexCompiler implements Compiler {
 
     }
 
-    public static class Integer extends PrimitiveReferency implements NumberReferency {
+    public static class Long extends PrimitiveReferency implements NumberReferency {
 
         public final long value;
 
-        public Integer(long value) {
+        public Long(long value) {
             this.value = value;
         }
 
@@ -4657,7 +4657,7 @@ public abstract class RegexCompiler implements Compiler {
     public static final Pattern NUMBERGET = Pattern.compile("^\\[(" + NUMBER_REG + ")\\]");
     public static final Pattern STRINGGET = Pattern.compile("^\\[" + STRING_REG + "\\]");
     public static final Pattern VAR = Pattern.compile("^var\\s+(" + VARIABLE_NAME + ")(\\s*,\\s*" + VARIABLE_NAME + ")*");
-    public static final Pattern HEX = Pattern.compile("^0x([0-9a-fA-F]+)");
+    public static final Pattern HEX = Pattern.compile("^-?0x([0-9a-fA-F]+)");
     public static final Pattern NUMBER = Pattern.compile("^" + NUMBER_REG);
     public static final Pattern VARIABLEGET = Pattern.compile("^\\.\\s*(" + VARIABLE_NAME + ')');
     public static final Pattern VARIABLE = Pattern.compile("^" + VARIABLE_NAME);
@@ -5060,7 +5060,7 @@ public abstract class RegexCompiler implements Compiler {
     public static class ScriptParser extends RegexParser {
 
         public ScriptParser() {
-            super(SINGLELINE_COMMENT, MULTILINE_COMMENT, LAMBDA, REGEX, DBLSHIFTRIGHTEQ, SHIFTLEFTEQ, SHIFTRIGHTEQ, DBLSHIFTRIGHT, SHIFTLEFT, SHIFTRIGHT, NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, ANDEQUAL, OREQUAL, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MINUSEQ, DIVIDEEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, HEX, NUMBER, VARIABLE, VARIABLEGET, DIVIDE, WHITESPACE, TEMPLATE_LITERAL, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, FORKSTART, VARARGS);
+            super(SINGLELINE_COMMENT, MULTILINE_COMMENT, LAMBDA, HEX, REGEX, DBLSHIFTRIGHTEQ, SHIFTLEFTEQ, SHIFTRIGHTEQ, DBLSHIFTRIGHT, SHIFTLEFT, SHIFTRIGHT, NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, ANDEQUAL, OREQUAL, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MINUSEQ, DIVIDEEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, NUMBER, VARIABLE, VARIABLEGET, DIVIDE, WHITESPACE, TEMPLATE_LITERAL, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, FORKSTART, VARARGS);
         }
 
         @Override
@@ -5084,7 +5084,10 @@ public abstract class RegexCompiler implements Compiler {
             }
             if (pattern == HEX) {
                 try {
-                    throw new PartExchange(new Integer(java.lang.Integer.valueOf(matcher.group(1), 16)), matcher.group().length());
+                    long val = java.lang.Long.valueOf(matcher.group(1), 16);
+                    if(matcher.group().startsWith("-"))
+                        val = -val;
+                    throw new PartExchange(new Long(val), matcher.group().length());
                 } catch (NumberFormatException ex) {
                     try {
                         throw new PartExchange(new Number(Double.valueOf(matcher.group(0))), matcher.group().length());
@@ -5095,7 +5098,7 @@ public abstract class RegexCompiler implements Compiler {
             }
             if (pattern == NUMBER) {
                 try {
-                    throw new PartExchange(new Integer(java.lang.Integer.valueOf(matcher.group(0))), matcher.group().length());
+                    throw new PartExchange(new Long(java.lang.Long.valueOf(matcher.group(0))), matcher.group().length());
                 } catch (NumberFormatException ex) {
                     try {
                         throw new PartExchange(new Number(Double.valueOf(matcher.group(0))), matcher.group().length());

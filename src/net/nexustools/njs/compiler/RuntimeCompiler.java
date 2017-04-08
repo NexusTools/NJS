@@ -421,8 +421,8 @@ public class RuntimeCompiler extends RegexCompiler {
 
         final int rows = object.rows;
         final int columns = object.columns;
-        if (object instanceof Integer) {
-            final long number = ((Integer) object).value;
+        if (object instanceof Long) {
+            final long number = ((Long) object).value;
             if (number == 0) {
                 return new Impl() {
                     @Override
@@ -1019,12 +1019,16 @@ public class RuntimeCompiler extends RegexCompiler {
             List<Var.Set> ret = ((Var) object).sets;
 
             final int len = ret.size();
-            final java.lang.String[] keys = new java.lang.String[len];
+            final java.lang.Object[] keys = new java.lang.Object[len];
             final Impl[] values = new Impl[len];
 
             for (int i = 0; i < len; i++) {
                 Var.Set set = ret.get(i);
-                keys[i] = ((Reference)set.lhs).ref;
+                if(set.lhs instanceof Reference) {
+                    keys[i] = ((Reference)set.lhs).ref;
+                } else {
+                    keys[i] = set.lhs;
+                }
                 if (set.rhs != null) {
                     values[i] = compile(data, set.rhs);
                 }
@@ -1035,17 +1039,47 @@ public class RuntimeCompiler extends RegexCompiler {
                 public Referencable run(Global global, Scope scope) {
                     int i = 0;
                     for (; i < len; i++) {
-                        if (values[i] != null) {
-                            scope.var(keys[i], values[i].run(global, scope).get());
+                        if(keys[i] instanceof java.lang.String) {
+                            if (values[i] != null) {
+                                scope.var((java.lang.String)keys[i], values[i].run(global, scope).get());
+                            } else {
+                                scope.var((java.lang.String)keys[i]);
+                            }
                         } else {
-                            scope.var(keys[i]);
+                            BaseObject input = values[i].run(global, scope).get();
+                            NameSet set = (NameSet)keys[i];
+                            if(set.array) {
+                                int a = 0;
+                                for(java.lang.String name : set.names.keySet()) {
+                                    scope.var(name, input.get(a++));
+                                }
+                            } else {
+                                for(Map.Entry<java.lang.String, java.lang.String> name : set.names.entrySet()) {
+                                    scope.var(name.getValue(), input.get(name.getKey()));
+                                }
+                            }
                         }
                     }
                     for (; i < keys.length; i++) {
-                        if (values[i] != null) {
-                            scope.var(keys[i], values[i].run(global, scope).get());
+                        if(keys[i] instanceof java.lang.String) {
+                            if (values[i] != null) {
+                                scope.var((java.lang.String)keys[i], values[i].run(global, scope).get());
+                            } else {
+                                scope.var((java.lang.String)keys[i]);
+                            }
                         } else {
-                            scope.var(keys[i]);
+                            BaseObject input = values[i].run(global, scope).get();
+                            NameSet set = (NameSet)keys[i];
+                            if(set.array) {
+                                int a = 0;
+                                for(java.lang.String name : set.names.keySet()) {
+                                    scope.var(name, input.get(a++));
+                                }
+                            } else {
+                                for(Map.Entry<java.lang.String, java.lang.String> name : set.names.entrySet()) {
+                                    scope.var(name.getValue(), input.get(name.getKey()));
+                                }
+                            }
                         }
                     }
                     return UNDEFINED_REFERENCE;

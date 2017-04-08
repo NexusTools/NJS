@@ -31,35 +31,35 @@ import org.junit.Test;
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public class Eval {
-	
-	Compiler[] compilers;
-	
-	@Before
-	public void setUp() {
-		compilers = new Compiler[]{
-			new JavaTranspiler(),
-			new RuntimeCompiler()
-		};
-	}
-	
-	@After
-	public void tearDown() {
-		compilers = null;
-	}
-	
-	@Test
-	public void test() {
-		for(Compiler compiler : compilers) {
-			try {
-				compiler.compile(new InputStreamReader(Eval.class.getResourceAsStream("/tests/eval.js")), "eval.js", false).exec(Utilities.createExtendedGlobal(compiler), null);
-			} catch(java.lang.RuntimeException re) {
-				System.err.println(Utilities.extractStack(re.toString(), re));
-				throw re;
-			} catch(java.lang.Error e) {
-				System.err.println(Utilities.extractStack(e.toString(), e));
-				throw e;
-			}
-		}
-	}
-	
+
+    Compiler[] compilers;
+
+    @Before
+    public void setUp() {
+        compilers = new Compiler[]{
+            new JavaTranspiler(),
+            new RuntimeCompiler()
+        };
+    }
+
+    @After
+    public void tearDown() {
+        compilers = null;
+    }
+
+    @Test
+    public void test() {
+        for (Compiler compiler : compilers) {
+            try {
+                compiler.compile(new InputStreamReader(Eval.class.getResourceAsStream("/tests/eval.js")), "eval.js", false).exec(Utilities.createExtendedGlobal(compiler), null);
+            } catch (java.lang.RuntimeException re) {
+                System.err.println(Utilities.extractStack(re.toString(), re));
+                throw re;
+            } catch (java.lang.Error e) {
+                System.err.println(Utilities.extractStack(e.toString(), e));
+                throw e;
+            }
+        }
+    }
+
 }

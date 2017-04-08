@@ -15,8 +15,7 @@
  */
 
 var Assert = importClass("org.junit.Assert");
+var System = importClass("java.lang.System");
 
-function test() {
-    return eval("(this)");
-}
-Assert.assertTrue('test.call(23) == 23', test.call(23) == 23);
+Assert.assertTrue('-0x80000000 === -2147483648', -0x80000000 === -2147483648);
+

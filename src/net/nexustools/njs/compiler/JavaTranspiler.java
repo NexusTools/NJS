@@ -78,7 +78,7 @@ public class JavaTranspiler extends RegexCompiler {
                 scanArgument(((RhLh) argument).rhs, variableScope);
             } else if (argument instanceof Rh) {
                 scanParsedSource(argument, variableScope);
-            } else if (argument instanceof Number || argument instanceof Integer || argument instanceof Null || argument instanceof Undefined) {
+            } else if (argument instanceof Number || argument instanceof Long || argument instanceof Null || argument instanceof Undefined) {
                 // IGNORED
             } else if (argument instanceof RightReference || argument instanceof ReferenceChain) {
                 variableScope.markUseSyntheticStack();
@@ -350,8 +350,8 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append(java.lang.String.valueOf(((Number) part).value));
                 sourceBuilder.append("D");
             }
-        } else if (part instanceof Integer) {
-            sourceBuilder.append(java.lang.String.valueOf(((Integer) part).value));
+        } else if (part instanceof Long) {
+            sourceBuilder.append(java.lang.String.valueOf(((Long) part).value));
             sourceBuilder.append("D");
         } else if (part instanceof String) {
             try {
@@ -448,8 +448,8 @@ public class JavaTranspiler extends RegexCompiler {
         if (part instanceof Number) {
             sourceBuilder.append(java.lang.String.valueOf((long)((Number) part).value));
             sourceBuilder.append("L");
-        } else if (part instanceof Integer) {
-            sourceBuilder.append(java.lang.String.valueOf(((Integer) part).value));
+        } else if (part instanceof Long) {
+            sourceBuilder.append(java.lang.String.valueOf(((Long) part).value));
             sourceBuilder.append("L");
         } else if (part instanceof String) {
             try {
@@ -1468,7 +1468,7 @@ public class JavaTranspiler extends RegexCompiler {
             variableScope.reference(((Reference) parsed).ref);
         } else if (parsed instanceof ReferenceChain) {
             variableScope.reference(((ReferenceChain) parsed).chain.get(0));
-        } else if (parsed instanceof Integer || parsed instanceof Boolean
+        } else if (parsed instanceof Long || parsed instanceof Boolean
                 || parsed instanceof Number || parsed instanceof String || parsed instanceof Null || parsed instanceof Undefined) {
             // IGNORED
         } else if (parsed instanceof RhLh) {
@@ -1856,8 +1856,8 @@ public class JavaTranspiler extends RegexCompiler {
                 }
             }
             return false;
-        } else if (part instanceof Integer) {
-            long value = ((Integer) part).value;
+        } else if (part instanceof Long) {
+            long value = ((Long) part).value;
             if(value == 0)
                 sourceBuilder.append("global.Zero");
             else if(value == 1)
