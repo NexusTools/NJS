@@ -31,8 +31,9 @@ public class Scope implements Scopable {
 
         private final HashMap<java.lang.String, BaseObject> arguments = new HashMap();
 
-        public void let(java.lang.String key, BaseObject val) {
+        public BaseObject let(java.lang.String key, BaseObject val) {
             arguments.put(key, val);
+            return val;
         }
 
         @Override
@@ -111,8 +112,9 @@ public class Scope implements Scopable {
         }
 
         @Override
-        public void var(java.lang.String key, BaseObject val) {
+        public BaseObject var(java.lang.String key, BaseObject val) {
             storage.put(key, val);
+            return val;
         }
 
         @Override
@@ -196,12 +198,13 @@ public class Scope implements Scopable {
             let(keys[i], root.get(keys[i+1]));
     }
 
-    public final void let(java.lang.String key, BaseObject val) {
+    public final BaseObject let(java.lang.String key, BaseObject val) {
         try {
             ((BlockScopeable) scopeables[0]).let(key, val);
         } catch(ClassCastException ex) {
             ((Scopable) scopeables[0]).set(key, val);
         }
+        return val;
     }
     
     public final void multivar(BaseObject root, java.lang.String... keys) {
@@ -209,12 +212,14 @@ public class Scope implements Scopable {
             var(keys[i], root.get(keys[i+1]));
     }
 
-    public final void var(java.lang.String key) {
+    public final BaseObject var(java.lang.String key) {
         var(key, Undefined.INSTANCE);
+        return Undefined.INSTANCE;
     }
 
-    public void var(java.lang.String key, BaseObject val) {
+    public BaseObject var(java.lang.String key, BaseObject val) {
         scopeables[scopeables.length - 1].set(key, val);
+        return val;
     }
 
     @Override

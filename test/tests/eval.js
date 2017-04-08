@@ -8,5 +8,5 @@ Object.getOwnPropertyNames(this).forEach((function (key) {
 try {
     throw new Error("Muffin Tuffin");
 } catch (e) {
-    Assert.assertTrue(eval("(e)").message === "Muffin Tuffin");
+    Assert.assertTrue(eval("e").message === "Muffin Tuffin");
 }

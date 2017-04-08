@@ -799,6 +799,9 @@ public abstract class RegexCompiler implements Compiler {
 
     public static class Return extends Rh {
 
+        public Return(Parsed rh) {
+            super(rh);
+        }
         public Return() {
         }
 

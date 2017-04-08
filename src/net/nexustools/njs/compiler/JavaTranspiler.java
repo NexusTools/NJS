@@ -3620,9 +3620,10 @@ public class JavaTranspiler extends RegexCompiler {
         StackOptimizations expectedStack = (StackOptimizations) script.optimizations;
         if (scope.isFunction()) {
             boolean hasReturn;
-            if(script.impl.length == 1 && (script.impl[0] instanceof OpenBracket || script.impl[0] instanceof MultiBracket)) {
+            int last = script.impl.length-1;
+            if(last > -1 && !(script.impl[last] instanceof Return) && !(script.impl[last] instanceof Block)) {
+                script.impl[last] = new Return(script.impl[last]);
                 hasReturn = true;
-                sourceBuilder.append("return ");
             } else
                 hasReturn = false;
             for (Parsed part : script.impl) {
@@ -3641,9 +3642,10 @@ public class JavaTranspiler extends RegexCompiler {
             }
         } else if (script.impl.length > 0) {
             boolean hasReturn, atTop = true;
-            if(script.impl.length == 1 && (script.impl[0] instanceof OpenBracket || script.impl[0] instanceof MultiBracket)) {
+            int last = script.impl.length-1;
+            if(last > -1 && !(script.impl[last] instanceof Return) && !(script.impl[last] instanceof Block)) {
                 hasReturn = true;
-                sourceBuilder.append("return ");
+                script.impl[last] = new Return(script.impl[last]);
             } else
                 hasReturn = false;
             for (int i = 0; i < script.impl.length; i++) {
