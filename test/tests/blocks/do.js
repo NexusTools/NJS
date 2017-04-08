@@ -15,28 +15,8 @@
  */
 
 var Assert = importClass("org.junit.Assert");
-var System = importClass("java.lang.System");
 
-function multiply(val, multi) {
-    return val * multi;
-}
-
-function check(num, ident) {
-    return ident(num) === num;
-}
-
-function checkneg(num, multi, ident) {
-    return ident(num, multi) === -num;
-}
-
-Assert.assertTrue(check(77, val => multiply(val, 1)));
-Assert.assertTrue(checkneg(77, -1, (val, multi) => multiply(val, multi)));
-Assert.assertTrue(check(77, val => {
-    System.out.println((new Error).stack);
-    return val;
-}));
-
-Assert.assertTrue(check(77, (() => {
-    return val => val;
-})()));
-
+var i = 0;
+do {
+    Assert.assertTrue(i < 11);
+} while(i++ < 10);

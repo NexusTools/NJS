@@ -373,6 +373,8 @@ public abstract class RegexCompiler implements Compiler {
                 return new Or(this);
             } else if (part instanceof AndAnd) {
                 return new AndAnd(this);
+            } else if (part instanceof In) {
+                return new In(this);
             } else if (part instanceof OrOr) {
                 return new OrOr(this);
             } else if (part instanceof Number && ((Number) part).value < 0) {
@@ -622,14 +624,14 @@ public abstract class RegexCompiler implements Compiler {
     public static class IntegerReference extends Referency {
 
         public final Parsed lhs;
-        public final int ref;
+        public final long ref;
 
-        public IntegerReference(Parsed lhs, int ref) {
+        public IntegerReference(Parsed lhs, long ref) {
             this.lhs = lhs.finish();
             this.ref = ref;
         }
 
-        public IntegerReference(int ref) {
+        public IntegerReference(long ref) {
             this.ref = ref;
             lhs = null;
         }
@@ -721,7 +723,16 @@ public abstract class RegexCompiler implements Compiler {
                     closed = true;
                     return this;
                 }
-                currentArgumentPart = part;
+                if(part instanceof DirectReference) {
+                    currentArgumentPart = new OpenArray();
+                    ((OpenArray)currentArgumentPart).entries.add(new String(((DirectReference)part).ref));
+                    ((OpenArray)currentArgumentPart).closed = true;
+                } else if(part instanceof IntegerReference) {
+                    currentArgumentPart = new OpenArray();
+                    ((OpenArray)currentArgumentPart).entries.add(new Long(((IntegerReference)part).ref));
+                    ((OpenArray)currentArgumentPart).closed = true;
+                } else
+                    currentArgumentPart = part;
             } else {
                 if (!currentArgumentPart.isIncomplete()) {
                     if (part instanceof CloseBracket) {
@@ -775,7 +786,7 @@ public abstract class RegexCompiler implements Compiler {
                 }
             }
             if (currentArgumentPart != null) {
-                throw new Error.JavaException("SyntaxError", "Unexpected EOF");
+                throw new Error.JavaException("SyntaxError", "Unexpected finish");
             }
             return this;
         }
@@ -877,6 +888,23 @@ public abstract class RegexCompiler implements Compiler {
         }
     }
 
+    public static class Break extends Helper {
+
+        public Break() {
+        }
+
+        @Override
+        public java.lang.String toSource() {
+            return "break";
+        }
+
+        @Override
+        public Parsed finish() {
+            return this;
+        }
+        
+    }
+
     public static class Case extends Helper {
         
         public boolean closed;
@@ -908,6 +936,8 @@ public abstract class RegexCompiler implements Compiler {
             } else if(part instanceof NewLine)
                 throw new CompleteException();
             
+            if(closed)
+                throw new CompleteException(part);
             return super.transform(part);
         }
 
@@ -948,6 +978,8 @@ public abstract class RegexCompiler implements Compiler {
             } else if(part instanceof NewLine)
                 throw new CompleteException();
             
+            if(closed)
+                throw new CompleteException(part);
             return super.transform(part);
         }
 
@@ -1157,9 +1189,9 @@ public abstract class RegexCompiler implements Compiler {
         public Parsed finish() {
             if(contents != null) {
                 contents = contents.finish();
-                if ((contents instanceof Reference || contents instanceof ReferenceChain)) {
+                /*if ((contents instanceof Reference || contents instanceof ReferenceChain)) {
                     return contents;
-                }
+                }*/
             }
             return this;
         }
@@ -1213,6 +1245,10 @@ public abstract class RegexCompiler implements Compiler {
         public Block() {
             state = State.BeforeCondition;
         }
+        
+        public void complete() {
+            state = Block.State.Complete;
+        }
 
         @Override
         public Parsed transform(Parsed part) {
@@ -1235,6 +1271,10 @@ public abstract class RegexCompiler implements Compiler {
                     } else if (part instanceof If && this instanceof Else) {
                         return new ElseIf();
                     } else if (allowSimpleImpl()) {
+                        if(part instanceof SemiColon) {
+                            state = State.Complete;
+                            throw new CompleteException();
+                        }
                         simpleimpl = part;
                         state = State.InSimpleImpl;
                         return this;
@@ -1336,6 +1376,82 @@ public abstract class RegexCompiler implements Compiler {
                 join(Arrays.asList(impl), ';', builder);
             }
             builder.append("}");
+            return builder.toString();
+        }
+    }
+    
+    public static class Do extends Block {
+        enum State {
+            BeforeImpl,
+            InImpl,
+            BeforeWhile,
+            BeforeCondition,
+            InCondition,
+            Complete
+        }
+        
+        public State state = State.BeforeImpl;
+
+        public Do() {
+        }
+
+        @Override
+        public void complete() {
+            state = State.BeforeWhile;
+        }
+
+        @Override
+        public boolean isIncomplete() {
+            return state != State.Complete;
+        }
+
+        @Override
+        public Parsed transform(Parsed part) {
+            switch(state) {
+                case BeforeImpl:
+                    if(part instanceof OpenGroup)
+                        return parse();
+                    break;
+                case BeforeWhile:
+                    if(part instanceof While) {
+                        state = State.BeforeCondition;
+                        return this;
+                    }
+                    break;
+                case BeforeCondition:
+                    if(part instanceof OpenBracket) {
+                        state = State.InCondition;
+                        return this;
+                    }
+                    break;
+                case InCondition:
+                    transformCondition(part);
+                    return this;
+                case Complete:
+                    throw new CompleteException(part);
+            }
+
+            throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " (" + state + ":" + getClass().getSimpleName() + ")");
+        }
+
+        @Override
+        public void finishCondition() {
+            state =  State.Complete;
+        }
+
+        @Override
+        public java.lang.String toSource() {
+            StringBuilder builder = new StringBuilder("do {");
+            if (simpleimpl != null) {
+                builder.append(simpleimpl);
+            } else if (impl == null) {
+                builder.append("<unparsed>");
+            } else {
+                join(Arrays.asList(impl), ';', builder);
+            }
+            builder.append("} while(");
+            builder.append(condition);
+            builder.append(")");
             return builder.toString();
         }
     }
@@ -1575,7 +1691,8 @@ public abstract class RegexCompiler implements Compiler {
         static enum ForConditionState {
             DuringInit,
             DuringCondition,
-            DuringLoop
+            DuringLoop,
+            AfterInOf
         }
 
         static enum ForType {
@@ -1584,9 +1701,9 @@ public abstract class RegexCompiler implements Compiler {
             OfLoop
         }
 
-        Parsed init;
-        Parsed loop;
+        Parsed init, storage;
         ForType type = ForType.Standard;
+        List<Parsed> loop = new ArrayList();
         ForConditionState state = ForConditionState.DuringInit;
 
         public For() {
@@ -1621,29 +1738,34 @@ public abstract class RegexCompiler implements Compiler {
                             state = ForConditionState.DuringCondition;
                             return;
                         }
-                        init = part;
+                        if(part instanceof Var)
+                            init = part;
+                        else
+                            init = new Var().transform(part);
                     } else {
                         if (!init.isIncomplete()) {
                             if (part instanceof SemiColon) {
                                 init = init.finish();
                                 state = ForConditionState.DuringCondition;
                                 return;
-                            } else if (part instanceof In) {
+                            }
+                            if (part instanceof In) {
                                 type = ForType.InLoop;
-                                init = init.finish();
-                                state = ForConditionState.DuringLoop;
+                                init = init.transform(new Set());
+                                state = ForConditionState.AfterInOf;
                                 return;
-                            } else if (part instanceof Of) {
+                            }
+                            if (part instanceof Of) {
                                 type = ForType.OfLoop;
-                                init = init.finish();
-                                state = ForConditionState.DuringLoop;
+                                init = init.transform(new Set());
+                                state = ForConditionState.AfterInOf;
                                 return;
                             }
                         }
                         try {
                             init = init.transform(part);
                         } catch (CompleteException ex) {
-                            throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part);
+                            throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part + " near " + describe(this));
                         }
                     }
                     break;
@@ -1670,27 +1792,48 @@ public abstract class RegexCompiler implements Compiler {
                     }
                     break;
                 case DuringLoop:
-                    if (loop == null) {
+                    if (storage == null) {
                         if (part instanceof CloseBracket) {
                             finishCondition();
                             return;
                         }
-                        loop = part;
+                        storage = part;
                     } else {
-                        if (!loop.isIncomplete()) {
+                        if (!storage.isIncomplete()) {
                             if (part instanceof CloseBracket) {
-                                loop = loop.finish();
+                                loop.add(storage.finish());
+                                storage = null;
                                 finishCondition();
+                                return;
+                            }
+                            if (part instanceof Comma) {
+                                loop.add(storage.finish());
+                                storage = null;
                                 return;
                             }
                         }
                         try {
-                            loop = loop.transform(part);
+                            storage = storage.transform(part);
                         } catch (CompleteException ex) {
                             throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part);
                         }
                     }
                     break;
+                case AfterInOf:
+                    if (!init.isIncomplete()) {
+                        if (part instanceof CloseBracket) {
+                            init = init.finish();
+                            finishCondition();
+                            return;
+                        }
+                    }
+                    try {
+                        init = init.transform(part);
+                    } catch (CompleteException ex) {
+                        throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part);
+                    }
+                    break;
+                    
             }
 
             return;
@@ -1819,6 +1962,8 @@ public abstract class RegexCompiler implements Compiler {
         @Override
         public Parsed transform(Parsed part) {
             if(part instanceof SemiColon)
+                throw new CompleteException();
+            if(part instanceof NewLine)
                 return this;
             throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + toString());
         }
@@ -1853,14 +1998,13 @@ public abstract class RegexCompiler implements Compiler {
     public static class OpenGroup extends Referency {
 
         public static enum State {
-            Idle,
             NeedKey,
             HaveKey,
             ReadingValue,
             Complete
         }
 
-        State state = State.Idle;
+        State state = State.NeedKey;
         Map<java.lang.String, Parsed> entries = new HashMap();
         java.lang.String currentEntryKey;
         Parsed currentEntry;
@@ -1903,12 +2047,11 @@ public abstract class RegexCompiler implements Compiler {
             }
 
             switch (state) {
-                case Idle:
+                case NeedKey:
                     if (part instanceof CloseGroup) {
                         state = State.Complete;
                         return this;
                     }
-                case NeedKey:
                     if (part instanceof Reference) {
                         currentEntryKey = ((Reference) part).ref;
                     } else if (part instanceof String) {
@@ -2140,7 +2283,26 @@ public abstract class RegexCompiler implements Compiler {
         }
     }
 
-    public static class Function extends Parsed {
+    public static class Class extends Referency {
+
+        @Override
+        public java.lang.String toSource() {
+            return "class ";
+        }
+
+        @Override
+        public int precedence() {
+            return -1;
+        }
+        
+    }
+
+    public static class Function extends Referency {
+
+        @Override
+        public int precedence() {
+            return -1;
+        }
 
         public static enum Type {
             Standard,
@@ -2315,23 +2477,30 @@ public abstract class RegexCompiler implements Compiler {
                         state = State.InBody;
                         throw new ParseFunction(this);
                     }
-
-                case InBody:
-                    if (part instanceof CloseGroup) {
-                        throw new CompleteException(part);
-                    }
+                    break;
 
                 case Complete:
                     if(part instanceof OpenBracket)
                         return new Call(part, this);
-                    throw new CompleteException(part);
+                    return super.transform(part);
                     
                 case InLambda:
+                    if(!storage.isIncomplete()) {
+                        if (part instanceof SemiColon) {
+                            System.out.println(describe(storage));
+                            throw new CompleteException();
+                        }
+                    }
                     storage = storage.transform(part);
                     return this;
             }
 
             throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSimpleSource() + " (" + state + ')');
+        }
+
+        @Override
+        public Parsed transformFallback(Parsed part) {
+            throw new CompleteException(part);
         }
 
         @Override
@@ -2341,9 +2510,11 @@ public abstract class RegexCompiler implements Compiler {
 
         @Override
         public boolean isIncomplete() {
+            if(state == State.Complete)
+                return false;
             if(state == State.InLambda)
                 return storage == null || storage.isIncomplete();
-            return state != State.Complete;
+            return true;
         }
 
         @Override
@@ -2354,6 +2525,8 @@ public abstract class RegexCompiler implements Compiler {
                 impl.methodName = "<lambda>";
                 impl.callee = this;
                 storage = null;
+                
+                state = State.Complete;
             }
             return this;
         }
@@ -2543,7 +2716,11 @@ public abstract class RegexCompiler implements Compiler {
             if (rhs == null) {
                 if (part instanceof IntegerReference) {
                     rhs = new OpenArray();
-                    ((OpenArray) rhs).entries.add(new Number(((IntegerReference) part).ref));
+                    ((OpenArray) rhs).entries.add(new Long(((IntegerReference) part).ref));
+                    ((OpenArray) rhs).closed = true;
+                } else if(part instanceof DirectReference) {
+                    rhs = new OpenArray();
+                    ((OpenArray) rhs).entries.add(new String(((DirectReference) part).ref));
                     ((OpenArray) rhs).closed = true;
                 } else {
                     if (!part.isStandalone()) {
@@ -2573,9 +2750,6 @@ public abstract class RegexCompiler implements Compiler {
                 return this;
             }
 
-            if (part instanceof SemiColon) {
-                throw new CompleteException();
-            }
             if (part instanceof NewLine) {
                 newline = true;
                 return this;
@@ -2860,7 +3034,7 @@ public abstract class RegexCompiler implements Compiler {
             if (rhs == null) {
                 if (part instanceof IntegerReference) {
                     rhs = new OpenArray();
-                    ((OpenArray) rhs).entries.add(new Number(((IntegerReference) part).ref));
+                    ((OpenArray) rhs).entries.add(new Long(((IntegerReference) part).ref));
                     ((OpenArray) rhs).closed = true;
                 } else {
                     if (!part.isStandalone()) {
@@ -4132,7 +4306,7 @@ public abstract class RegexCompiler implements Compiler {
                 }
             }
             if (currentPart != null) {
-                throw new Error.JavaException("SyntaxError", "Unexpected EOF");
+                throw new Error.JavaException("SyntaxError", "Unexpected finish");
             }
             return this;
         }
@@ -4484,17 +4658,6 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public Parsed transform(Parsed part) {
-            if (part instanceof In) {
-                return new In(this);
-            }
-            
-            return super.transform(part); //To change body of generated methods, choose Tools | Templates.
-        }
-        
-        
-
-        @Override
         public java.lang.String toSource() {
             return '"' + convertStringSource(string) + '"';
         }
@@ -4658,6 +4821,7 @@ public abstract class RegexCompiler implements Compiler {
     public static final Pattern STRINGGET = Pattern.compile("^\\[" + STRING_REG + "\\]");
     public static final Pattern VAR = Pattern.compile("^var\\s+(" + VARIABLE_NAME + ")(\\s*,\\s*" + VARIABLE_NAME + ")*");
     public static final Pattern HEX = Pattern.compile("^-?0x([0-9a-fA-F]+)");
+    public static final Pattern OCT = Pattern.compile("^-?0[oO]?([0-9]+)");
     public static final Pattern NUMBER = Pattern.compile("^" + NUMBER_REG);
     public static final Pattern VARIABLEGET = Pattern.compile("^\\.\\s*(" + VARIABLE_NAME + ')');
     public static final Pattern VARIABLE = Pattern.compile("^" + VARIABLE_NAME);
@@ -4918,10 +5082,10 @@ public abstract class RegexCompiler implements Compiler {
                                         currentPart = currentPart.finish();
                                         if (currentPart != null) {
                                             if (!currentPart.isStandalone()) {
-                                                throw new Error.JavaException("SyntaxError", "Unexpected " + currentPart);
+                                                throw new Error.JavaException("SyntaxError", "Unexpected " + currentPart, ex);
                                             }
                                             if (currentPart.isIncomplete()) {
-                                                throw new Error.JavaException("SyntaxError", "Expected more after " + currentPart);
+                                                throw new Error.JavaException("SyntaxError", "Expected more after " + currentPart, ex);
                                             }
                                             parts.add(currentPart);
                                         }
@@ -4938,7 +5102,7 @@ public abstract class RegexCompiler implements Compiler {
                                                     currentPart = null;
                                                     break next;
                                                 }
-                                                throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + ex.part);
+                                                throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + ex.part, ex);
                                             }
                                         }
                                         try {
@@ -4968,7 +5132,7 @@ public abstract class RegexCompiler implements Compiler {
                                             blockParser.parse(reader);
                                         } catch (ParseComplete ce) {
                                             ex.block.impl = ce.impl;
-                                            ex.block.state = Block.State.Complete;
+                                            ex.block.complete();
                                             builder.append(ce.source);
                                             builder.append(reader.ltrim(1));
                                         }
@@ -5060,7 +5224,7 @@ public abstract class RegexCompiler implements Compiler {
     public static class ScriptParser extends RegexParser {
 
         public ScriptParser() {
-            super(SINGLELINE_COMMENT, MULTILINE_COMMENT, LAMBDA, HEX, REGEX, DBLSHIFTRIGHTEQ, SHIFTLEFTEQ, SHIFTRIGHTEQ, DBLSHIFTRIGHT, SHIFTLEFT, SHIFTRIGHT, NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, ANDEQUAL, OREQUAL, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MINUSEQ, DIVIDEEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, NUMBER, VARIABLE, VARIABLEGET, DIVIDE, WHITESPACE, TEMPLATE_LITERAL, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, FORKSTART, VARARGS);
+            super(SINGLELINE_COMMENT, MULTILINE_COMMENT, LAMBDA, OCT, HEX, REGEX, DBLSHIFTRIGHTEQ, SHIFTLEFTEQ, SHIFTRIGHTEQ, DBLSHIFTRIGHT, SHIFTLEFT, SHIFTRIGHT, NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, ANDEQUAL, OREQUAL, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MINUSEQ, DIVIDEEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, NUMBER, VARIABLE, VARIABLEGET, DIVIDE, WHITESPACE, TEMPLATE_LITERAL, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, FORKSTART, VARARGS);
         }
 
         @Override
@@ -5085,6 +5249,20 @@ public abstract class RegexCompiler implements Compiler {
             if (pattern == HEX) {
                 try {
                     long val = java.lang.Long.valueOf(matcher.group(1), 16);
+                    if(matcher.group().startsWith("-"))
+                        val = -val;
+                    throw new PartExchange(new Long(val), matcher.group().length());
+                } catch (NumberFormatException ex) {
+                    try {
+                        throw new PartExchange(new Number(Double.valueOf(matcher.group(0))), matcher.group().length());
+                    } catch (NumberFormatException eex) {
+                        throw new PartExchange(new Number(Double.NaN), matcher.group().length());
+                    }
+                }
+            }
+            if (pattern == OCT) {
+                try {
+                    long val = java.lang.Long.valueOf(matcher.group(1), 8);
                     if(matcher.group().startsWith("-"))
                         val = -val;
                     throw new PartExchange(new Long(val), matcher.group().length());
@@ -5127,6 +5305,8 @@ public abstract class RegexCompiler implements Compiler {
                     throw new PartExchange(new Yield(), ref.length());
                 } else if (ref.equals("instanceof")) {
                     throw new PartExchange(new InstanceOf(), ref.length());
+                } else if (ref.equals("do")) {
+                    throw new PartExchange(new Do(), ref.length());
                 } else if (ref.equals("if")) {
                     throw new PartExchange(new If(), ref.length());
                 } else if (ref.equals("else")) {
@@ -5153,6 +5333,10 @@ public abstract class RegexCompiler implements Compiler {
                     throw new PartExchange(new TypeOf(), ref.length());
                 } else if (ref.equals("case")) {
                     throw new PartExchange(new Case(), ref.length());
+                } else if (ref.equals("class")) {
+                    throw new PartExchange(new Class(), ref.length());
+                } else if (ref.equals("break")) {
+                    throw new PartExchange(new Break(), ref.length());
                 } else if (ref.equals("default")) {
                     throw new PartExchange(new Default(), ref.length());
                 } else if (ref.equals("return")) {
@@ -5326,7 +5510,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         public void ret(Matcher matcher) {
-            throw new Error.JavaException("SyntaxError", "Illegal return statement");
+            throw new PartExchange(new Return(), matcher.group().length());
         }
 
         @Override

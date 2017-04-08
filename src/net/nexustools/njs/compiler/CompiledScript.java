@@ -143,6 +143,18 @@ public abstract class CompiledScript extends AbstractFunction implements Script 
         return exec(global, null);
     }
 
+    public static net.nexustools.njs.Number.Instance plusPlusLeft(Global global, BaseObject key, BaseObject _this) {
+        net.nexustools.njs.Number.Instance incremented = global.wrap(global.Number.fromValueOf(Utilities.get(_this, key)).value + 1);
+        Utilities.set(_this, key, incremented);
+        return incremented;
+    }
+
+    public static net.nexustools.njs.Number.Instance plusPlusRight(Global global, BaseObject key, BaseObject _this) {
+        net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(Utilities.get(_this, key));
+        Utilities.set(_this, key, global.Number.wrap(current.value + 1));
+        return current;
+    }
+
     public static net.nexustools.njs.Number.Instance plusPlusLeft(Global global, java.lang.String key, Scopable _this) {
         net.nexustools.njs.Number.Instance incremented = global.wrap(global.Number.fromValueOf(_this.get(key)).value + 1);
         _this.set(key, incremented);
@@ -153,6 +165,10 @@ public abstract class CompiledScript extends AbstractFunction implements Script 
         net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
         _this.set(key, global.Number.wrap(current.value + 1));
         return current;
+    }
+
+    public static void plusPlusTop(Global global, BaseObject key, BaseObject _this) {
+        Utilities.set(_this, key, global.Number.wrap(global.Number.fromValueOf(Utilities.get(_this, key)).value + 1));
     }
 
     public static void plusPlusTop(Global global, java.lang.String key, Scopable _this) {

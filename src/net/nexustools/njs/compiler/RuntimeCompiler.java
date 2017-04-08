@@ -413,6 +413,18 @@ public class RuntimeCompiler extends RegexCompiler {
             return REFERENCE;
         }
     };
+    
+    private void execute(Impl[] impls, Global global, Scope scope) {
+        for(Impl impl : impls)
+            impl.run(global, scope).get();
+    }
+    
+    private Impl[] compile(ScriptCompilerData data, Parsed[] objects) {
+        Impl[] dat = new Impl[objects.length];
+        for(int i=0; i<objects.length; i++)
+            dat[i] = compile(data, objects[i]);
+        return dat;
+    }
 
     private Impl compile(final ScriptCompilerData data, Parsed object) {
         if (DEBUG) {
@@ -1416,7 +1428,7 @@ public class RuntimeCompiler extends RegexCompiler {
                 }
             };
         } else if (object instanceof IntegerReference) {
-            final int integer = ((IntegerReference) object).ref;
+            final int integer = (int)((IntegerReference) object).ref;
             if (((IntegerReference) object).lhs == null) {
                 return new Impl() {
                     @Override
@@ -1452,177 +1464,151 @@ public class RuntimeCompiler extends RegexCompiler {
                 }
             };
         } else if (object instanceof For) {
-            Parsed _init = ((For) object).init;
-            Parsed _loop = ((For) object).loop;
-            final Impl condition = ((For) object).condition == null ? null : compile(data, ((For) object).condition);
-            if (_init != null && _loop != null) {
-                final Impl init = compile(data, _init);
-                final Impl loop = compile(data, _loop);
-
-                if (((For) object).simpleimpl != null) {
+            switch(((For)object).type) {
+                case InLoop:
+                {
+                    final Impl storage = compile(data, ((For) object).storage);
                     final Impl impl = compile(data, ((For) object).simpleimpl);
-                    switch (((For) object).type) {
-                        case InLoop: {
-                            final java.lang.String key = ((Reference)((Var) ((For) object).init).sets.get(0).lhs).ref;
-                            if (((For) object).init instanceof Let) {
-                                return new Impl() {
-                                    @Override
-                                    public Referencable run(Global global, Scope scope) {
-                                        scope = scope.beginBlock();
-                                        Iterator<java.lang.String> it = loop.run(global, scope).get().deepPropertyNameIterator();
-                                        while (it.hasNext()) {
-                                            scope.let(key, global.String.wrap(it.next()));
-                                            Referencable ref = impl.run(global, scope);
-                                            if (ref instanceof Return) {
-                                                return ref;
-                                            }
-                                            ref.get();
-                                        }
-                                        return UNDEFINED_REFERENCE;
-                                    }
-                                };
-                            }
-                            return new Impl() {
-                                @Override
-                                public Referencable run(Global global, Scope scope) {
-                                    Iterator<java.lang.String> it = loop.run(global, scope).get().deepPropertyNameIterator();
-                                    while (it.hasNext()) {
-                                        scope.var(key, global.String.wrap(it.next()));
-                                        Referencable ref = impl.run(global, scope);
-                                        if (ref instanceof Return) {
-                                            return ref;
-                                        }
-                                        ref.get();
-                                    }
-                                    return UNDEFINED_REFERENCE;
-                                }
-                            };
-                        }
-                        case OfLoop: {
-                            final java.lang.String key = ((Reference)((Var) ((For) object).init).sets.get(0).lhs).ref;
-                            if (((For) object).init instanceof Let) {
-                                return new Impl() {
-                                    @Override
-                                    public Referencable run(Global global, Scope scope) {
-                                        scope = scope.beginBlock();
-                                        for (BaseObject forObject : loop.run(global, scope).get()) {
-                                            scope.let(key, forObject);
-                                            Referencable ref = impl.run(global, scope);
-                                            if (ref instanceof Return) {
-                                                return ref;
-                                            }
-                                            ref.get();
-                                        }
-                                        return UNDEFINED_REFERENCE;
-                                    }
-                                };
-                            }
-                            return new Impl() {
-                                @Override
-                                public Referencable run(Global global, Scope scope) {
-                                    for (BaseObject forObject : loop.run(global, scope).get()) {
-                                        scope.var(key, forObject);
-                                        Referencable ref = impl.run(global, scope);
-                                        if (ref instanceof Return) {
-                                            return ref;
-                                        }
-                                        ref.get();
-                                    }
-                                    return UNDEFINED_REFERENCE;
-                                }
-                            };
-                        }
-                        case Standard:
-                            return new Impl() {
-                                @Override
-                                public Referencable run(Global global, Scope scope) {
-                                    for (init.run(global, scope).get(); condition.run(global, scope).get().toBool(); loop.run(global, scope).get()) {
-                                        Referencable ref = impl.run(global, scope);
-                                        if (ref instanceof Return) {
-                                            return ref;
-                                        }
-                                        ref.get();
-                                    }
-
-                                    return UNDEFINED_REFERENCE;
-                                }
-                            };
-                    }
-
-                }
-                final Script impl = compileScript(((For) object).impl, data.fileName, ScriptType.Block);
-                switch (((For) object).type) {
-                    case InLoop: {
-                        final java.lang.String key = ((Reference)((Var) ((For) object).init).sets.get(0).lhs).ref;
-                        if (((For) object).init instanceof Let) {
-                            return new Impl() {
-                                @Override
-                                public Referencable run(Global global, Scope scope) {
-                                    scope = scope.beginBlock();
-                                    Iterator<java.lang.String> it = loop.run(global, scope).get().deepPropertyNameIterator();
-                                    while (it.hasNext()) {
-                                        scope.let(key, global.String.wrap(it.next()));
-                                        BaseObject ret = impl.exec(global, scope);
-                                        if (ret != null) {
-                                            return new Return(ret, rows, columns);
-                                        }
-                                    }
-                                    return UNDEFINED_REFERENCE;
-                                }
-                            };
-                        }
+                    final java.lang.String key = ((Reference)((Var) ((For) object).init).sets.get(0).lhs).ref;
+                    if (((For) object).init instanceof Let) {
                         return new Impl() {
                             @Override
                             public Referencable run(Global global, Scope scope) {
-                                Iterator<java.lang.String> it = loop.run(global, scope).get().deepPropertyNameIterator();
+                                scope = scope.beginBlock();
+                                Iterator<java.lang.String> it = storage.run(global, scope).get().deepPropertyNameIterator();
                                 while (it.hasNext()) {
-                                    scope.var(key, global.String.wrap(it.next()));
-                                    BaseObject ret = impl.exec(global, scope);
-                                    if (ret != null) {
-                                        return new Return(ret, rows, columns);
+                                    scope.let(key, global.String.wrap(it.next()));
+                                    Referencable ref = impl.run(global, scope);
+                                    if (ref instanceof Return) {
+                                        return ref;
                                     }
+                                    ref.get();
                                 }
                                 return UNDEFINED_REFERENCE;
                             }
                         };
                     }
-                    case OfLoop: {
-                        final java.lang.String key = ((Reference)((Var) ((For) object).init).sets.get(0).lhs).ref;
-                        if (((For) object).init instanceof Let) {
+                    
+                    return new Impl() {
+                        @Override
+                        public Referencable run(Global global, Scope scope) {
+                            Iterator<java.lang.String> it = storage.run(global, scope).get().deepPropertyNameIterator();
+                            while (it.hasNext()) {
+                                scope.var(key, global.String.wrap(it.next()));
+                                Referencable ref = impl.run(global, scope);
+                                if (ref instanceof Return) {
+                                    return ref;
+                                }
+                                ref.get();
+                            }
+                            return UNDEFINED_REFERENCE;
+                        }
+                    };
+                }
+                    
+                case OfLoop:
+                {
+                    final Impl storage = compile(data, ((For) object).storage);
+                    final Impl impl = compile(data, ((For) object).simpleimpl);
+                    final java.lang.String key = ((Reference)((Var) ((For) object).init).sets.get(0).lhs).ref;
+                    if (((For) object).init instanceof Let) {
+                        return new Impl() {
+                            @Override
+                            public Referencable run(Global global, Scope scope) {
+                                scope = scope.beginBlock();
+                                for (BaseObject forObject : storage.run(global, scope).get()) {
+                                    scope.let(key, forObject);
+                                    Referencable ref = impl.run(global, scope);
+                                    if (ref instanceof Return) {
+                                        return ref;
+                                    }
+                                    ref.get();
+                                }
+                                return UNDEFINED_REFERENCE;
+                            }
+                        };
+                    }
+                    return new Impl() {
+                        @Override
+                        public Referencable run(Global global, Scope scope) {
+                            for (BaseObject forObject : storage.run(global, scope).get()) {
+                                scope.var(key, forObject);
+                                Referencable ref = impl.run(global, scope);
+                                if (ref instanceof Return) {
+                                    return ref;
+                                }
+                                ref.get();
+                            }
+                            return UNDEFINED_REFERENCE;
+                        }
+                    };
+                }
+                    
+                case Standard:
+                    Parsed _init = ((For) object).init;
+                    Parsed[] _loop = ((For) object).loop.toArray(new Parsed[((For) object).loop.size()]);
+                    final Impl condition = ((For) object).condition == null ? null : compile(data, ((For) object).condition);
+                    if (_init != null && _loop.length > 0) {
+                        final Impl init = compile(data, _init);
+                        final Impl[] loop = compile(data, _loop);
+
+                        if (((For) object).simpleimpl != null) {
+                            final Impl impl = compile(data, ((For) object).simpleimpl);
+                            return new Impl() {
+                                    @Override
+                                    public Referencable run(Global global, Scope scope) {
+                                        for (init.run(global, scope).get(); condition.run(global, scope).get().toBool(); execute(loop, global, scope)) {
+                                            Referencable ref = impl.run(global, scope);
+                                            if (ref instanceof Return) {
+                                                return ref;
+                                            }
+                                            ref.get();
+                                        }
+
+                                        return UNDEFINED_REFERENCE;
+                                    }
+                                };
+
+                        }
+                        final Script impl = compileScript(((For) object).impl, data.fileName, ScriptType.Block);
+                        return new Impl() {
+                            @Override
+                            public Referencable run(Global global, Scope scope) {
+                                for (init.run(global, scope).get(); condition.run(global, scope).get().toBool(); execute(loop, global, scope)) {
+                                    BaseObject ret = impl.exec(global, scope);
+                                    if (ret != null) {
+                                        return new Return(ret, rows, columns);
+                                    }
+                                }
+
+                                return UNDEFINED_REFERENCE;
+                            }
+                        };
+                    } else if (_loop.length > 0) {
+                        final Impl[] loop = compile(data, _loop);
+
+                        if (((For) object).simpleimpl != null) {
+                            final Impl impl = compile(data, ((For) object).simpleimpl);
                             return new Impl() {
                                 @Override
                                 public Referencable run(Global global, Scope scope) {
-                                    scope = scope.beginBlock();
-                                    for (BaseObject forObject : loop.run(global, scope).get()) {
-                                        scope.let(key, forObject);
-                                        BaseObject ret = impl.exec(global, scope);
-                                        if (ret != null) {
-                                            return new Return(ret, rows, columns);
+                                    for (; condition.run(global, scope).get().toBool(); execute(loop, global, scope)) {
+                                        Referencable ref = impl.run(global, scope);
+                                        if (ref instanceof Return) {
+                                            return ref;
                                         }
+                                        ref.get();
                                     }
+
                                     return UNDEFINED_REFERENCE;
                                 }
                             };
                         }
+                        final Script impl = compileScript(((For) object).impl, data.fileName, ScriptType.Block);
                         return new Impl() {
                             @Override
                             public Referencable run(Global global, Scope scope) {
-                                for (BaseObject forObject : loop.run(global, scope).get()) {
-                                    scope.var(key, forObject);
-                                    BaseObject ret = impl.exec(global, scope);
-                                    if (ret != null) {
-                                        return new Return(ret, rows, columns);
-                                    }
-                                }
-                                return UNDEFINED_REFERENCE;
-                            }
-                        };
-                    }
-                    case Standard:
-                        return new Impl() {
-                            @Override
-                            public Referencable run(Global global, Scope scope) {
-                                for (init.run(global, scope).get(); condition.run(global, scope).get().toBool(); loop.run(global, scope).get()) {
+                                for (; condition.run(global, scope).get().toBool(); execute(loop, global, scope)) {
                                     BaseObject ret = impl.exec(global, scope);
                                     if (ret != null) {
                                         return new Return(ret, rows, columns);
@@ -1632,108 +1618,77 @@ public class RuntimeCompiler extends RegexCompiler {
                                 return UNDEFINED_REFERENCE;
                             }
                         };
-                }
-            } else if (_loop != null) {
-                final Impl loop = compile(data, _loop);
+                    } else if (_init != null) {
+                        final Impl init = compile(data, _init);
 
-                if (((For) object).simpleimpl != null) {
-                    final Impl impl = compile(data, ((For) object).simpleimpl);
+                        if (((For) object).simpleimpl != null) {
+                            final Impl impl = compile(data, ((For) object).simpleimpl);
+                            return new Impl() {
+                                @Override
+                                public Referencable run(Global global, Scope scope) {
+                                    for (init.run(global, scope).get(); condition.run(global, scope).get().toBool();) {
+                                        Referencable ref = impl.run(global, scope);
+                                        if (ref instanceof Return) {
+                                            return ref;
+                                        }
+                                        ref.get();
+                                    }
+
+                                    return UNDEFINED_REFERENCE;
+                                }
+                            };
+                        }
+                        final Script impl = compileScript(((For) object).impl, data.fileName, ScriptType.Block);
+                        return new Impl() {
+                            @Override
+                            public Referencable run(Global global, Scope scope) {
+                                for (init.run(global, scope).get(); condition.run(global, scope).get().toBool();) {
+                                    BaseObject ret = impl.exec(global, scope);
+                                    if (ret != null) {
+                                        return new Return(ret, rows, columns);
+                                    }
+                                }
+
+                                return UNDEFINED_REFERENCE;
+                            }
+                        };
+                    }
+
+                    if (((For) object).simpleimpl != null) {
+                        final Impl impl = compile(data, ((For) object).simpleimpl);
+                        return new Impl() {
+                            @Override
+                            public Referencable run(Global global, Scope scope) {
+                                for (; condition.run(global, scope).get().toBool();) {
+                                    Referencable ref = impl.run(global, scope);
+                                    if (ref instanceof Return) {
+                                        return ref;
+                                    }
+                                    ref.get();
+                                }
+
+                                return UNDEFINED_REFERENCE;
+                            }
+                        };
+                    }
+                    final Script impl = compileScript(((For) object).impl, data.fileName, ScriptType.Block);
                     return new Impl() {
                         @Override
                         public Referencable run(Global global, Scope scope) {
-                            for (; condition.run(global, scope).get().toBool(); loop.run(global, scope).get()) {
-                                Referencable ref = impl.run(global, scope);
-                                if (ref instanceof Return) {
-                                    return ref;
+                            for (; condition.run(global, scope).get().toBool();) {
+                                BaseObject ret = impl.exec(global, scope);
+                                if (ret != null) {
+                                    return new Return(ret, rows, columns);
                                 }
-                                ref.get();
                             }
 
                             return UNDEFINED_REFERENCE;
                         }
                     };
-                }
-                final Script impl = compileScript(((For) object).impl, data.fileName, ScriptType.Block);
-                return new Impl() {
-                    @Override
-                    public Referencable run(Global global, Scope scope) {
-                        for (; condition.run(global, scope).get().toBool(); loop.run(global, scope).get()) {
-                            BaseObject ret = impl.exec(global, scope);
-                            if (ret != null) {
-                                return new Return(ret, rows, columns);
-                            }
-                        }
-
-                        return UNDEFINED_REFERENCE;
-                    }
-                };
-            } else if (_init != null && _loop != null) {
-                final Impl init = compile(data, _init);
-
-                if (((For) object).simpleimpl != null) {
-                    final Impl impl = compile(data, ((For) object).simpleimpl);
-                    return new Impl() {
-                        @Override
-                        public Referencable run(Global global, Scope scope) {
-                            for (init.run(global, scope).get(); condition.run(global, scope).get().toBool();) {
-                                Referencable ref = impl.run(global, scope);
-                                if (ref instanceof Return) {
-                                    return ref;
-                                }
-                                ref.get();
-                            }
-
-                            return UNDEFINED_REFERENCE;
-                        }
-                    };
-                }
-                final Script impl = compileScript(((For) object).impl, data.fileName, ScriptType.Block);
-                return new Impl() {
-                    @Override
-                    public Referencable run(Global global, Scope scope) {
-                        for (init.run(global, scope).get(); condition.run(global, scope).get().toBool();) {
-                            BaseObject ret = impl.exec(global, scope);
-                            if (ret != null) {
-                                return new Return(ret, rows, columns);
-                            }
-                        }
-
-                        return UNDEFINED_REFERENCE;
-                    }
-                };
             }
-
-            if (((For) object).simpleimpl != null) {
-                final Impl impl = compile(data, ((For) object).simpleimpl);
-                return new Impl() {
-                    @Override
-                    public Referencable run(Global global, Scope scope) {
-                        for (; condition.run(global, scope).get().toBool();) {
-                            Referencable ref = impl.run(global, scope);
-                            if (ref instanceof Return) {
-                                return ref;
-                            }
-                            ref.get();
-                        }
-
-                        return UNDEFINED_REFERENCE;
-                    }
-                };
-            }
-            final Script impl = compileScript(((For) object).impl, data.fileName, ScriptType.Block);
-            return new Impl() {
-                @Override
-                public Referencable run(Global global, Scope scope) {
-                    for (; condition.run(global, scope).get().toBool();) {
-                        BaseObject ret = impl.exec(global, scope);
-                        if (ret != null) {
-                            return new Return(ret, rows, columns);
-                        }
-                    }
-
-                    return UNDEFINED_REFERENCE;
-                }
-            };
+            
+            
+                    
         } else if (object instanceof Try) {
             Try t = (Try) object;
             final Script impl = compileScript(t.impl, data.fileName, ScriptType.Block);

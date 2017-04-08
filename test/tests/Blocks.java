@@ -32,57 +32,62 @@ import org.junit.Test;
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public class Blocks {
-	
-	Compiler[] compilers;
-	
-	@Before
-	public void setUp() {
-		compilers = new Compiler[]{
-			new JavaTranspiler(),
-			new RuntimeCompiler()
-		};
-	}
-	
-	@After
-	public void tearDown() {
-		compilers = null;
-	}
-	
-	@Test
-	public void _if() {
-		test("if");
-	}
-	
-	@Test
-	public void _for() {
-		test("for");
-	}
-	
-	@Test
-	public void _while() {
-		test("while");
-	}
-	
-	@Test
-	public void _try() {
-		test("try");
-	}
 
-	public void test(java.lang.String name) {
-		for(Compiler compiler : compilers) {
-			try {
-				compiler.compile(new InputStreamReader(Blocks.class.getResourceAsStream("/tests/blocks/" + name + ".js")), name + ".js", false).exec(Utilities.createExtendedGlobal(), null);
-			} catch(net.nexustools.njs.Error.ConvertedException re) {
-				re.printStackTrace();
-				throw re;
-			} catch(java.lang.RuntimeException re) {
-				System.err.println(Utilities.extractStack(re.toString(), re));
-				throw re;
-			} catch(java.lang.Error e) {
-				System.err.println(Utilities.extractStack(e.toString(), e));
-				throw e;
-			}
-		}
-	}
-	
+    Compiler[] compilers;
+
+    @Before
+    public void setUp() {
+        compilers = new Compiler[]{
+            new JavaTranspiler(),
+            new RuntimeCompiler()
+        };
+    }
+
+    @After
+    public void tearDown() {
+        compilers = null;
+    }
+
+    @Test
+    public void _if() {
+        test("if");
+    }
+
+    @Test
+    public void _for() {
+        test("for");
+    }
+
+    @Test
+    public void _while() {
+        test("while");
+    }
+
+    @Test
+    public void _try() {
+        test("try");
+    }
+
+    @Test
+    public void _do() {
+        test("do");
+    }
+
+    public void test(java.lang.String name) {
+        for (Compiler compiler : compilers) {
+            try {
+                compiler.compile(new InputStreamReader(Blocks.class.getResourceAsStream("/tests/blocks/" + name + ".js")), name + ".js", false).exec(Utilities.createExtendedGlobal(), null);
+            } catch (net.nexustools.njs.Error.ConvertedException re) {
+                re.printStackTrace();
+                throw re;
+            } catch (java.lang.RuntimeException re) {
+                System.err.println(Utilities.extractStack(re.toString(), re));
+                throw re;
+            } catch (java.lang.Error e) {
+                System.err.println(Utilities.extractStack(e.toString(), e));
+                throw e;
+            }
+        }
+    }
+
 }
