@@ -15,6 +15,7 @@
  */
 package net.nexustools.njs.compiler;
 
+import net.nexustools.njs.AbstractFunction;
 import net.nexustools.njs.BaseFunction;
 import net.nexustools.njs.BaseObject;
 import net.nexustools.njs.Global;
@@ -26,9 +27,14 @@ import net.nexustools.njs.Scope;
  *
  * @author Katelyn Slater <kate@nexustools.com>
  */
-public abstract class CompiledScript implements Script {
+public abstract class CompiledScript extends AbstractFunction implements Script {
 
     public static abstract class Debuggable extends CompiledScript {
+    
+        public Debuggable() {}
+        public Debuggable(Global global) {
+            super(global);
+        }
 
         public static BaseObject constructTop(String source, BaseObject _this, BaseObject... params) {
             BaseFunction function;
@@ -92,6 +98,11 @@ public abstract class CompiledScript implements Script {
     }
 
     public static abstract class Optimized extends CompiledScript {
+    
+        public Optimized() {}
+        public Optimized(Global global) {
+            super(global);
+        }
 
         public static BaseObject callTopDynamic(BaseObject key, BaseObject _this, BaseObject... params) {
             return ((BaseFunction) Utilities.get(_this, key)).call(_this, params);
@@ -113,11 +124,21 @@ public abstract class CompiledScript implements Script {
             return ((BaseFunction) _function).call(_this, params);
         }
     }
+    
+    private final Global global;
+    public CompiledScript() {
+        global = null;
+    }
+    public CompiledScript(Global global) {
+        super(global);
+        this.global = global;
+    }
 
     public BaseObject exec() {
         return exec(Utilities.createExtendedGlobal(), null);
     }
 
+    @Override
     public BaseObject exec(Global global) {
         return exec(global, null);
     }
@@ -149,18 +170,108 @@ public abstract class CompiledScript implements Script {
         _this.set(key, global.Number.wrap(current.value - 1));
         return current;
     }
+
+    public static net.nexustools.njs.Number.Instance minusEqual(Global global, java.lang.String key, BaseObject val, Scopable _this) {
+        net.nexustools.njs.Number.Instance _val = global.Number.fromValueOf(val);
+        
+        net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
+        _this.set(key, current = global.Number.wrap(current.value - _val.value));
+        return current;
+    }
+
+    public static net.nexustools.njs.Number.Instance minusEqual(Global global, java.lang.String key, double val, Scopable _this) {
+        net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
+        _this.set(key, current = global.Number.wrap(current.value - val));
+        return current;
+    }
+
+    public static net.nexustools.njs.Number.Instance orEqual(Global global, java.lang.String key, BaseObject val, Scopable _this) {
+        net.nexustools.njs.Number.Instance _val = global.Number.fromValueOf(val);
+        
+        net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
+        _this.set(key, current = global.Number.wrap((long)current.value | (long)_val.value));
+        return current;
+    }
+
+    public static net.nexustools.njs.Number.Instance orEqual(Global global, java.lang.String key, double val, Scopable _this) {
+        net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
+        _this.set(key, current = global.Number.wrap((long)current.value | (long)val));
+        return current;
+    }
+
+    public static net.nexustools.njs.Number.Instance andEqual(Global global, java.lang.String key, BaseObject val, Scopable _this) {
+        net.nexustools.njs.Number.Instance _val = global.Number.fromValueOf(val);
+        
+        net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
+        _this.set(key, current = global.Number.wrap((long)current.value & (long)_val.value));
+        return current;
+    }
+
+    public static net.nexustools.njs.Number.Instance andEqual(Global global, java.lang.String key, double val, Scopable _this) {
+        net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
+        _this.set(key, current = global.Number.wrap((long)current.value & (long)val));
+        return current;
+    }
+
+    public static net.nexustools.njs.Number.Instance dblShiftRightEqual(Global global, java.lang.String key, BaseObject val, Scopable _this) {
+        net.nexustools.njs.Number.Instance _val = global.Number.fromValueOf(val);
+        
+        net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
+        _this.set(key, current = global.Number.wrap((int)current.value >>> (int)_val.value));
+        return current;
+    }
+
+    public static net.nexustools.njs.Number.Instance dblShiftRightEqual(Global global, java.lang.String key, double val, Scopable _this) {
+        net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
+        _this.set(key, current = global.Number.wrap((int)current.value >>> (int)val));
+        return current;
+    }
+
+    public static net.nexustools.njs.Number.Instance multiplyEqual(Global global, java.lang.String key, BaseObject val, Scopable _this) {
+        net.nexustools.njs.Number.Instance _val = global.Number.fromValueOf(val);
+        
+        net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
+        _this.set(key, current = global.Number.wrap(_val.value * current.value));
+        return current;
+    }
+
+    public static net.nexustools.njs.Number.Instance multiplyEqual(Global global, java.lang.String key, double val, Scopable _this) {
+        net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
+        _this.set(key, current = global.Number.wrap(val * current.value));
+        return current;
+    }
+
+    public static net.nexustools.njs.Number.Instance divideEqual(Global global, java.lang.String key, BaseObject val, Scopable _this) {
+        net.nexustools.njs.Number.Instance _val = global.Number.fromValueOf(val);
+        
+        net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
+        _this.set(key, current = global.Number.wrap(current.value / _val.value));
+        return current;
+    }
+
+    public static net.nexustools.njs.Number.Instance divideEqual(Global global, java.lang.String key, double val, Scopable _this) {
+        net.nexustools.njs.Number.Instance current = global.Number.fromValueOf(_this.get(key));
+        _this.set(key, current = global.Number.wrap(current.value / val));
+        return current;
+    }
     
     public static BaseObject last(BaseObject... values) {
         return values[values.length-1];
     }
 
+    public static BaseObject plusEqual(Global global, java.lang.String key, BaseObject val, Scopable _this) {
+        BaseObject result = plus(global, _this.get(key), val);
+        _this.set(key, result);
+        return result;
+    }
+
     public static BaseObject plus(Global global, BaseObject lhs, BaseObject rhs) {
         lhs = Utilities.valueOf(lhs);
         rhs = Utilities.valueOf(rhs);
-
-        net.nexustools.njs.Number.Instance _lhs = lhs.toNumber();
-        net.nexustools.njs.Number.Instance _rhs = rhs.toNumber();
-        if ((!_lhs.isNaN() && !_rhs.isNaN()) || (lhs instanceof net.nexustools.njs.Number.Instance && rhs instanceof net.nexustools.njs.Number.Instance)) {
+        
+        if (lhs instanceof net.nexustools.njs.Number.Instance && rhs instanceof net.nexustools.njs.Number.Instance) {
+            net.nexustools.njs.Number.Instance _lhs = lhs.toNumber();
+            net.nexustools.njs.Number.Instance _rhs = rhs.toNumber();
             return global.wrap(_lhs.value + _rhs.value);
         }
 
@@ -239,7 +350,10 @@ public abstract class CompiledScript implements Script {
 
         return lhs.toDouble() <= rhs.toDouble();
     }
-    
-    
+
+    @Override
+    public BaseObject call(BaseObject _this, BaseObject... params) {
+        return exec(global, Scope.current());
+    }
 
 }

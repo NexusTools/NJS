@@ -165,6 +165,17 @@ public abstract class RegexCompiler implements Compiler {
         }
     }
 
+    public static class Reparse extends RuntimeException {
+
+        final java.lang.String buffer;
+        final Parsed transform;
+
+        public Reparse(java.lang.String buffer, Parsed transform) {
+            this.buffer = buffer;
+            this.transform = transform;
+        }
+    }
+
     public static class CompleteException extends RuntimeException {
 
         final Parsed part;
@@ -201,6 +212,15 @@ public abstract class RegexCompiler implements Compiler {
         }
     }
 
+    public static class ParseSwitch extends RuntimeException {
+
+        public final Switch block;
+
+        public ParseSwitch(Switch block) {
+            this.block = block;
+        }
+    }
+
     public static class ParseComplete extends RuntimeException {
 
         public final ScriptData impl;
@@ -227,6 +247,10 @@ public abstract class RegexCompiler implements Compiler {
         @Override
         public java.lang.String toString() {
             return toSimpleSource();
+        }
+        
+        public boolean isTrue() {
+            return false;
         }
 
         public boolean isNumber() {
@@ -337,6 +361,10 @@ public abstract class RegexCompiler implements Compiler {
                 return new Set(this);
             } else if (part instanceof Percent) {
                 return new Percent(this);
+            } else if (part instanceof AndEq) {
+                return new AndEq(this);
+            } else if (part instanceof OrEq) {
+                return new OrEq(this);
             } else if (part instanceof And) {
                 return new And(this);
             } else if (part instanceof Or) {
@@ -349,6 +377,8 @@ public abstract class RegexCompiler implements Compiler {
                 return new Minus(this, new Number(-((Number) part).value));
             } else if (part instanceof Integer && ((Integer) part).value < 0) {
                 return new Minus(this, new Number(-((Integer) part).value));
+            } else if (part instanceof RegEx) {
+                throw new Reparse(((RegEx)part).pattern + "/" + ((RegEx)part).flags, new Divide());
             } else {
                 return transformFallback(part);
             }
@@ -385,8 +415,12 @@ public abstract class RegexCompiler implements Compiler {
                 return new VariableReference(this);
             } else if (part instanceof MultiplyEq) {
                 return new MultiplyEq(this);
+            } else if (part instanceof DivideEq) {
+                return new DivideEq(this);
             } else if (part instanceof PlusEq) {
                 return new PlusEq(this);
+            } else if (part instanceof MinusEq) {
+                return new MinusEq(this);
             } else if (part instanceof PlusPlus) {
                 return new PlusPlus(this);
             } else if (part instanceof MinusMinus) {
@@ -397,6 +431,8 @@ public abstract class RegexCompiler implements Compiler {
                 return new ShiftLeft(this);
             } else if (part instanceof DoubleShiftRight) {
                 return new DoubleShiftRight(this);
+            } else if (part instanceof DoubleShiftRightEq) {
+                return new DoubleShiftRightEq(this);
             } else if (part instanceof Fork) {
                 return new Fork(this);
             }
@@ -808,14 +844,89 @@ public abstract class RegexCompiler implements Compiler {
     }
 
     public static class Case extends Helper {
+        
+        public boolean closed;
+        public Parsed ref;
 
-        public Case() {
+        public Case() {}
+
+        @Override
+        public boolean isStandalone() {
+            return true;
         }
 
         @Override
         public java.lang.String toSource() {
-            return "case";
+            return "case " + ref + ":";
         }
+
+        @Override
+        public Parsed transform(Parsed part) {
+            if(ref == null) {
+                if(part instanceof String || part instanceof Integer || part instanceof Undefined || part instanceof Null)
+                    ref = part;
+                else
+                    throw new Error.JavaException("SyntaxError", "Only strings and integers supported for switch case, encountered " + describe(part));
+                return this;
+            } else if(part instanceof Colon) {
+                closed = true;
+                return this;
+            } else if(part instanceof NewLine)
+                throw new CompleteException();
+            
+            return super.transform(part);
+        }
+
+        @Override
+        public boolean isIncomplete() {
+            return !closed;
+        }
+        
+        @Override
+        public Parsed finish() {
+            ref = ref.finish();
+            return this;
+        }
+        
+    }
+    
+    public static class Default extends Helper {
+        
+        public boolean closed;
+
+        public Default() {}
+
+        @Override
+        public boolean isStandalone() {
+            return true;
+        }
+
+        @Override
+        public java.lang.String toSource() {
+            return "default:";
+        }
+
+        @Override
+        public Parsed transform(Parsed part) {
+            if(part instanceof Colon) {
+                closed = true;
+                return this;
+            } else if(part instanceof NewLine)
+                throw new CompleteException();
+            
+            return super.transform(part);
+        }
+
+        @Override
+        public boolean isIncomplete() {
+            return !closed;
+        }
+        
+        @Override
+        public Parsed finish() {
+            return this;
+        }
+        
     }
 
     public static class ReferenceChain extends Referency {
@@ -985,9 +1096,11 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         public Parsed finish() {
-            contents = contents.finish();
-            if ((contents instanceof Reference || contents instanceof ReferenceChain)) {
-                return contents;
+            if(contents != null) {
+                contents = contents.finish();
+                if ((contents instanceof Reference || contents instanceof ReferenceChain)) {
+                    return contents;
+                }
             }
             return this;
         }
@@ -1183,6 +1296,18 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
+        public Parsed transform(Parsed part) {
+            if(part instanceof Call) {
+                if(((Reference)((Call)part).reference).ref.equals("catch"))
+                    return transform(new Catch(((Call)part).arguments.get(0)));
+            }
+                    
+            return super.transform(part); //To change body of generated methods, choose Tools | Templates.
+        }
+        
+        
+
+        @Override
         public java.lang.String toSource() {
             StringBuilder builder = new StringBuilder("try {");
             if (impl == null) {
@@ -1243,6 +1368,10 @@ public abstract class RegexCompiler implements Compiler {
         public Catch() {
             super(Block.State.BeforeCondition);
         }
+        public Catch(Parsed condition) {
+            super(Block.State.AfterCondition);
+            this.condition = condition;
+        }
 
         @Override
         public boolean allowSimpleImpl() {
@@ -1272,56 +1401,15 @@ public abstract class RegexCompiler implements Compiler {
 
     public static class Switch extends Block {
 
-        public static enum CaseState {
-            NeedCase,
-            InCase,
-            HaveCase,
-            StartImpl,
-            InImpl
-
-        }
-
         public static class Case {
         }
-
-        List<Case> cases = new ArrayList();
-        CaseState caseState = CaseState.NeedCase;
 
         public Switch() {
         }
 
         @Override
-        public Parsed transformImpl(Parsed part) {
-            if (part instanceof NewLine) {
-                return this;
-            }
-
-            switch (caseState) {
-                case NeedCase:
-                    if (part instanceof RegexCompiler.Case) {
-                        caseState = CaseState.InCase;
-                        return this;
-                    }
-                    break;
-                case InCase:
-                    if (part instanceof PrimitiveReferency) {
-                        caseState = CaseState.HaveCase;
-                        return this;
-                    }
-                case HaveCase:
-                    if (part instanceof Colon) {
-                        caseState = CaseState.StartImpl;
-                        return this;
-                    }
-            }
-
-            throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part.toSource());
-        }
-
-        @Override
         public Parsed parse() {
-            state = State.InImpl;
-            return this;
+            throw new ParseSwitch(this);
         }
 
         @Override
@@ -1345,7 +1433,7 @@ public abstract class RegexCompiler implements Compiler {
 
         @Override
         public boolean isStandalone() {
-            return false;
+            return true;
         }
 
     }
@@ -1356,6 +1444,11 @@ public abstract class RegexCompiler implements Compiler {
 
         public Boolean(java.lang.Boolean value) {
             this.value = value;
+        }
+
+        @Override
+        public boolean isTrue() {
+            return value;
         }
 
         @Override
@@ -1497,6 +1590,10 @@ public abstract class RegexCompiler implements Compiler {
                     break;
                 case DuringCondition:
                     if (condition == null) {
+                        if (part instanceof SemiColon) {
+                            state = ForConditionState.DuringLoop;
+                            return;
+                        }
                         condition = part;
                     } else {
                         if (!condition.isIncomplete()) {
@@ -2247,17 +2344,28 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         public RhLh(Parsed lhs) {
-            this.lhs = lhs.finish();
+            if(lhs != null) {
+                rows = lhs.rows;
+                columns = lhs.columns;
+                this.lhs = lhs.finish();
+            } else
+                this.lhs = null;
         }
 
         public RhLh(Parsed lhs, Parsed rhs) {
             super(rhs);
+            rows = lhs.rows;
+            columns = lhs.columns;
             this.lhs = lhs.finish();
+        }
+        
+        public boolean requireLHS() {
+            return true;
         }
 
         @Override
         public Parsed finish() {
-            if (lhs == null) {
+            if (lhs == null && requireLHS()) {
                 throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Missing Left-Hand-Side (" + getClass().getSimpleName() + ')');
             }
             return super.finish();
@@ -2360,6 +2468,16 @@ public abstract class RegexCompiler implements Compiler {
                     return this;
                 }
                 return new ShiftRight(this);
+            } else if (part instanceof DoubleShiftRightEq) {
+                if (precedence < ((BaseReferency) part).precedence()) {
+                    rhs = rhs.transform(part);
+                    return this;
+                }
+                if (useRhs) {
+                    rhs = new DoubleShiftRightEq(rhs);
+                    return this;
+                }
+                return new DoubleShiftRightEq(this);
             } else if (part instanceof DoubleShiftRight) {
                 if (precedence < ((BaseReferency) part).precedence()) {
                     rhs = rhs.transform(part);
@@ -2862,8 +2980,10 @@ public abstract class RegexCompiler implements Compiler {
 
         public Set(Parsed lhs) {
             super(lhs);
-            rows = lhs.rows;
-            columns = lhs.columns;
+        }
+
+        public Set(Parsed lhs, Parsed rhs) {
+            super(lhs, rhs);
         }
 
         @Override
@@ -2893,13 +3013,31 @@ public abstract class RegexCompiler implements Compiler {
 
         public MultiplyEq(Parsed lhs) {
             super(lhs);
-            rows = lhs.rows;
-            columns = lhs.columns;
         }
 
         @Override
         public java.lang.String op() {
             return "*=";
+        }
+
+        @Override
+        public int precedence() {
+            return 3;
+        }
+    }
+    
+    public static class DivideEq extends RhLhReferency {
+
+        public DivideEq() {
+        }
+
+        public DivideEq(Parsed lhs) {
+            super(lhs);
+        }
+
+        @Override
+        public java.lang.String op() {
+            return "/=";
         }
 
         @Override
@@ -2960,6 +3098,26 @@ public abstract class RegexCompiler implements Compiler {
         @Override
         public java.lang.String op() {
             return ">>>";
+        }
+
+        @Override
+        public int precedence() {
+            return 12;
+        }
+    }
+    
+    public static class DoubleShiftRightEq extends RhLhReferency implements NumberReferency {
+
+        public DoubleShiftRightEq() {
+        }
+
+        public DoubleShiftRightEq(Parsed lhs) {
+            super(lhs);
+        }
+
+        @Override
+        public java.lang.String op() {
+            return ">>>=";
         }
 
         @Override
@@ -3141,6 +3299,64 @@ public abstract class RegexCompiler implements Compiler {
 
     }
 
+    public static class OrEq extends RhLhReferency {
+
+        public OrEq() {}
+        public OrEq(Parsed lhs) {
+            super(lhs);
+        }
+
+        @Override
+        public java.lang.String op() {
+            return "|=";
+        }
+
+        @Override
+        public int precedence() {
+            return 7;
+        }
+
+        @Override
+        public boolean isNumber() {
+            return true;
+        }
+
+        @Override
+        public java.lang.String primaryType() {
+            return "number";
+        }
+
+    }
+
+    public static class AndEq extends RhLhReferency {
+
+        public AndEq() {}
+        public AndEq(Parsed lhs) {
+            super(lhs);
+        }
+
+        @Override
+        public java.lang.String op() {
+            return "&=";
+        }
+
+        @Override
+        public int precedence() {
+            return 9;
+        }
+
+        @Override
+        public boolean isNumber() {
+            return true;
+        }
+
+        @Override
+        public java.lang.String primaryType() {
+            return "number";
+        }
+
+    }
+
     public static class And extends RhLhReferency {
 
         public And() {
@@ -3175,11 +3391,16 @@ public abstract class RegexCompiler implements Compiler {
     public static class Plus extends RhLhReferency {
 
         public Plus() {
-            super(new Number(0));
+            super(null);
         }
 
         public Plus(Parsed lhs) {
             super(lhs);
+        }
+
+        @Override
+        public boolean requireLHS() {
+            return false;
         }
 
         @Override
@@ -3209,7 +3430,7 @@ public abstract class RegexCompiler implements Compiler {
 
         @Override
         public boolean isNumber() {
-            return !lhs.isString() || !rhs.isString();
+            return lhs == null || (!lhs.isString() && !rhs.isString());
         }
 
         @Override
@@ -3281,13 +3502,41 @@ public abstract class RegexCompiler implements Compiler {
 
         public PlusEq(Parsed lhs) {
             super(lhs);
-            rows = lhs.rows;
-            columns = lhs.columns;
         }
 
         @Override
         public java.lang.String op() {
             return "+=";
+        }
+
+        @Override
+        public int precedence() {
+            return 3;
+        }
+
+        @Override
+        public boolean isNumber() {
+            return true;
+        }
+
+        @Override
+        public java.lang.String primaryType() {
+            return "number";
+        }
+    }
+    
+    public static class MinusEq extends RhLhReferency {
+
+        public MinusEq() {
+        }
+
+        public MinusEq(Parsed lhs) {
+            super(lhs);
+        }
+
+        @Override
+        public java.lang.String op() {
+            return "-=";
         }
 
         @Override
@@ -3604,6 +3853,11 @@ public abstract class RegexCompiler implements Compiler {
     }
 
     public static class In extends RhLhReferency {
+        
+        public In() {}
+        public In(Parsed lhs) {
+            super(lhs);
+        }
 
         @Override
         public int precedence() {
@@ -3841,16 +4095,90 @@ public abstract class RegexCompiler implements Compiler {
         }
 
     }
+    
+    // TODO: Better error handling...
+    public static class NameSet extends Parsed {
+        private boolean closed;
+        public final boolean array;
+        private java.lang.String currentKey;
+        private java.lang.String currentValue;
+        public final Map<java.lang.String, java.lang.String> names = new java.util.LinkedHashMap();
+        
+        public NameSet(boolean array) {
+            this.array = array;
+        }
+
+        @Override
+        public Parsed transform(Parsed part) {
+            if(part instanceof Reference) {
+                if(currentKey == null)
+                    currentKey = ((Reference)part).ref;
+                else if(currentValue == null && !array)
+                    currentValue = ((Reference)part).ref;
+            } else if(part instanceof Colon)
+                return this;
+            else if(part instanceof Comma) {
+                names.put(currentKey, currentValue == null ? currentKey : currentValue);
+                currentKey = currentValue = null;
+            } else if(part instanceof CloseArray && array)
+                closed = true;
+            else if(part instanceof CloseGroup && !array)
+                closed = true;
+            else
+                throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + describe(this));
+            return this;
+        }
+
+        @Override
+        public java.lang.String toSource() {
+            StringBuilder builder = new StringBuilder(array ? "[ " : "{ ");
+            for(Map.Entry<java.lang.String, java.lang.String> name : names.entrySet()) {
+                if(builder.length() > 2)
+                    builder.append(", ");
+                
+                java.lang.String key = name.getKey();
+                builder.append(key);
+                if(!array) {
+                    java.lang.String val = name.getValue();
+                    if(!key.equals(val)) {
+                        builder.append(": ");
+                        builder.append(val);
+                    }
+                }
+            }
+            builder.append(array ? " ]" : " }");
+            return builder.toString();
+        }
+
+        @Override
+        public boolean isStandalone() {
+            return true;
+        }
+
+        @Override
+        public boolean isIncomplete() {
+            return !closed;
+        }
+
+        @Override
+        public Parsed finish() {
+            return this;
+        }
+        
+    }
 
     public static class Var extends Parsed {
 
         public static class Set {
 
-            public final java.lang.String lhs;
+            public Parsed lhs;
             public Parsed rhs;
 
+            private Set(boolean array) {
+                lhs = new NameSet(array);
+            }
             private Set(java.lang.String ref) {
-                lhs = ref;
+                lhs = new Reference(ref);
             }
 
             @Override
@@ -3858,7 +4186,7 @@ public abstract class RegexCompiler implements Compiler {
                 if (rhs != null) {
                     return lhs + " = " + rhs.toSource();
                 }
-                return lhs;
+                return lhs.toString();
             }
         }
         Set currentSet;
@@ -3873,7 +4201,16 @@ public abstract class RegexCompiler implements Compiler {
                 if (part instanceof Reference) {
                     currentSet = new Set(((Reference) part).ref);
                     return this;
+                } else if(part instanceof OpenGroup) {
+                    currentSet = new Set(false);
+                    return this;
+                } else if(part instanceof OpenArray) {
+                    currentSet = new Set(true);
+                    return this;
                 }
+            } else if (currentSet.lhs.isIncomplete()) {
+                currentSet.lhs = currentSet.lhs.transform(part);
+                return this;
             } else if (currentSet.rhs != null) {
                 if (!currentSet.rhs.isIncomplete()) {
                     if (part instanceof Comma) {
@@ -3900,7 +4237,7 @@ public abstract class RegexCompiler implements Compiler {
                 throw new CompleteException();
             }
 
-            throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource());
+            throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " near " + describe(this));
         }
 
         @Override
@@ -3929,7 +4266,7 @@ public abstract class RegexCompiler implements Compiler {
 
         @Override
         public boolean isIncomplete() {
-            return (currentSet == null && sets.isEmpty()) || (currentSet != null && currentSet.rhs != null && currentSet.rhs.isIncomplete());
+            return (currentSet == null && sets.isEmpty()) || (currentSet != null && ((currentSet.rhs != null && currentSet.rhs.isIncomplete()) || (currentSet.lhs == null || currentSet.lhs.isIncomplete())));
         }
 
         @Override
@@ -3945,8 +4282,8 @@ public abstract class RegexCompiler implements Compiler {
             for (Set set : sets) {
                 if (set.rhs != null) {
                     set.rhs = set.rhs.finish();
-                    if (set.rhs instanceof Function && ((Function) set.rhs).name == null) {
-                        ((Function) set.rhs).name = set.lhs;
+                    if (set.rhs instanceof Function && ((Function) set.rhs).name == null && set.lhs instanceof Reference) {
+                        ((Function) set.rhs).name = ((Reference)set.lhs).ref;
                     }
                 }
             }
@@ -3980,6 +4317,17 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
+        public Parsed transform(Parsed part) {
+            if (part instanceof In) {
+                return new In(this);
+            }
+            
+            return super.transform(part); //To change body of generated methods, choose Tools | Templates.
+        }
+        
+        
+
+        @Override
         public java.lang.String toSource() {
             return '"' + convertStringSource(string) + '"';
         }
@@ -4005,12 +4353,17 @@ public abstract class RegexCompiler implements Compiler {
 
     public static class Integer extends PrimitiveReferency implements NumberReferency {
 
-        public final int value;
+        public final long value;
 
-        public Integer(int value) {
+        public Integer(long value) {
             this.value = value;
         }
 
+        @Override
+        public boolean isTrue() {
+            return value != 0;
+        }
+        
         @Override
         public java.lang.String toSource() {
             return java.lang.String.valueOf(value);
@@ -4028,6 +4381,11 @@ public abstract class RegexCompiler implements Compiler {
 
         public Number(double value) {
             this.value = value;
+        }
+
+        @Override
+        public boolean isTrue() {
+            return value != 0;
         }
 
         @Override
@@ -4056,11 +4414,12 @@ public abstract class RegexCompiler implements Compiler {
     public static final java.lang.String VARIABLE_NAME = "[_$a-zA-Z\\xA0-\\uFFFF][_$a-zA-Z0-9\\xA0-\\uFFFF]*";
     public static final Pattern MULTILINE_COMMENT = Pattern.compile("^(\\/\\*(?:(?!\\*\\/).|[\\n\\r])*\\*\\/)");
     public static final Pattern SINGLELINE_COMMENT = Pattern.compile("^(\\/\\/[^\\n\\r]*([\\n\\r]+|$))");
-    public static final Pattern REGEX = Pattern.compile("^/([^/]*[^\\\\])/([gi]*)");
+    public static final Pattern REGEX = Pattern.compile("^/([^/\\s]*)/([gi]*)");
     public static final Pattern STRING = Pattern.compile("^" + STRING_REG);
     public static final Pattern NUMBERGET = Pattern.compile("^\\[(" + NUMBER_REG + ")\\]");
     public static final Pattern STRINGGET = Pattern.compile("^\\[" + STRING_REG + "\\]");
     public static final Pattern VAR = Pattern.compile("^var\\s+(" + VARIABLE_NAME + ")(\\s*,\\s*" + VARIABLE_NAME + ")*");
+    public static final Pattern HEX = Pattern.compile("^0x([0-9a-fA-F]+)");
     public static final Pattern NUMBER = Pattern.compile("^" + NUMBER_REG);
     public static final Pattern VARIABLEGET = Pattern.compile("^\\.\\s*(" + VARIABLE_NAME + ')');
     public static final Pattern VARIABLE = Pattern.compile("^" + VARIABLE_NAME);
@@ -4068,6 +4427,7 @@ public abstract class RegexCompiler implements Compiler {
     public static final Pattern OPEN_BRACKET = Pattern.compile("^\\(");
     public static final Pattern WHITESPACE = Pattern.compile("^\\s+");
     public static final Pattern MULTIPLYEQ = Pattern.compile("^\\*=");
+    public static final Pattern DIVIDEEQ = Pattern.compile("^/=");
     public static final Pattern CLOSE_GROUP = Pattern.compile("^\\}");
     public static final Pattern OPEN_GROUP = Pattern.compile("^\\{");
     public static final Pattern CLOSE_ARRAY = Pattern.compile("^\\]");
@@ -4079,13 +4439,17 @@ public abstract class RegexCompiler implements Compiler {
     public static final Pattern MULTIPLY = Pattern.compile("^\\*");
     public static final Pattern DIVIDE = Pattern.compile("^/");
     public static final Pattern MINUS = Pattern.compile("^\\-");
+    public static final Pattern MINUSEQ = Pattern.compile("^\\-=");
     public static final Pattern MORETHAN = Pattern.compile("^\\>");
     public static final Pattern LESSTHAN = Pattern.compile("^\\<");
     public static final Pattern MOREEQUAL = Pattern.compile("^\\>=");
     public static final Pattern LESSEQUAL = Pattern.compile("^\\<=");
     public static final Pattern SHIFTRIGHT = Pattern.compile("^\\>\\>");
     public static final Pattern SHIFTLEFT = Pattern.compile("^\\<\\<");
+    public static final Pattern SHIFTRIGHTEQ = Pattern.compile("^\\>\\>=");
+    public static final Pattern SHIFTLEFTEQ = Pattern.compile("^\\<\\<=");
     public static final Pattern DBLSHIFTRIGHT = Pattern.compile("^\\>\\>\\>");
+    public static final Pattern DBLSHIFTRIGHTEQ = Pattern.compile("^\\>\\>\\>=");
     public static final Pattern FORKSTART = Pattern.compile("^\\?");
     public static final Pattern PLUSEQ = Pattern.compile("^\\+=");
     public static final Pattern SEMICOLON = Pattern.compile("^;");
@@ -4096,6 +4460,8 @@ public abstract class RegexCompiler implements Compiler {
     public static final Pattern PERCENT = Pattern.compile("^%");
     public static final Pattern OR = Pattern.compile("^\\|");
     public static final Pattern AND = Pattern.compile("^&");
+    public static final Pattern OREQUAL = Pattern.compile("^\\|=");
+    public static final Pattern ANDEQUAL = Pattern.compile("^&=");
     public static final Pattern OROR = Pattern.compile("^\\|\\|");
     public static final Pattern ANDAND = Pattern.compile("^&&");
     public static final Pattern NOT = Pattern.compile("^!");
@@ -4115,9 +4481,10 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         public java.lang.String current() throws IOException {
-            if (currentBuffer.isEmpty()) {
+            if (currentBuffer.isEmpty()) 
                 return more();
-            }
+            if(currentBuffer.length() < 4048)
+                more();
             return currentBuffer;
         }
 
@@ -4137,8 +4504,7 @@ public abstract class RegexCompiler implements Compiler {
 
             int read = reader.read(buffer, 0, untilFull);
             if (read > 0) {
-                currentBuffer += new java.lang.String(buffer, 0, read);
-                return currentBuffer;
+                return currentBuffer += new java.lang.String(buffer, 0, read);
             }
             return null;
         }
@@ -4232,14 +4598,22 @@ public abstract class RegexCompiler implements Compiler {
         public final ScriptData parse(ParserReader reader) throws IOException {
             return parse(reader, new StringBuilder());
         }
+        
+        public boolean inFunction() {
+            return false;
+        }
+        
+        public Parsed transform(Parsed input) {
+            return input;
+        }
 
         public final ScriptData parse(ParserReader reader, StringBuilder builder) throws IOException {
             if (DEBUG) {
                 System.out.println("[" + this + "] Parsing...");
             }
             FunctionParser functionParser = this instanceof FunctionParser ? (FunctionParser) this : new FunctionParser();
-            BlockParser blockParser = this instanceof BlockParser ? (BlockParser) this : new BlockParser(this == functionParser);
-            java.lang.String buffer;
+            BlockParser blockParser = this instanceof BlockParser ? (BlockParser) this : new BlockParser(inFunction());
+            SwitchParser switchParser = this instanceof SwitchParser ? (SwitchParser) this : new SwitchParser(inFunction());
             Matcher matcher;
 
             final int sRows = reader.rows;
@@ -4248,7 +4622,7 @@ public abstract class RegexCompiler implements Compiler {
             Parsed currentPart = null;
             List<Parsed> parts = new ArrayList();
             while (true) {
-                buffer = reader.current();
+                java.lang.String buffer = reader.current();
                 if (buffer == null) {
                     eof();
                     break;
@@ -4267,28 +4641,37 @@ public abstract class RegexCompiler implements Compiler {
                                 part.part.rows = rows;
                                 part.part.columns = columns;
                                 if (currentPart != null) {
-                                    if (!currentPart.isIncomplete() && part.part instanceof CloseGroup) {
-                                        currentPart = currentPart.finish();
-                                        if (currentPart != null) {
-                                            if (!currentPart.isStandalone()) {
-                                                throw new Error.JavaException("SyntaxError", "Unexpected " + currentPart);
+                                    if (!currentPart.isIncomplete()) {
+                                        if(part.part instanceof CloseGroup) {
+                                            currentPart = currentPart.finish();
+                                            if (currentPart != null) {
+                                                if (!currentPart.isStandalone()) {
+                                                    throw new Error.JavaException("SyntaxError", "Unexpected " + currentPart);
+                                                }
+                                                if (currentPart.isIncomplete()) {
+                                                    throw new Error.JavaException("SyntaxError", "Expected more after " + currentPart);
+                                                }
+                                                parts.add(currentPart);
                                             }
-                                            if (currentPart.isIncomplete()) {
-                                                throw new Error.JavaException("SyntaxError", "Expected more after " + currentPart);
+                                            if (DEBUG) {
+                                                System.out.println("[" + this + "] End...");
                                             }
-                                            parts.add(currentPart);
+                                            end(sRows, sColumns, parts, builder.toString());
                                         }
-                                        if (DEBUG) {
-                                            System.out.println("[" + this + "] End...");
-                                        }
-                                        end(sRows, sColumns, parts, builder.toString());
                                     }
 
                                     try {
                                         if (DEBUG) {
                                             System.out.println("[" + this + "] " + describe(currentPart) + " -> " + describe(part.part));
                                         }
-                                        currentPart = currentPart.transform(part.part);
+                                        try {
+                                            currentPart = currentPart.transform(part.part);
+                                        } catch (Reparse reparse) {
+                                            reader.ltrim(part.trim);
+                                            reader.currentBuffer = reparse.buffer + reader.currentBuffer;
+                                            currentPart = currentPart.transform(reparse.transform);
+                                            break next;
+                                        }
                                     } catch (CompleteException ex) {
                                         if (DEBUG) {
                                             System.out.println("[" + this + "] Complete: " + ex);
@@ -4320,7 +4703,14 @@ public abstract class RegexCompiler implements Compiler {
                                                 throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + ex.part);
                                             }
                                         }
-                                        currentPart = ex.part;
+                                        try {
+                                            currentPart = transform(ex.part);
+                                        } catch (Reparse reparse) {
+                                            reader.ltrim(part.trim);
+                                            reader.currentBuffer = reparse.buffer + reader.currentBuffer;
+                                            currentPart = reparse.transform;
+                                            break next;
+                                        }
                                     } catch (ParseFunction ex) {
                                         builder.append(reader.ltrim(part.trim));
                                         try {
@@ -4345,6 +4735,17 @@ public abstract class RegexCompiler implements Compiler {
                                             builder.append(reader.ltrim(1));
                                         }
                                         break next;
+                                    } catch (ParseSwitch ex) {
+                                        builder.append(reader.ltrim(part.trim));
+                                        try {
+                                            switchParser.parse(reader);
+                                        } catch (ParseComplete ce) {
+                                            ex.block.impl = ce.impl;
+                                            ex.block.state = Block.State.Complete;
+                                            builder.append(ce.source);
+                                            builder.append(reader.ltrim(1));
+                                        }
+                                        break next;
                                     }
                                 } else {
                                     if (part.part instanceof CloseGroup) {
@@ -4352,8 +4753,15 @@ public abstract class RegexCompiler implements Compiler {
                                             System.out.println("[" + this + "] End...");
                                         }
                                         end(sRows, sColumns, parts, builder.toString());
-                                    }
-                                    currentPart = part.part;
+                                    } else
+                                        try {
+                                            currentPart = transform(part.part);
+                                        } catch (Reparse reparse) {
+                                            reader.ltrim(part.trim);
+                                            reader.currentBuffer = reparse.buffer + reader.currentBuffer;
+                                            currentPart = reparse.transform;
+                                            break next;
+                                        }
                                 }
                                 builder.append(reader.ltrim(part.trim));
                             } catch (PartComplete part) {
@@ -4381,7 +4789,7 @@ public abstract class RegexCompiler implements Compiler {
                     }
                     java.lang.String next;
                     if ((next = reader.more()) == null) {
-                        throw new Error.JavaException("SyntaxError", "No matching patterns for " + this + ": " + buffer);
+                        throw new Error.JavaException("SyntaxError", "No matching patterns for " + this + ": " + buffer.substring(0, Math.min(20, buffer.length())));
                     }
                     buffer = next;
                 }
@@ -4414,7 +4822,7 @@ public abstract class RegexCompiler implements Compiler {
     public static class ScriptParser extends RegexParser {
 
         public ScriptParser() {
-            super(DBLSHIFTRIGHT, SHIFTLEFT, SHIFTRIGHT, NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, NUMBER, VARIABLE, VARIABLEGET, SINGLELINE_COMMENT, MULTILINE_COMMENT, DIVIDE, WHITESPACE, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, REGEX, FORKSTART);
+            super(SINGLELINE_COMMENT, MULTILINE_COMMENT, REGEX, DBLSHIFTRIGHTEQ, SHIFTLEFTEQ, SHIFTRIGHTEQ, DBLSHIFTRIGHT, SHIFTLEFT, SHIFTRIGHT, NOTSTRICTEQUALS, NOTEQUALS, STRICTEQUALS, EQUALS, COLON, MOREEQUAL, LESSEQUAL, MORETHAN, LESSTHAN, COMMA, NUMBERGET, STRINGGET, NOT, ANDAND, OROR, ANDEQUAL, OREQUAL, AND, OR, PERCENT, SET, PLUSPLUS, MINUSMINUS, PLUSEQ, MINUSEQ, DIVIDEEQ, MULTIPLYEQ, PLUS, MINUS, MULTIPLY, SEMICOLON, NEWLINE, HEX, NUMBER, VARIABLE, VARIABLEGET, DIVIDE, WHITESPACE, STRING, OPEN_GROUP, CLOSE_GROUP, OPEN_BRACKET, CLOSE_BRACKET, VAR, OPEN_ARRAY, CLOSE_ARRAY, FORKSTART);
         }
 
         @Override
@@ -4425,6 +4833,17 @@ public abstract class RegexCompiler implements Compiler {
             if (pattern == STRING) {
                 java.lang.String string = matcher.group(1);
                 throw new PartExchange(new String(string.substring(1, string.length() - 1)), matcher.group().length());
+            }
+            if (pattern == HEX) {
+                try {
+                    throw new PartExchange(new Integer(java.lang.Integer.valueOf(matcher.group(1), 16)), matcher.group().length());
+                } catch (NumberFormatException ex) {
+                    try {
+                        throw new PartExchange(new Number(Double.valueOf(matcher.group(0))), matcher.group().length());
+                    } catch (NumberFormatException eex) {
+                        throw new PartExchange(new Number(Double.NaN), matcher.group().length());
+                    }
+                }
             }
             if (pattern == NUMBER) {
                 try {
@@ -4483,11 +4902,13 @@ public abstract class RegexCompiler implements Compiler {
                     throw new PartExchange(new TypeOf(), ref.length());
                 } else if (ref.equals("case")) {
                     throw new PartExchange(new Case(), ref.length());
+                } else if (ref.equals("default")) {
+                    throw new PartExchange(new Default(), ref.length());
                 } else if (ref.equals("return")) {
                     ret(matcher);
                 } else if (ref.equals("var")) {
                     throw new PartExchange(new Var(), ref.length());
-                } else if (ref.equals("let")) {
+                } else if (ref.equals("let") || ref.equals("const")) {
                     throw new PartExchange(new Let(), ref.length());
                 } else {
                     throw new PartExchange(new Reference(ref), ref.length());
@@ -4547,6 +4968,9 @@ public abstract class RegexCompiler implements Compiler {
             if (pattern == DBLSHIFTRIGHT) {
                 throw new PartExchange(new DoubleShiftRight(), matcher.group().length());
             }
+            if (pattern == DBLSHIFTRIGHTEQ) {
+                throw new PartExchange(new DoubleShiftRightEq(), matcher.group().length());
+            }
             if (pattern == EQUALS) {
                 throw new PartExchange(new Equals(), matcher.group().length());
             }
@@ -4563,8 +4987,14 @@ public abstract class RegexCompiler implements Compiler {
             if (pattern == PLUSEQ) {
                 throw new PartExchange(new PlusEq(), matcher.group().length());
             }
+            if (pattern == MINUSEQ) {
+                throw new PartExchange(new MinusEq(), matcher.group().length());
+            }
             if (pattern == MULTIPLYEQ) {
                 throw new PartExchange(new MultiplyEq(), matcher.group().length());
+            }
+            if (pattern == DIVIDEEQ) {
+                throw new PartExchange(new DivideEq(), matcher.group().length());
             }
             if (pattern == PLUSPLUS) {
                 throw new PartExchange(new PlusPlus(), matcher.group().length());
@@ -4597,6 +5027,12 @@ public abstract class RegexCompiler implements Compiler {
             }
             if (pattern == PERCENT) {
                 throw new PartExchange(new Percent(), matcher.group().length());
+            }
+            if (pattern == OREQUAL) {
+                throw new PartExchange(new OrEq(), matcher.group().length());
+            }
+            if (pattern == ANDEQUAL) {
+                throw new PartExchange(new AndEq(), matcher.group().length());
             }
             if (pattern == OR) {
                 throw new PartExchange(new Or(), matcher.group().length());
@@ -4656,6 +5092,11 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
+        public boolean inFunction() {
+            return inFunction;
+        }
+
+        @Override
         public void end(int rows, int columns, List<Parsed> parts, java.lang.String source) {
             throw new ParseComplete(new ScriptData(parts.toArray(new Parsed[parts.size()]), source, rows, columns), source);
         }
@@ -4672,6 +5113,11 @@ public abstract class RegexCompiler implements Compiler {
     public static class FunctionParser extends ScriptParser {
 
         @Override
+        public boolean inFunction() {
+            return true;
+        }
+
+        @Override
         public void ret(Matcher matcher) {
             throw new PartExchange(new Return(), matcher.group().length());
         }
@@ -4680,6 +5126,24 @@ public abstract class RegexCompiler implements Compiler {
         public void end(int rows, int columns, List<Parsed> parts, java.lang.String source) {
             throw new ParseComplete(new ScriptData(parts.toArray(new Parsed[parts.size()]), source, rows, columns), source);
         }
+    }
+
+    public static class SwitchParser extends BlockParser {
+        public SwitchParser(boolean inFunction) {
+            super(inFunction);
+        }
+        
+        @Override
+        public Parsed transform(Parsed input) {
+            if(input instanceof Reference) {
+                if(((Reference)input).ref.equals("case"))
+                    return new Case();
+                if(((Reference)input).ref.equals("default"))
+                    return new Default();
+            }
+            return input;
+        }
+        
     }
 
     @Override

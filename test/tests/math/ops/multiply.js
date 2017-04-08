@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -13,27 +13,10 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package net.nexustools.njs;
 
-/**
- *
- * @author Katelyn Slater <kate@nexustools.com>
- */
-public interface BaseFunction extends BaseObject {
+var Assert = importClass("org.junit.Assert");
 
-    public java.lang.String name();
-
-    public java.lang.String source();
-
-    public java.lang.String arguments();
-
-    public BaseObject call(BaseObject _this, BaseObject... params);
-
-    public BaseObject construct(BaseObject... params);
-
-    public void setPrototype(BaseObject prototype);
-
-    public BaseObject prototype();
-
-    public BaseObject _new();
-}
+Assert.assertTrue((2 * 2) == "4");
+var test = 5;
+Assert.assertTrue((test *= 5) === 25);
+Assert.assertTrue(test === 25);

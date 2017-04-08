@@ -16,15 +16,21 @@
 
 var Assert = importClass("org.junit.Assert");
 
-Assert.assertTrue('(43 | 21) == "63"', (43 | 21) == "63");
-Assert.assertTrue(("43" | 21) == "63");
-Assert.assertTrue((43 | "21") == "63");
-Assert.assertTrue(("43" | "21") == "63");
-Assert.assertTrue((43 | 21) === 63);
-Assert.assertTrue(("43" | 21) === 63);
-Assert.assertTrue((43 | "21") === 63);
-Assert.assertTrue(("43" | "21") === 63);
+var result = 2+2;
+Assert.assertTrue("result === \"4\": " + result, result == "4");
+var test = 5, result = test += 5;
+Assert.assertTrue("test += 5: " + test, result === 10);
+Assert.assertTrue("test === 10: " + test, test === 10);
 
-var test = 43;
-test |= 21;
-Assert.assertTrue(test === 63);
+test = "5";
+test += "5";
+Assert.assertTrue(test, test === "55");
+result = test + "5";
+Assert.assertTrue(result, result === "555");
+test = 2;
+result = (test + "5");
+Assert.assertTrue("result === 25: " + result, result === "25");
+
+result = +new Date;
+Assert.assertTrue("+new Date > 0: " + result, result > 0);
+Assert.assertTrue("+\"2\" === 2", +"2" === 2);

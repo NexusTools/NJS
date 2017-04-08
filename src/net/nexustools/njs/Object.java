@@ -122,7 +122,6 @@ public class Object extends AbstractFunction {
         }, new AbstractFunction(global) {
             @Override
             public BaseObject call(BaseObject _this, BaseObject... params) {
-                System.out.println("Setting prototype of " + _this + " to " + params[0]);
                 _this.setPrototypeOf(params[0]);
                 return Undefined.INSTANCE;
             }

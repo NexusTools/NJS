@@ -422,7 +422,7 @@ public class RuntimeCompiler extends RegexCompiler {
         final int rows = object.rows;
         final int columns = object.columns;
         if (object instanceof Integer) {
-            final int number = ((Integer) object).value;
+            final long number = ((Integer) object).value;
             if (number == 0) {
                 return new Impl() {
                     @Override
@@ -873,22 +873,105 @@ public class RuntimeCompiler extends RegexCompiler {
                     return new ValueReferenceable(number, rows, columns);
                 }
             };
+        } else if (object instanceof AndEq) {
+            final Impl lhs = compile(data, ((AndEq) object).lhs);
+            final Impl rhs = compile(data, ((AndEq) object).rhs);
+            return new Impl() {
+                @Override
+                public Referencable run(Global global, Scope scope) {
+                    Referencable ref = lhs.run(global, scope);
+
+                    net.nexustools.njs.Number.Instance number = global.wrap((long)global.Number.fromValueOf(ref.get()).value & (long)global.Number.fromValueOf(rhs.run(global, scope).get()).value);
+                    ref.set(number);
+                    return new ValueReferenceable(number, rows, columns);
+                }
+            };
+        } else if (object instanceof OrEq) {
+            final Impl lhs = compile(data, ((OrEq) object).lhs);
+            final Impl rhs = compile(data, ((OrEq) object).rhs);
+            return new Impl() {
+                @Override
+                public Referencable run(Global global, Scope scope) {
+                    Referencable ref = lhs.run(global, scope);
+
+                    net.nexustools.njs.Number.Instance number = global.wrap((long)global.Number.fromValueOf(ref.get()).value | (long)global.Number.fromValueOf(rhs.run(global, scope).get()).value);
+                    ref.set(number);
+                    return new ValueReferenceable(number, rows, columns);
+                }
+            };
         } else if (object instanceof Plus) {
-            final Impl lhs = compile(data, ((Plus) object).lhs);
+            Parsed l = ((Plus) object).lhs;
             final Impl rhs = compile(data, ((Plus) object).rhs);
+            if(l == null)
+                return new Impl() {
+                    @Override
+                    public Referencable run(Global global, Scope scope) {
+                        BaseObject r = rhs.run(global, scope).get();
+                        return new ValueReferenceable(global.Number.fromValueOf(r), rows, columns);
+                    }
+                };
+            final Impl lhs = compile(data, l);
             return new Impl() {
                 @Override
                 public Referencable run(Global global, Scope scope) {
                     BaseObject l = Utilities.valueOf(lhs.run(global, scope).get());
                     BaseObject r = Utilities.valueOf(rhs.run(global, scope).get());
 
-                    net.nexustools.njs.Number.Instance _lhs = l.toNumber();
-                    net.nexustools.njs.Number.Instance _rhs = r.toNumber();
-                    if ((!_lhs.isNaN() && !_rhs.isNaN()) || (lhs instanceof net.nexustools.njs.Number.Instance && rhs instanceof net.nexustools.njs.Number.Instance)) {
+                    if (l instanceof net.nexustools.njs.Number.Instance && r instanceof net.nexustools.njs.Number.Instance) {
+                        net.nexustools.njs.Number.Instance _lhs = l.toNumber();
+                        net.nexustools.njs.Number.Instance _rhs = r.toNumber();
                         return new ValueReferenceable(global.wrap(_lhs.value + _rhs.value), rows, columns);
                     }
 
                     return new ValueReferenceable(global.wrap(l.toString() + r.toString()), rows, columns);
+                }
+            };
+        } else if (object instanceof PlusEq) {
+            final Impl lhs = compile(data, ((PlusEq) object).lhs);
+            final Impl rhs = compile(data, ((PlusEq) object).rhs);
+            return new Impl() {
+                @Override
+                public Referencable run(Global global, Scope scope) {
+                    Referencable ref = lhs.run(global, scope);
+                    BaseObject l = ref.get();
+                    BaseObject r = rhs.run(global, scope).get();
+
+                    BaseObject value;
+                    if (l instanceof net.nexustools.njs.Number.Instance && r instanceof net.nexustools.njs.Number.Instance) {
+                        net.nexustools.njs.Number.Instance _lhs = global.Number.fromValueOf(l);
+                        net.nexustools.njs.Number.Instance _rhs = global.Number.fromValueOf(r);
+                        value = global.wrap(_lhs.value + _rhs.value);
+                    } else
+                        value = global.wrap(l.toString() + r.toString());
+
+                    ref.set(value);
+                    return new ValueReferenceable(value, rows, columns);
+                }
+            };
+        } else if (object instanceof MinusEq) {
+            final Impl lhs = compile(data, ((MinusEq) object).lhs);
+            final Impl rhs = compile(data, ((MinusEq) object).rhs);
+            return new Impl() {
+                @Override
+                public Referencable run(Global global, Scope scope) {
+                    Referencable ref = lhs.run(global, scope);
+
+                    net.nexustools.njs.Number.Instance number = global.wrap(global.Number.fromValueOf(ref.get()).value - global.Number.fromValueOf(rhs.run(global, scope).get()).value);
+                    ref.set(number);
+                    return new ValueReferenceable(number, rows, columns);
+                }
+            };
+        } else if (object instanceof DivideEq) {
+            final Impl lhs = compile(data, ((DivideEq) object).lhs);
+            final Impl rhs = compile(data, ((DivideEq) object).rhs);
+            return new Impl() {
+                @Override
+                public Referencable run(Global global, Scope scope) {
+                    Referencable ref = lhs.run(global, scope);
+
+                    net.nexustools.njs.Number.Instance number = global.wrap(global.Number.fromValueOf(ref.get()).value / global.Number.fromValueOf(rhs.run(global, scope).get()).value);
+                    ref.set(number);
+                    return new ValueReferenceable(number, rows, columns);
                 }
             };
         } else if (object instanceof OpenBracket) {
@@ -922,7 +1005,7 @@ public class RuntimeCompiler extends RegexCompiler {
 
             for (int i = 0; i < len; i++) {
                 Var.Set set = ret.get(i);
-                keys[i] = set.lhs;
+                keys[i] = ((Reference)set.lhs).ref;
                 if (set.rhs != null) {
                     values[i] = compile(data, set.rhs);
                 }
@@ -1093,7 +1176,7 @@ public class RuntimeCompiler extends RegexCompiler {
                     @Override
                     public Referencable run(Global global, Scope scope) {
                         Referencable ref = _ref.run(global, scope);
-                        net.nexustools.njs.Number.Instance val = ref.get().toNumber();
+                        net.nexustools.njs.Number.Instance val = global.Number.fromValueOf(ref.get());
                         ref.set(global.wrap(val.value + 1));
                         return new ValueReferenceable(val, rows, columns);
                     }
@@ -1103,7 +1186,7 @@ public class RuntimeCompiler extends RegexCompiler {
                     @Override
                     public Referencable run(Global global, Scope scope) {
                         Referencable ref = _ref.run(global, scope);
-                        net.nexustools.njs.Number.Instance val = ref.get().toNumber();
+                        net.nexustools.njs.Number.Instance val = global.Number.fromValueOf(ref.get());
                         ref.set(val = global.wrap(val.value + 1));
                         return new ValueReferenceable(val, rows, columns);
                     }
@@ -1116,7 +1199,7 @@ public class RuntimeCompiler extends RegexCompiler {
                     @Override
                     public Referencable run(Global global, Scope scope) {
                         Referencable ref = _ref.run(global, scope);
-                        net.nexustools.njs.Number.Instance val = ref.get().toNumber();
+                        net.nexustools.njs.Number.Instance val = global.Number.fromValueOf(ref.get());
                         ref.set(global.wrap(val.value - 1));
                         return new ValueReferenceable(val, rows, columns);
                     }
@@ -1126,7 +1209,7 @@ public class RuntimeCompiler extends RegexCompiler {
                     @Override
                     public Referencable run(Global global, Scope scope) {
                         Referencable ref = _ref.run(global, scope);
-                        net.nexustools.njs.Number.Instance val = ref.get().toNumber();
+                        net.nexustools.njs.Number.Instance val = global.Number.fromValueOf(ref.get());
                         ref.set(val = global.wrap(val.value - 1));
                         return new ValueReferenceable(val, rows, columns);
                     }
@@ -1321,7 +1404,7 @@ public class RuntimeCompiler extends RegexCompiler {
                     final Impl impl = compile(data, ((For) object).simpleimpl);
                     switch (((For) object).type) {
                         case InLoop: {
-                            final java.lang.String key = ((Var) ((For) object).init).sets.get(0).lhs;
+                            final java.lang.String key = ((Reference)((Var) ((For) object).init).sets.get(0).lhs).ref;
                             if (((For) object).init instanceof Let) {
                                 return new Impl() {
                                     @Override
@@ -1357,7 +1440,7 @@ public class RuntimeCompiler extends RegexCompiler {
                             };
                         }
                         case OfLoop: {
-                            final java.lang.String key = ((Var) ((For) object).init).sets.get(0).lhs;
+                            final java.lang.String key = ((Reference)((Var) ((For) object).init).sets.get(0).lhs).ref;
                             if (((For) object).init instanceof Let) {
                                 return new Impl() {
                                     @Override
@@ -1411,7 +1494,7 @@ public class RuntimeCompiler extends RegexCompiler {
                 final Script impl = compileScript(((For) object).impl, data.fileName, ScriptType.Block);
                 switch (((For) object).type) {
                     case InLoop: {
-                        final java.lang.String key = ((Var) ((For) object).init).sets.get(0).lhs;
+                        final java.lang.String key = ((Reference)((Var) ((For) object).init).sets.get(0).lhs).ref;
                         if (((For) object).init instanceof Let) {
                             return new Impl() {
                                 @Override
@@ -1445,7 +1528,7 @@ public class RuntimeCompiler extends RegexCompiler {
                         };
                     }
                     case OfLoop: {
-                        final java.lang.String key = ((Var) ((For) object).init).sets.get(0).lhs;
+                        final java.lang.String key = ((Reference)((Var) ((For) object).init).sets.get(0).lhs).ref;
                         if (((For) object).init instanceof Let) {
                             return new Impl() {
                                 @Override

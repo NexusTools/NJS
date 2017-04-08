@@ -16,7 +16,7 @@
 
 var Assert = importClass("org.junit.Assert");
 
-Assert.assertTrue((54 & 12) == "4");
+Assert.assertTrue('(54 & 12) == "4"', (54 & 12) == "4");
 Assert.assertTrue(("54" & 12) == "4");
 Assert.assertTrue((54 & "12") == "4");
 Assert.assertTrue(("54" & "12") == "4");
@@ -24,3 +24,7 @@ Assert.assertTrue((54 & 12) === 4);
 Assert.assertTrue(("54" & 12) === 4);
 Assert.assertTrue((54 & "12") === 4);
 Assert.assertTrue(("54" & "12") === 4);
+
+var test = 54;
+test &= 12;
+Assert.assertTrue('test === 4', test === 4);

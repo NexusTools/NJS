@@ -190,9 +190,19 @@ public class Scope implements Scopable {
         }
         this._this = _this;
     }
+    
+    public final void multilet(BaseObject root, java.lang.String... keys) {
+        for(int i=0; i<keys.length; i+=2)
+            let(keys[i], root.get(keys[i+1]));
+    }
 
     public final void let(java.lang.String key, BaseObject val) {
         ((BlockScopeable) scopeables[0]).let(key, val);
+    }
+    
+    public final void multivar(BaseObject root, java.lang.String... keys) {
+        for(int i=0; i<keys.length; i+=2)
+            var(keys[i], root.get(keys[i+1]));
     }
 
     public final void var(java.lang.String key) {

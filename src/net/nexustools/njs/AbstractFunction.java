@@ -59,7 +59,7 @@ public abstract class AbstractFunction extends GenericObject implements BaseFunc
     }
 
     @Override
-    public final BaseObject construct() {
+    public final BaseObject _new() {
         GenericObject _new = new GenericObject(prototype(), iterator, String, Number);
         _new.setHidden("constructor", this);
         return _new;

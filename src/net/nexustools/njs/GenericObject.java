@@ -82,7 +82,7 @@ public class GenericObject extends NumberObject {
         iterator = global.Symbol.iterator;
         String = global.String;
         setHidden("constructor", constructor);
-        init(constructor.construct());
+        init(constructor.prototype());
     }
 
     public GenericObject(Symbol.Instance iterator, String String) {
@@ -98,7 +98,7 @@ public class GenericObject extends NumberObject {
     }
 
     public GenericObject(BaseFunction constructor, Symbol.Instance iterator, String String, Number Number) {
-        this(constructor.construct(), iterator, String, Number);
+        this(constructor.prototype(), iterator, String, Number);
         setHidden("constructor", constructor);
     }
 
@@ -751,6 +751,17 @@ public class GenericObject extends NumberObject {
             }
         }
         return false;
+    }
+
+    @Override
+    public boolean in(java.lang.String name) {
+        if(hasOwnProperty(name))
+            return true;
+        
+        if(__proto__ == null)
+            return false;
+        
+        return __proto__.hasOwnProperty(name);
     }
 
     @Override

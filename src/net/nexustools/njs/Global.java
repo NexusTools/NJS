@@ -74,6 +74,8 @@ public class Global extends GenericObject {
     public final Number.Instance NaN;
     public final Number.Instance PositiveOne;
     public final Number.Instance NegativeOne;
+    public final Number.Instance PositiveInfinity;
+    public final Number.Instance NegativeInfinity;
     public final Number.Instance Zero;
 
     public Global() {
@@ -125,6 +127,8 @@ public class Global extends GenericObject {
 
         PositiveOne = Number.PositiveOne;
         NegativeOne = Number.NegativeOne;
+        PositiveInfinity = Number.PositiveInfinity;
+        NegativeInfinity = Number.NegativeInfinity;
         Zero = Number.Zero;
 
         Symbol.__proto__ = Number.__proto__ = String.__proto__ = Function.__proto__ = Object.__proto__ = Function.prototype();

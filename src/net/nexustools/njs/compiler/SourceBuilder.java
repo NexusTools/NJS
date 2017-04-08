@@ -20,6 +20,7 @@ package net.nexustools.njs.compiler;
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public class SourceBuilder {
+    // TODO: Convert to use 4 spaces instead of tabs
 
     java.lang.String indent = "";
     StringBuilder builder = new StringBuilder();

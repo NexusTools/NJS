@@ -224,6 +224,8 @@ public interface BaseObject extends Scopable, Iterable<BaseObject> {
 
     public boolean hasOwnProperty(java.lang.String name);
 
+    public boolean in(java.lang.String name);
+
     public void defineGetter(java.lang.String key, BaseFunction impl);
 
     public void defineSetter(java.lang.String key, BaseFunction impl);

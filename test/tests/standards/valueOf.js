@@ -24,8 +24,8 @@ TunaFish.prototype.valueOf = function() {
 	return this.value;
 };
 
-Assert.assertTrue(new TunaFish(5) > new TunaFish());
-Assert.assertTrue(new TunaFish(5) >= new TunaFish(5));
-Assert.assertTrue(new TunaFish(5) + new TunaFish(5) >= new TunaFish(10));
-Assert.assertTrue(new TunaFish(5) + new TunaFish(5) <= new TunaFish(10));
-Assert.assertTrue(new TunaFish(5) - new TunaFish(5) < new TunaFish(10));
+Assert.assertTrue('new TunaFish(5) > new TunaFish()', new TunaFish(5) > new TunaFish());
+Assert.assertTrue('new TunaFish(5) >= new TunaFish(5)', new TunaFish(5) >= new TunaFish(5));
+Assert.assertTrue('new TunaFish(5) + new TunaFish(5) >= new TunaFish(10)', new TunaFish(5) + new TunaFish(5) >= new TunaFish(10));
+Assert.assertTrue('new TunaFish(5) + new TunaFish(5) <= new TunaFish(10)', new TunaFish(5) + new TunaFish(5) <= new TunaFish(10));
+Assert.assertTrue('new TunaFish(5) - new TunaFish(5) < new TunaFish(10)', new TunaFish(5) - new TunaFish(5) < new TunaFish(10));
