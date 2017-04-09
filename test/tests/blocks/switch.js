@@ -16,33 +16,46 @@
 
 var Assert = importClass("org.junit.Assert");
 
-try {
-    throw new Error();
-} catch (e) {
-    Assert.assertTrue(e);
+switch(24) {
+    case 24:
+        Assert.assertTrue(true);
+        break;
+        
+    default:
+        Assert.assertTrue(false);
 }
 
-try {
-    Assert.fail();
-} catch (e) {
-    Assert.assertTrue(e);
+switch(27) {
+    case 24:
+        Assert.assertTrue(false);
+        break;
+        
+    default:
+        Assert.assertTrue(true);
 }
 
-try {
-    var tuna = new Error("Tuna Fish");
-    try {
-        try {
-
-        } finally {
-            Assert.fail();
-        }
-    } catch (e) {
-        throw tuna;
+function go(val) {
+    switch(val) {
+        case "5":
+        case "tuna":
+        case undefined:
+            Assert.assertTrue(true);
+            break;
+            
+        default:
+            Assert.assertTrue(false);
     }
-    Assert.fail();
-} catch (e) {
-    if (e !== tuna)
-        throw e;
-} finally {
-    Assert.assertTrue(true);
+}
+
+go("5");
+go("tuna");
+go(undefined);
+
+switch(2.8) {
+    case 2.8:
+        Assert.assertTrue(true);
+        break;
+        
+    default:
+        Assert.assertTrue(false);
 }

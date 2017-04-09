@@ -940,10 +940,10 @@ public abstract class RegexCompiler implements Compiler {
         @Override
         public Parsed transform(Parsed part) {
             if(ref == null) {
-                if(part instanceof String || part instanceof Long || part instanceof Undefined || part instanceof Null)
+                if(part instanceof String || part instanceof Long || part instanceof Number || part instanceof Undefined || part instanceof Null)
                     ref = part;
                 else
-                    throw new Error.JavaException("SyntaxError", "Only strings and integers supported for switch case, encountered " + describe(part));
+                    throw new Error.JavaException("SyntaxError", "Only strings and numbers supported for switch case, encountered " + describe(part));
                 return this;
             } else if(part instanceof Colon) {
                 closed = true;

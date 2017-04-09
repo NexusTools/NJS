@@ -64,6 +64,11 @@ public class Blocks {
     }
 
     @Test
+    public void _switch() {
+        test("switch");
+    }
+
+    @Test
     public void _try() {
         test("try");
     }
