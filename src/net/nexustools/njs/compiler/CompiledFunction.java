@@ -15,10 +15,7 @@
  */
 package net.nexustools.njs.compiler;
 
-import net.nexustools.njs.AbstractFunction;
-import net.nexustools.njs.BaseObject;
 import net.nexustools.njs.ConstructableFunction;
-import net.nexustools.njs.GenericObject;
 import net.nexustools.njs.Global;
 
 /**
@@ -31,6 +28,11 @@ public abstract class CompiledFunction extends ConstructableFunction {
 
     public CompiledFunction(Global global) {
         super(global);
+        this.global = global;
+    }
+
+    public CompiledFunction(net.nexustools.njs.BaseFunction _super, Global global) {
+        super(_super, global);
         this.global = global;
     }
 

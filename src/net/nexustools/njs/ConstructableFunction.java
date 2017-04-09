@@ -21,6 +21,9 @@ package net.nexustools.njs;
  */
 public abstract class ConstructableFunction extends AbstractFunction {
 
+    public ConstructableFunction(BaseFunction _super, Global global) {
+        super(_super, global);
+    }
     public ConstructableFunction(Global global) {
         super(global);
     }

@@ -87,6 +87,11 @@ public class Standards {
     }
 
     @Test
+    public void _class() {
+        test("class");
+    }
+
+    @Test
     public void group() {
         test("group");
     }

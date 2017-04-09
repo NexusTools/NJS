@@ -134,9 +134,11 @@ public abstract class RegexCompiler implements Compiler {
         final int rows, columns;
         java.lang.Object optimizations;
         java.lang.String methodName = null, source;
+        final Map<java.lang.String, Class> classes;
         final Map<java.lang.String, Function> functions;
 
         public ScriptData(Parsed[] impl, java.lang.String source, int rows, int columns) {
+            classes = new HashMap();
             functions = new HashMap();
             List<Parsed> imp = new ArrayList();
             for (int i = 0; i < impl.length; i++) {
@@ -532,7 +534,6 @@ public abstract class RegexCompiler implements Compiler {
             if (part instanceof Lambda) {
                 Function function = new Function();
                 function.arguments.add(ref);
-                function.name = function.uname = "<lambda>";
                 function.type = Function.Type.Lambda;
                 function.state = Function.State.InLambda;
                 function.storage = new LambdaReturn(function);
@@ -711,6 +712,9 @@ public abstract class RegexCompiler implements Compiler {
             rows = original.rows;
             reference = ref;
         }
+        public Call(Parsed ref) {
+            this(ref, ref);
+        }
 
         @Override
         public Parsed transform(Parsed part) {
@@ -872,6 +876,11 @@ public abstract class RegexCompiler implements Compiler {
     public static class Yield extends Rh {
 
         public Yield() {
+        }
+
+        @Override
+        public boolean isStandalone() {
+            return true;
         }
 
         @Override
@@ -1080,7 +1089,6 @@ public abstract class RegexCompiler implements Compiler {
                     Function function = new Function();
                     for(Parsed _part : parts)
                         function.arguments.add(((Reference)_part).ref);
-                    function.name = function.uname = "<lambda>";
                     function.type = Function.Type.Lambda;
                     function.state = Function.State.InLambda;
                     function.storage = new LambdaReturn(function);
@@ -1156,7 +1164,6 @@ public abstract class RegexCompiler implements Compiler {
                     Function function = new Function();
                     if(contents != null)
                         function.arguments.add(((Reference)contents).ref);
-                    function.name = function.uname = "<lambda>";
                     function.type = Function.Type.Lambda;
                     function.state = Function.State.InLambda;
                     function.storage = new LambdaReturn(function);
@@ -2297,12 +2304,198 @@ public abstract class RegexCompiler implements Compiler {
             return -1;
         }
     }
+    
+    public static class ClassMethod extends Function {
+        public enum Type {
+            Normal,
+            Constructor,
+            Getter,
+            Setter
+        }
+        final Class clazz;
+        Type type = Type.Normal;
+        public ClassMethod(Class clazz) {
+            state = State.InArguments;
+            this.clazz = clazz;
+        }
+
+        @Override
+        public void complete() {
+            super.complete();
+            clazz.complete();
+        }
+        
+    }
 
     public static class Class extends Referency {
+        private enum State {
+            BeforeName,
+            AfterName,
+            AfterExtends,
+            AfterExtender,
+            InBody,
+            GetterStart,
+            SetterStart,
+            BeforeMethodArgs,
+            InMethod,
+            Complete
+        }
+        
+        private State state = State.BeforeName;
+        ClassMethod currentClassMethod = new ClassMethod(this);
+        List<ClassMethod> methods = new ArrayList();
+        java.lang.String name, _extends;
+        
+        public void complete() {
+            state = Class.State.InBody;
+            methods.add(currentClassMethod);
+            currentClassMethod = new ClassMethod(this);
+        }
 
         @Override
         public java.lang.String toSource() {
-            return "class ";
+            StringBuilder builder = new StringBuilder("class ");
+            builder.append(name);
+            if(_extends != null) {
+                builder.append(" extends ");
+                builder.append(_extends);
+            }
+            builder.append(" {\n");
+            builder.append("}");
+            return builder.toString();
+        }
+
+        @Override
+        public int precedence() {
+            return -1;
+        }
+
+        @Override
+        public boolean isIncomplete() {
+            return state != State.Complete;
+        }
+
+        @Override
+        public Parsed transform(Parsed part) {
+            switch(state) {
+                case BeforeName:
+                    if(part instanceof Reference) {
+                        name = ((Reference)part).ref;
+                        state = State.AfterName;
+                        return this;
+                    }
+                    break;
+                case AfterExtends:
+                    if(part instanceof Reference) {
+                        _extends = ((Reference)part).ref;
+                        state = State.AfterExtender;
+                        return this;
+                    }
+                    break;
+                case AfterName:
+                    if(part instanceof ExtendsKeyword) {
+                        state = State.AfterExtends;
+                        return this;
+                    }
+                case AfterExtender:
+                    if(part instanceof OpenGroup) {
+                        state = State.InBody;
+                        return this;
+                    }
+                    break;
+                case InBody:
+                    if(part instanceof Getter) {
+                        currentClassMethod.type = ClassMethod.Type.Getter;
+                        return this;
+                    }
+                    if(part instanceof Setter) {
+                        currentClassMethod.type = ClassMethod.Type.Setter;
+                        return this;
+                    }
+                    if(part instanceof Constructor) {
+                        currentClassMethod.type = ClassMethod.Type.Constructor;
+                        state = State.BeforeMethodArgs;
+                        return this;
+                    }
+                    if(part instanceof Reference) {
+                        currentClassMethod.name = ((Reference) part).ref;
+                        state = State.BeforeMethodArgs;
+                        return this;
+                    }
+                    if(part instanceof CloseGroup) {
+                        state = State.Complete;
+                        return this;
+                    }
+                    break;
+                case BeforeMethodArgs:
+                    if(part instanceof OpenBracket) {
+                        state = State.InMethod;
+                        return this;
+                    }
+                    break;
+                case InMethod:
+                    currentClassMethod.transform(part);
+                    return this;
+                case Complete:
+                    if(part instanceof NewLine || part instanceof SemiColon)
+                        throw new CompleteException();
+            }
+            
+            if(part instanceof NewLine)
+                return this;
+            
+            if(state == State.Complete)
+                return super.transform(part);
+            throw new Error.JavaException("SyntaxError", "Unexpected " + part + " (" + state + ")");
+        }
+        
+        
+        
+    }
+    
+    public static class ClassKeyword extends Reference {
+        
+        public ClassKeyword(java.lang.String ref) {
+            super(ref);
+        }
+        
+    }
+
+    public static class Super extends ClassKeyword {
+        public Super() {
+            super("super");
+        }
+    }
+
+    public static class ExtendsKeyword extends ClassKeyword {
+        public ExtendsKeyword() {
+            super("extends");
+        }
+    }
+
+    public static class Constructor extends ClassKeyword {
+        public Constructor() {
+            super("constructor");
+        }
+    }
+
+    public static class Getter extends ClassKeyword {
+        public Getter() {
+            super("get");
+        }
+    }
+
+    public static class Setter extends ClassKeyword {
+        public Setter() {
+            super("set");
+        }
+    }
+
+    public static class Extends extends Referency {
+
+        @Override
+        public java.lang.String toSource() {
+            return "extends";
         }
 
         @Override
@@ -2313,6 +2506,10 @@ public abstract class RegexCompiler implements Compiler {
     }
 
     public static class Function extends Referency {
+        
+        public void complete() {
+            state = Function.State.Complete;
+        }
 
         @Override
         public int precedence() {
@@ -2340,7 +2537,6 @@ public abstract class RegexCompiler implements Compiler {
         Parsed call;
         Parsed storage;
         java.lang.String name;
-        java.lang.String uname;
         java.lang.String vararg;
         List<java.lang.String> arguments = new ArrayList();
         State state = State.BeforeName;
@@ -5134,7 +5330,7 @@ public abstract class RegexCompiler implements Compiler {
                                             ex.function.impl = ce.impl;
                                             ex.function.impl.callee = ex.function;
                                             ex.function.source = ce.source;
-                                            ex.function.state = Function.State.Complete;
+                                            ex.function.complete();
                                             builder.append(ce.source);
                                             builder.append(reader.ltrim(1));
                                         }
@@ -5346,6 +5542,16 @@ public abstract class RegexCompiler implements Compiler {
                     throw new PartExchange(new TypeOf(), ref.length());
                 } else if (ref.equals("case")) {
                     throw new PartExchange(new Case(), ref.length());
+                } else if (ref.equals("super")) {
+                    throw new PartExchange(new Super(), ref.length());
+                } else if (ref.equals("get")) {
+                    throw new PartExchange(new Getter(), ref.length());
+                } else if (ref.equals("constructor")) {
+                    throw new PartExchange(new Constructor(), ref.length());
+                } else if (ref.equals("extends")) {
+                    throw new PartExchange(new ExtendsKeyword(), ref.length());
+                } else if (ref.equals("set")) {
+                    throw new PartExchange(new Setter(), ref.length());
                 } else if (ref.equals("class")) {
                     throw new PartExchange(new Class(), ref.length());
                 } else if (ref.equals("break")) {

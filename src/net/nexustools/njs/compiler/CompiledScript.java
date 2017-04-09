@@ -142,6 +142,14 @@ public abstract class CompiledScript extends AbstractFunction implements Script 
     public BaseObject exec(Global global) {
         return exec(global, null);
     }
+    
+    public static BaseFunction lookupSuper(java.lang.String key, Scope scope) {
+        try {
+            return (BaseFunction)scope.get(key);
+        } catch(ClassCastException ex) {
+            throw new net.nexustools.njs.Error.JavaException("TypeError", "Class extends value " + key + " is not a function or null");
+        }
+    }
 
     public static net.nexustools.njs.Number.Instance plusPlusLeft(Global global, BaseObject key, BaseObject _this) {
         net.nexustools.njs.Number.Instance incremented = global.wrap(global.Number.fromValueOf(Utilities.get(_this, key)).value + 1);
