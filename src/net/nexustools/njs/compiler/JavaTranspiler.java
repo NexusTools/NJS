@@ -26,16 +26,12 @@ import java.io.Reader;
 import java.util.ArrayList;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.regex.Pattern;
+import java.util.HashMap;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import net.nexustools.njs.Utilities;
 
 import net.nexustools.njs.Utilities.FilePosition;
 
@@ -44,6 +40,48 @@ import net.nexustools.njs.Utilities.FilePosition;
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public class JavaTranspiler extends RegexCompiler {
+    
+    private static class SuperSourceBuilder extends SourceBuilder {
+        boolean first = true;
+        boolean _super = true;
+        final SourceBuilder parent;
+        public SuperSourceBuilder() {
+            this(new SourceBuilder());
+        }
+        public SuperSourceBuilder(SourceBuilder parent) {
+            this.parent = parent;
+        }
+
+        @Override
+        public void appendLicense() {
+            parent.appendLicense(); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public void append(java.lang.String source) {
+            if(first) {
+                _super = source.startsWith("_super");
+                first = false;
+            }
+            parent.append(source);
+        }
+
+        @Override
+        public void appendln(java.lang.String source) {
+            parent.appendln(source);
+        }
+
+        @Override
+        public void appendln() {
+            parent.appendln();
+        }
+
+        @Override
+        public java.lang.String toString() {
+            return parent.toString();
+        }
+        
+    }
 
     private static enum SwitchType {
         Enum,
@@ -142,15 +180,15 @@ public class JavaTranspiler extends RegexCompiler {
 
     private static abstract class ClassNameScopeChain {
 
-        java.lang.String toClassName(java.lang.String name) {
-            java.lang.String output = name.replaceAll("[^a-zA-Z_]", "_");
+        java.lang.String refName(java.lang.String name) {
+            java.lang.String output = name.replaceAll("[^a-zA-Z0-9_]", "_");
             if (!output.equals(name)) {
                 output += Math.abs(name.hashCode());
             }
-            return toClassName(output, true);
+            return refName(output, true);
         }
 
-        protected abstract java.lang.String toClassName(java.lang.String name, boolean create);
+        protected abstract java.lang.String refName(java.lang.String name, boolean create);
 
         public final ClassNameScopeChain extend() {
             return new ExtendedClassNameScopeChain(this);
@@ -167,8 +205,9 @@ public class JavaTranspiler extends RegexCompiler {
         }
 
         @Override
-        public java.lang.String toClassName(java.lang.String name, boolean create) {
-            java.lang.String output = parent.toClassName(name, false);
+        public java.lang.String refName(java.lang.String name, boolean create) {
+            System.out.println("refName: " + name + ", " + create);
+            java.lang.String output = parent.refName(name, false);
             if (output == null) {
                 AtomicInteger atomicInteger = used_names.get(name);
                 if (atomicInteger == null) {
@@ -179,18 +218,16 @@ public class JavaTranspiler extends RegexCompiler {
                 }
                 int num = atomicInteger.getAndIncrement();
                 if (num > 1) {
-                    return toClassName(name + "_" + num, true);
+                    return refName(name + "_" + num, true);
                 }
                 return name;
-            } else {
+            } else
                 return output;
-            }
-
         }
     }
     private ClassNameScopeChain BASE_CLASS_NAME_SCOPE_CHAIN = new ClassNameScopeChain() {
         @Override
-        public java.lang.String toClassName(java.lang.String name, boolean create) {
+        public java.lang.String refName(java.lang.String name, boolean create) {
             AtomicInteger atomicInteger;
             synchronized (GEN_PACKAGE_USED_NAMES) {
                 atomicInteger = GEN_PACKAGE_USED_NAMES.get(name);
@@ -203,7 +240,7 @@ public class JavaTranspiler extends RegexCompiler {
             }
             int num = atomicInteger.getAndIncrement();
             if (num > 1) {
-                return toClassName(name + "_" + num, true);
+                return refName(name + "_" + num, true);
             }
             return name;
         }
@@ -298,7 +335,7 @@ public class JavaTranspiler extends RegexCompiler {
         }
     }
 
-    private void generateStringSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak) {
+    private void generateStringSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak, TranspileContext context) {
         if (part instanceof String) {
             sourceBuilder.append("\"");
             sourceBuilder.append(convertStringSource(((String) part).string));
@@ -312,7 +349,7 @@ public class JavaTranspiler extends RegexCompiler {
                 else
                     sourceBuilder.append(" + ");
                 if(_part instanceof Parsed)
-                    generateStringSource(sourceBuilder, (Parsed)_part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    generateStringSource(sourceBuilder, (Parsed)_part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 else {
                     sourceBuilder.append("\"");
                     sourceBuilder.append(convertStringSource(_part.toString()));
@@ -321,9 +358,9 @@ public class JavaTranspiler extends RegexCompiler {
             }
             sourceBuilder.append(")");
         } else if (part instanceof Plus && ((Plus) part).isStringReferenceChain()) {
-            generateStringSource(sourceBuilder, ((Plus) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateStringSource(sourceBuilder, ((Plus) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(" + ");
-            generateStringSource(sourceBuilder, ((Plus) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateStringSource(sourceBuilder, ((Plus) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
         } else {
             if (localStack != null) {
                 if (part instanceof Reference) {
@@ -346,12 +383,12 @@ public class JavaTranspiler extends RegexCompiler {
                     }
                 }
             }
-            transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".toString()");
         }
     }
 
-    private void generateNumberSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak) {
+    private void generateNumberSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak, TranspileContext context) {
         if (part instanceof Number) {
             if(Double.isNaN(((Number) part).value))
                 sourceBuilder.append("Double.NaN");
@@ -375,48 +412,48 @@ public class JavaTranspiler extends RegexCompiler {
         } else if (part instanceof DoubleShiftRight) {
             Parsed lhs = ((DoubleShiftRight) part).lhs;
             Parsed rhs = ((DoubleShiftRight) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, ">>>", methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Double);
+            generateMath(sourceBuilder, lhs, rhs, ">>>", methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Double);
         } else if (part instanceof ShiftLeft) {
             Parsed lhs = ((ShiftLeft) part).lhs;
             Parsed rhs = ((ShiftLeft) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, "<<", methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Double);
+            generateMath(sourceBuilder, lhs, rhs, "<<", methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Double);
         } else if (part instanceof ShiftRight) {
             Parsed lhs = ((ShiftRight) part).lhs;
             Parsed rhs = ((ShiftRight) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, ">>", methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Double);
+            generateMath(sourceBuilder, lhs, rhs, ">>", methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Double);
         } else if (part instanceof Plus) {
             Parsed lhs = ((Plus) part).lhs;
             Parsed rhs = ((Plus) part).rhs;
             if(lhs == null)
-                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             else
-                generateMath(sourceBuilder, lhs, rhs, '+', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Double);
+                generateMath(sourceBuilder, lhs, rhs, '+', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Double);
         } else if (part instanceof Multiply) {
             Parsed lhs = ((Multiply) part).lhs;
             Parsed rhs = ((Multiply) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, '*', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Double);
+            generateMath(sourceBuilder, lhs, rhs, '*', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Double);
         } else if (part instanceof Divide) {
             Parsed lhs = ((Divide) part).lhs;
             Parsed rhs = ((Divide) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, '/', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Double);
+            generateMath(sourceBuilder, lhs, rhs, '/', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Double);
         } else if (part instanceof And) {
             Parsed lhs = ((And) part).lhs;
             Parsed rhs = ((And) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, '&', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Double);
+            generateMath(sourceBuilder, lhs, rhs, '&', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Double);
         } else if (part instanceof Or) {
             Parsed lhs = ((Or) part).lhs;
             Parsed rhs = ((Or) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, '|', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Double);
+            generateMath(sourceBuilder, lhs, rhs, '|', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Double);
         } else if (part instanceof Percent) {
             Parsed lhs = ((Percent) part).lhs;
             Parsed rhs = ((Percent) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, '%', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Double);
+            generateMath(sourceBuilder, lhs, rhs, '%', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Double);
         } else if (part instanceof Minus) {
             Parsed lhs = ((Minus) part).lhs;
             Parsed rhs = ((Minus) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, '-', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Double);
+            generateMath(sourceBuilder, lhs, rhs, '-', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Double);
         } else if (part instanceof OpenBracket) {
-            generateNumberSource(sourceBuilder, ((OpenBracket) part).contents, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateNumberSource(sourceBuilder, ((OpenBracket) part).contents, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
         } else {
             if (localStack != null) {
                 if (part instanceof Reference) {
@@ -452,12 +489,12 @@ public class JavaTranspiler extends RegexCompiler {
                 }
             }
             sourceBuilder.append("global.Number.fromValueOf(");
-            transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(").value");
         }
     }
 
-    private void generateLongSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak) {
+    private void generateLongSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak, TranspileContext context) {
         if (part instanceof Number) {
             sourceBuilder.append(java.lang.String.valueOf((long)((Number) part).value));
             sourceBuilder.append("L");
@@ -481,35 +518,35 @@ public class JavaTranspiler extends RegexCompiler {
             Parsed lhs = ((Plus) part).lhs;
             Parsed rhs = ((Plus) part).rhs;
             if(lhs == null)
-                generateLongSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateLongSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             else
-                generateMath(sourceBuilder, lhs, rhs, '+', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Long);
+                generateMath(sourceBuilder, lhs, rhs, '+', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Long);
         } else if (part instanceof Multiply) {
             Parsed lhs = ((Multiply) part).lhs;
             Parsed rhs = ((Multiply) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, '*', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Long);
+            generateMath(sourceBuilder, lhs, rhs, '*', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Long);
         } else if (part instanceof Divide) {
             Parsed lhs = ((Divide) part).lhs;
             Parsed rhs = ((Divide) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, '/', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Long);
+            generateMath(sourceBuilder, lhs, rhs, '/', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Long);
         } else if (part instanceof And) {
             Parsed lhs = ((And) part).lhs;
             Parsed rhs = ((And) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, '&', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Long);
+            generateMath(sourceBuilder, lhs, rhs, '&', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Long);
         } else if (part instanceof Or) {
             Parsed lhs = ((Or) part).lhs;
             Parsed rhs = ((Or) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, '|', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Long);
+            generateMath(sourceBuilder, lhs, rhs, '|', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Long);
         } else if (part instanceof Percent) {
             Parsed lhs = ((Percent) part).lhs;
             Parsed rhs = ((Percent) part).rhs;
             sourceBuilder.append("(long)");
-            generateMath(sourceBuilder, lhs, rhs, '%', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Long);
+            generateMath(sourceBuilder, lhs, rhs, '%', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Long);
         } else if (part instanceof Minus) {
             Parsed lhs = ((Minus) part).lhs;
             Parsed rhs = ((Minus) part).rhs;
             sourceBuilder.append("(long)");
-            generateMath(sourceBuilder, lhs, rhs, '-', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, MathWrap.Long);
+            generateMath(sourceBuilder, lhs, rhs, '-', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, MathWrap.Long);
         } else {
             if (localStack != null) {
                 if (part instanceof BaseReferency) {
@@ -528,9 +565,15 @@ public class JavaTranspiler extends RegexCompiler {
 
             sourceBuilder.append("(long)");
             sourceBuilder.append("global.Number.fromValueOf(");
-            transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(").value");
         }
+    }
+    
+    private static enum TranspileContext {
+        Script,
+        Function,
+        ClassMethod
     }
 
     private static enum MathWrap {
@@ -541,20 +584,20 @@ public class JavaTranspiler extends RegexCompiler {
         Void
     }
 
-    private void generateMath(SourceBuilder sourceBuilder, Parsed lhs, Parsed rhs, char op, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak, MathWrap wrap) {
-        generateMath(sourceBuilder, lhs, rhs, "" + op, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, wrap);
+    private void generateMath(SourceBuilder sourceBuilder, Parsed lhs, Parsed rhs, char op, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak, TranspileContext context, MathWrap wrap) {
+        generateMath(sourceBuilder, lhs, rhs, "" + op, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, wrap);
     }
 
-    private void generateMath(SourceBuilder sourceBuilder, Parsed lhs, Parsed rhs, java.lang.String op, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak, MathWrap wrap) {
+    private void generateMath(SourceBuilder sourceBuilder, Parsed lhs, Parsed rhs, java.lang.String op, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak, TranspileContext context, MathWrap wrap) {
         boolean wrapAsBaseObject = wrap == MathWrap.BaseObject;
         if (op.equals("+") && (wrapAsBaseObject || wrap == MathWrap.String)) {
             if ((lhs instanceof StringReferency && !isNumber(lhs, localStack)) || (rhs instanceof StringReferency && !isNumber(rhs, localStack))) {
                 if (lhs instanceof String && ((String) lhs).string.isEmpty()) {
                     if (wrapAsBaseObject) {
-                        transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         sourceBuilder.append("._toString()");
                     } else {
-                        generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     }
                     return;
                 }
@@ -564,18 +607,18 @@ public class JavaTranspiler extends RegexCompiler {
                 } else {
                     sourceBuilder.append("(");
                 }
-                generateStringSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateStringSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(" + ");
-                generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(")");
                 return;
             } else if (((lhs instanceof Plus && ((Plus) lhs).isStringReferenceChain()) || (rhs instanceof Plus && ((Plus) rhs).isStringReferenceChain()))) {
                 if (wrapAsBaseObject) {
                     sourceBuilder.append("global.wrap(");
                 }
-                generateStringSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateStringSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(" + ");
-                generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 if (wrapAsBaseObject) {
                     sourceBuilder.append(")");
                 }
@@ -585,9 +628,9 @@ public class JavaTranspiler extends RegexCompiler {
                     sourceBuilder.append("global.Number.fromValueOf(");
                 }
                 sourceBuilder.append("plus(global, ");
-                transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(", ");
-                transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(")");
                 if (!wrapAsBaseObject) {
                     sourceBuilder.append(").value");
@@ -615,35 +658,35 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.append("(");
         }
         if (andOrOr) {
-            generateLongSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateLongSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
         } else {
-            generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
         }
         sourceBuilder.append(" ");
         sourceBuilder.append(op);
         sourceBuilder.append(" ");
         if (andOrOr) {
-            generateLongSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateLongSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
         } else {
-            generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
         }
         sourceBuilder.append(")");
     }
 
-    private boolean generateIfBlockSource(SourceBuilder sourceBuilder, Else els, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak) {
+    private boolean generateIfBlockSource(SourceBuilder sourceBuilder, Else els, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak, TranspileContext context) {
         boolean hasReturn = true, hasElse = false;
         while (els != null) {
             if (els.simpleimpl != null) {
                 if (els instanceof ElseIf) {
                     sourceBuilder.append(" else if(");
-                    generateBooleanSource(sourceBuilder, els.condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    generateBooleanSource(sourceBuilder, els.condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.appendln(") {");
                 } else {
                     hasElse = true;
                     sourceBuilder.appendln(" else {");
                 }
                 sourceBuilder.indent();
-                hasReturn = transpileParsedSource(sourceBuilder, els.simpleimpl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, true) && hasReturn;
+                hasReturn = transpileParsedSource(sourceBuilder, els.simpleimpl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, true) && hasReturn;
                 if(!(els.simpleimpl instanceof Block))
                     sourceBuilder.appendln(";");
                 else
@@ -653,14 +696,14 @@ public class JavaTranspiler extends RegexCompiler {
             } else {
                 if (els instanceof ElseIf) {
                     sourceBuilder.append(" else if(");
-                    generateBooleanSource(sourceBuilder, els.condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    generateBooleanSource(sourceBuilder, els.condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.appendln(") {");
                 } else {
                     hasElse = true;
                     sourceBuilder.appendln(" else {");
                 }
                 sourceBuilder.indent();
-                hasReturn = generateBlockSource(sourceBuilder, els.impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak) && hasReturn;
+                hasReturn = generateBlockSource(sourceBuilder, els.impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context) && hasReturn;
                 sourceBuilder.unindent();
                 sourceBuilder.append("}");
             }
@@ -674,15 +717,15 @@ public class JavaTranspiler extends RegexCompiler {
         return hasReturn && hasElse;
     }
 
-    private void generateBooleanSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak) {
+    private void generateBooleanSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak, TranspileContext context) {
         while (part instanceof OpenBracket) {
             part = ((OpenBracket) part).contents;
         }
 
         if (part instanceof In) {
-            transpileParsedSource(sourceBuilder, ((In)part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((In)part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".in(");
-            generateStringSource(sourceBuilder, ((In)part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateStringSource(sourceBuilder, ((In)part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(")");
         } else if (part instanceof Boolean) {
             if (((Boolean) part).value) {
@@ -691,130 +734,130 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append("false");
             }
         } else if (part instanceof InstanceOf) {
-            transpileParsedSource(sourceBuilder, ((InstanceOf) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((InstanceOf) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".instanceOf((BaseFunction)");
-            transpileParsedSource(sourceBuilder, ((InstanceOf) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((InstanceOf) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(")");
         } else if (part instanceof Not) {
             sourceBuilder.append("!");
-            generateBooleanSource(sourceBuilder, ((Not) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateBooleanSource(sourceBuilder, ((Not) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
         } else if (part instanceof OrOr) {
-            generateBooleanSource(sourceBuilder, ((OrOr) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateBooleanSource(sourceBuilder, ((OrOr) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(" || ");
-            generateBooleanSource(sourceBuilder, ((OrOr) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateBooleanSource(sourceBuilder, ((OrOr) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
         } else if (part instanceof AndAnd) {
-            generateBooleanSource(sourceBuilder, ((AndAnd) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateBooleanSource(sourceBuilder, ((AndAnd) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(" && ");
-            generateBooleanSource(sourceBuilder, ((AndAnd) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateBooleanSource(sourceBuilder, ((AndAnd) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
         } else if (part instanceof Equals) {
             java.lang.String ltype = ((Equals) part).lhs.primaryType();
             java.lang.String rtype = ((Equals) part).rhs.primaryType();
-            if (ltype.equals(rtype) && generateCommonComparison(sourceBuilder, ltype, false, ((Equals) part).lhs, ((Equals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak)) {
+            if (ltype.equals(rtype) && generateCommonComparison(sourceBuilder, ltype, false, ((Equals) part).lhs, ((Equals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context)) {
                 return;
             }
 
-            transpileParsedSource(sourceBuilder, ((Equals) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((Equals) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".equals(");
-            transpileParsedSource(sourceBuilder, ((Equals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((Equals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(")");
         } else if (part instanceof NotEquals) {
             java.lang.String ltype = ((NotEquals) part).lhs.primaryType();
             java.lang.String rtype = ((NotEquals) part).rhs.primaryType();
-            if (ltype.equals(rtype) && generateCommonComparison(sourceBuilder, ltype, true, ((NotEquals) part).lhs, ((NotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak)) {
+            if (ltype.equals(rtype) && generateCommonComparison(sourceBuilder, ltype, true, ((NotEquals) part).lhs, ((NotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context)) {
                 return;
             }
 
             sourceBuilder.append("!");
-            transpileParsedSource(sourceBuilder, ((NotEquals) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((NotEquals) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".equals(");
-            transpileParsedSource(sourceBuilder, ((NotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((NotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(")");
         } else if (part instanceof StrictEquals) {
             java.lang.String ltype = ((StrictEquals) part).lhs.primaryType();
             java.lang.String rtype = ((StrictEquals) part).rhs.primaryType();
-            if (ltype.equals(rtype) && generateCommonComparison(sourceBuilder, ltype, false, ((StrictEquals) part).lhs, ((StrictEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak)) {
+            if (ltype.equals(rtype) && generateCommonComparison(sourceBuilder, ltype, false, ((StrictEquals) part).lhs, ((StrictEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context)) {
                 return;
             }
 
-            transpileParsedSource(sourceBuilder, ((StrictEquals) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((StrictEquals) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".strictEquals(");
-            transpileParsedSource(sourceBuilder, ((StrictEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((StrictEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(")");
         } else if (part instanceof StrictNotEquals) {
             java.lang.String ltype = ((StrictNotEquals) part).lhs.primaryType();
             java.lang.String rtype = ((StrictNotEquals) part).rhs.primaryType();
-            if (ltype.equals(rtype) && generateCommonComparison(sourceBuilder, ltype, true, ((StrictNotEquals) part).lhs, ((StrictNotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak)) {
+            if (ltype.equals(rtype) && generateCommonComparison(sourceBuilder, ltype, true, ((StrictNotEquals) part).lhs, ((StrictNotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context)) {
                 return;
             }
 
             sourceBuilder.append("!");
-            transpileParsedSource(sourceBuilder, ((StrictNotEquals) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((StrictNotEquals) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".strictEquals(");
-            transpileParsedSource(sourceBuilder, ((StrictNotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((StrictNotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(")");
         } else if (part instanceof MoreThan) {
             Parsed lhs = ((MoreThan) part).lhs;
             Parsed rhs = ((MoreThan) part).rhs;
 
             if (isNumber(lhs, localStack) || isNumber(rhs, localStack)) {
-                generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(" > ");
-                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 return;
             }
 
             sourceBuilder.append("lessThan(");
-            transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(", ");
-            transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(")");
         } else if (part instanceof LessThan) {
             Parsed lhs = ((LessThan) part).lhs;
             Parsed rhs = ((LessThan) part).rhs;
 
             if (isNumber(lhs, localStack) || isNumber(rhs, localStack)) {
-                generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(" < ");
-                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 return;
             }
 
             sourceBuilder.append("lessThan(");
-            transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(", ");
-            transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(")");
         } else if (part instanceof MoreEqual) {
             Parsed lhs = ((MoreEqual) part).lhs;
             Parsed rhs = ((MoreEqual) part).rhs;
 
             if (isNumber(lhs, localStack) || isNumber(rhs, localStack)) {
-                generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(" >= ");
-                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 return;
             }
 
             sourceBuilder.append("moreEqual(");
-            transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(", ");
-            transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(")");
         } else if (part instanceof LessEqual) {
             Parsed lhs = ((LessEqual) part).lhs;
             Parsed rhs = ((LessEqual) part).rhs;
 
             if (isNumber(lhs, localStack) || isNumber(rhs, localStack)) {
-                generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(" <= ");
-                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 return;
             }
 
             sourceBuilder.append("lessEqual(");
-            transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(", ");
-            transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(")");
         } else if (part instanceof Delete) {
             Parsed rhs = ((Delete) part).rhs;
@@ -843,9 +886,9 @@ public class JavaTranspiler extends RegexCompiler {
                 return;
             } else if (rhs instanceof VariableReference) {
                 sourceBuilder.append("Utilities.delete(");
-                transpileParsedSource(sourceBuilder, ((VariableReference)rhs).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, ((VariableReference)rhs).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(", ");
-                transpileParsedSource(sourceBuilder, ((VariableReference)rhs).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, ((VariableReference)rhs).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(")");
                 return;
             }
@@ -873,7 +916,7 @@ public class JavaTranspiler extends RegexCompiler {
                     }
                 }
             }
-            transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".toBool()");
         }
     }
@@ -901,27 +944,27 @@ public class JavaTranspiler extends RegexCompiler {
         //assert ((new JavaTranspiler().compile("(function munchkin(){\n\tfunction yellow(){\n\t\treturn 55;\n\t}\n\treturn yellow()\n\t})()", "JavaCompilerStaticTest", false)).exec(new Global(), null).toString().equals("55"));
     }
 
-    private boolean generateCommonComparison(SourceBuilder sourceBuilder, java.lang.String ltype, boolean not, Parsed lhs, Parsed rhs, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak) {
+    private boolean generateCommonComparison(SourceBuilder sourceBuilder, java.lang.String ltype, boolean not, Parsed lhs, Parsed rhs, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak, TranspileContext context) {
         if (ltype.equals("string")) {
             if (not) {
                 sourceBuilder.append("!");
             }
-            generateStringSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateStringSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".equals(");
-            generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(")");
             return true;
         }
         if (ltype.equals("number")) {
-            generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateNumberSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(not ? " != " : " == ");
-            generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             return true;
         }
         if (ltype.equals("boolean")) {
-            generateBooleanSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateBooleanSource(sourceBuilder, lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(not ? " != " : " == ");
-            generateBooleanSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateBooleanSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             return true;
         }
         return false;
@@ -1644,7 +1687,7 @@ public class JavaTranspiler extends RegexCompiler {
         }
     }
 
-    protected boolean generateBlockSource(SourceBuilder sourceBuilder, ScriptData blockDat, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak) {
+    protected boolean generateBlockSource(SourceBuilder sourceBuilder, ScriptData blockDat, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak, TranspileContext context) {
         if(blockDat == null)
             return false;
         
@@ -1653,7 +1696,7 @@ public class JavaTranspiler extends RegexCompiler {
             if (addDebugging) {
                 addSourceMapEntry(sourceBuilder, sourceMap, part);
             }
-            hasReturn = transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, true) || hasReturn;
+            hasReturn = transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, true) || hasReturn;
             if(!(part instanceof Block))
                 sourceBuilder.appendln(";");
             else
@@ -1662,11 +1705,11 @@ public class JavaTranspiler extends RegexCompiler {
         return hasReturn;
     }
 
-    protected boolean transpileParsedSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak) {
-        return transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, false);
+    protected boolean transpileParsedSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak, TranspileContext context) {
+        return transpileParsedSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, false);
     }
 
-    protected boolean transpileParsedSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak, boolean atTop) {
+    protected boolean transpileParsedSource(SourceBuilder sourceBuilder, Parsed part, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak, TranspileContext context, boolean atTop) {
         while (part instanceof OpenBracket) {
             part = ((OpenBracket) part).contents;
         }
@@ -1676,12 +1719,12 @@ public class JavaTranspiler extends RegexCompiler {
             if(((Return) part).rhs == null)
                 sourceBuilder.append("Undefined.INSTANCE");
             else
-                transpileParsedSource(sourceBuilder, ((Return) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, ((Return) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             return true;
         } else if (part instanceof TypeOf) {
             Parsed rhs = ((TypeOf) part).rhs;
             sourceBuilder.append("global.wrap(");
-            transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".typeOf())");
             return false;
         } else if (part instanceof Call) {
@@ -1690,13 +1733,14 @@ public class JavaTranspiler extends RegexCompiler {
                 reference = ((OpenBracket) reference).contents;
             }
 
+            SuperSourceBuilder superSourceBuilder = context == TranspileContext.ClassMethod ? new SuperSourceBuilder(atTop ? sourceBuilder : new SourceBuilder()) : null;
             if (reference instanceof BaseReferency && !(reference instanceof Reference || reference instanceof Call)) {
                 final java.lang.String source = reference.toSimpleSource();
                 if (reference instanceof RightReference) {
                     final java.lang.String key = ((RightReference) reference).chain.remove(((RightReference) reference).chain.size() - 1);
                     if (atTop) {
                         sourceBuilder.append("__this = ");
-                        transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        transpileParsedSource(superSourceBuilder == null ? sourceBuilder : superSourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         sourceBuilder.appendln(";");
                         if (addDebugging) {
                             sourceBuilder.appendln("try {");
@@ -1713,7 +1757,10 @@ public class JavaTranspiler extends RegexCompiler {
                             sourceBuilder.appendln(" is not a function\");");
                             sourceBuilder.appendln("}");
                         }
-                        sourceBuilder.append("function.call(__this");
+                        sourceBuilder.append("function.call(");
+                        if(superSourceBuilder == null || !superSourceBuilder._super)
+                            sourceBuilder.append("_");
+                        sourceBuilder.append("_this");
                     } else {
                         sourceBuilder.append("callTop(");
                         if (addDebugging) {
@@ -1721,14 +1768,28 @@ public class JavaTranspiler extends RegexCompiler {
                             sourceBuilder.append(convertStringSource(source));
                             sourceBuilder.append("\", ");
                         }
-                        sourceBuilder.append("\"");
-                        sourceBuilder.append(convertStringSource(key));
-                        sourceBuilder.append("\", ");
-                        transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        if(superSourceBuilder == null) {
+                            sourceBuilder.append("\"");
+                            sourceBuilder.append(convertStringSource(key));
+                            sourceBuilder.append("\", ");
+                            transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
+                        } else {
+                            transpileParsedSource(superSourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
+                            if(superSourceBuilder._super) {
+                                ((RightReference) reference).chain.add(key);
+                                transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
+                                sourceBuilder.append(", _this");
+                            } else {
+                                sourceBuilder.append("\"");
+                                sourceBuilder.append(convertStringSource(key));
+                                sourceBuilder.append("\", ");
+                                sourceBuilder.append(superSourceBuilder.toString());
+                            }
+                        }
                     }
                     for (Parsed arg : ((Call) part).arguments) {
                         sourceBuilder.append(", ");
-                        transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     }
                     sourceBuilder.append(")");
                     return false;
@@ -1736,7 +1797,7 @@ public class JavaTranspiler extends RegexCompiler {
                     final int key = (int)((IntegerReference) reference).ref;
                     if (atTop) {
                         sourceBuilder.append("__this = ");
-                        transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        transpileParsedSource(superSourceBuilder == null ? sourceBuilder : superSourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         sourceBuilder.appendln(";");
                         if (addDebugging) {
                             sourceBuilder.appendln("try {");
@@ -1753,7 +1814,10 @@ public class JavaTranspiler extends RegexCompiler {
                             sourceBuilder.appendln(" is not a function\");");
                             sourceBuilder.appendln("}");
                         }
-                        sourceBuilder.append("function.call(__this");
+                        sourceBuilder.append("function.call(");
+                        if(superSourceBuilder == null || !superSourceBuilder._super)
+                            sourceBuilder.append("_");
+                        sourceBuilder.append("_this");
                     } else {
                         sourceBuilder.append("callTop(");
                         if (addDebugging) {
@@ -1761,13 +1825,25 @@ public class JavaTranspiler extends RegexCompiler {
                             sourceBuilder.append(convertStringSource(source));
                             sourceBuilder.append("\", ");
                         }
-                        sourceBuilder.append(java.lang.String.valueOf(key));
-                        sourceBuilder.append(", ");
-                        transpileParsedSource(sourceBuilder, ((IntegerReference) reference).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        if(superSourceBuilder == null) {
+                            sourceBuilder.append(java.lang.String.valueOf(key));
+                            sourceBuilder.append(", ");
+                            transpileParsedSource(sourceBuilder, ((IntegerReference) reference).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
+                        } else {
+                            transpileParsedSource(superSourceBuilder, ((IntegerReference) reference).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
+                            if(superSourceBuilder._super) {
+                                transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
+                                sourceBuilder.append(", _this");
+                            } else {
+                                sourceBuilder.append(java.lang.String.valueOf(key));
+                                sourceBuilder.append(", ");
+                                sourceBuilder.append(superSourceBuilder.toString());
+                            }
+                        }
                     }
                     for (Parsed arg : ((Call) part).arguments) {
                         sourceBuilder.append(", ");
-                        transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     }
                     sourceBuilder.append(")");
                     return false;
@@ -1775,7 +1851,7 @@ public class JavaTranspiler extends RegexCompiler {
                     final java.lang.String key = ((ReferenceChain) reference).chain.remove(((ReferenceChain) reference).chain.size() - 1);
                     if (atTop) {
                         sourceBuilder.append("__this = ");
-                        transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        transpileParsedSource(superSourceBuilder == null ? sourceBuilder : superSourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         sourceBuilder.appendln(";");
                         if (addDebugging) {
                             sourceBuilder.appendln("try {");
@@ -1792,7 +1868,10 @@ public class JavaTranspiler extends RegexCompiler {
                             sourceBuilder.appendln(" is not a function\");");
                             sourceBuilder.appendln("}");
                         }
-                        sourceBuilder.append("function.call(__this");
+                        sourceBuilder.append("function.call(");
+                        if(superSourceBuilder == null || !superSourceBuilder._super)
+                            sourceBuilder.append("_");
+                        sourceBuilder.append("_this");
                     } else {
                         sourceBuilder.append("callTop(");
                         if (addDebugging) {
@@ -1800,14 +1879,28 @@ public class JavaTranspiler extends RegexCompiler {
                             sourceBuilder.append(convertStringSource(source));
                             sourceBuilder.append("\", ");
                         }
-                        sourceBuilder.append("\"");
-                        sourceBuilder.append(convertStringSource(key));
-                        sourceBuilder.append("\", ");
-                        transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        if(superSourceBuilder == null) {
+                            sourceBuilder.append("\"");
+                            sourceBuilder.append(convertStringSource(key));
+                            sourceBuilder.append("\", ");
+                            transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
+                        } else {
+                            transpileParsedSource(superSourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
+                            if(superSourceBuilder._super) {
+                                ((ReferenceChain) reference).chain.add(key);
+                                transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
+                                sourceBuilder.append(", _this");
+                            } else {
+                                sourceBuilder.append("\"");
+                                sourceBuilder.append(convertStringSource(key));
+                                sourceBuilder.append("\", ");
+                                sourceBuilder.append(superSourceBuilder.toString());
+                            }
+                        }
                     }
                     for (Parsed arg : ((Call) part).arguments) {
                         sourceBuilder.append(", ");
-                        transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     }
                     sourceBuilder.append(")");
                     return false;
@@ -1818,24 +1911,24 @@ public class JavaTranspiler extends RegexCompiler {
                         sourceBuilder.append(convertStringSource(source));
                         sourceBuilder.append("\", ");
                     }
-                    transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     for (Parsed arg : ((Call) part).arguments) {
                         sourceBuilder.append(", ");
-                        transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     }
                     sourceBuilder.append(")");
                     return false;
                 } else if(reference instanceof VariableReference) {
                     if (atTop) {
                         sourceBuilder.append("__this = ");
-                        transpileParsedSource(sourceBuilder, ((VariableReference)reference).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        transpileParsedSource(superSourceBuilder == null ? sourceBuilder : superSourceBuilder, ((VariableReference)reference).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         sourceBuilder.appendln(";");
                         if (addDebugging) {
                             sourceBuilder.appendln("try {");
                             sourceBuilder.indent();
                         }
                         sourceBuilder.append("function = (BaseFunction)Utilities.get(__this, ");
-                        transpileParsedSource(sourceBuilder, ((VariableReference)reference).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        transpileParsedSource(sourceBuilder, ((VariableReference)reference).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         sourceBuilder.appendln(");");
                         if (addDebugging) {
                             sourceBuilder.unindent();
@@ -1845,7 +1938,10 @@ public class JavaTranspiler extends RegexCompiler {
                             sourceBuilder.appendln(" is not a function\");");
                             sourceBuilder.appendln("}");
                         }
-                        sourceBuilder.append("function.call(__this");
+                        sourceBuilder.append("function.call(");
+                        if(superSourceBuilder == null || !superSourceBuilder._super)
+                            sourceBuilder.append("_");
+                        sourceBuilder.append("_this");
                     } else {
                         sourceBuilder.append("callTopDynamic(");
                         if (addDebugging) {
@@ -1853,22 +1949,34 @@ public class JavaTranspiler extends RegexCompiler {
                             sourceBuilder.append(convertStringSource(source));
                             sourceBuilder.append("\", ");
                         }
-                        transpileParsedSource(sourceBuilder, ((VariableReference)reference).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
-                        sourceBuilder.append(", ");
-                        transpileParsedSource(sourceBuilder, ((VariableReference)reference).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        if(superSourceBuilder == null) {
+                            transpileParsedSource(sourceBuilder, ((VariableReference)reference).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
+                            sourceBuilder.append(", ");
+                            transpileParsedSource(sourceBuilder, ((VariableReference)reference).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
+                        } else {
+                            transpileParsedSource(superSourceBuilder, ((VariableReference) reference).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
+                            if(superSourceBuilder._super) {
+                                transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
+                                sourceBuilder.append(", _this");
+                            } else {
+                                transpileParsedSource(sourceBuilder, ((VariableReference)reference).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
+                                sourceBuilder.append(", ");
+                                sourceBuilder.append(superSourceBuilder.toString());
+                            }
+                        }
                     }
                     for (Parsed arg : ((Call) part).arguments) {
                         sourceBuilder.append(", ");
-                        transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     }
                     sourceBuilder.append(")");
                     return false;
                 } else if(reference instanceof Function || reference instanceof Class) {
-                    transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.append(".call(_this");
                     for (Parsed arg : ((Call) part).arguments) {
                         sourceBuilder.append(", ");
-                        transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     }
                     sourceBuilder.append(")");
                     return false;
@@ -1883,7 +1991,7 @@ public class JavaTranspiler extends RegexCompiler {
                     sourceBuilder.appendln("try {");
                     sourceBuilder.indent();
                     sourceBuilder.append("function = (BaseFunction)");
-                    transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.appendln(";");
                     sourceBuilder.unindent();
                     sourceBuilder.appendln("} catch(ClassCastException ex) {");
@@ -1897,32 +2005,32 @@ public class JavaTranspiler extends RegexCompiler {
                     sourceBuilder.append("\"");
                     sourceBuilder.append(source);
                     sourceBuilder.append("\", ");
-                    transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.append(", ");
                     sourceBuilder.append("_this");
                 }
                 for (Parsed arg : ((Call) part).arguments) {
                     sourceBuilder.append(", ");
-                    transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 }
                 sourceBuilder.append(")");
             } else {
                 sourceBuilder.append("((BaseFunction)");
-                transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(").call(");
                 sourceBuilder.append("_this");
                 for (Parsed arg : ((Call) part).arguments) {
                     sourceBuilder.append(", ");
-                    transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 }
                 sourceBuilder.append(")");
             }
             return false;
         } else if (part instanceof InstanceOf) {
             sourceBuilder.append("(");
-            transpileParsedSource(sourceBuilder, ((InstanceOf) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((InstanceOf) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".instanceOf((BaseFunction)");
-            transpileParsedSource(sourceBuilder, ((InstanceOf) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((InstanceOf) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
             return false;
         } else if (part instanceof Number) {
@@ -1967,62 +2075,65 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.append("\")");
             return false;
         } else if (part instanceof Reference) {
-            generateBaseScopeAccess(sourceBuilder, ((Reference) part).ref, baseScope, expectedStack, localStack);
+            if(context == TranspileContext.ClassMethod && ((Reference)part).ref.equals("super"))
+                sourceBuilder.append("_super");
+            else
+                generateBaseScopeAccess(sourceBuilder, ((Reference) part).ref, baseScope, expectedStack, localStack);
             return false;
         } else if (part instanceof DoubleShiftRight) {
             Parsed lhs = ((DoubleShiftRight) part).lhs;
             Parsed rhs = ((DoubleShiftRight) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, ">>>", methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, atTop ? MathWrap.Void : MathWrap.BaseObject);
+            generateMath(sourceBuilder, lhs, rhs, ">>>", methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, atTop ? MathWrap.Void : MathWrap.BaseObject);
             return false;
         } else if (part instanceof ShiftLeft) {
             Parsed lhs = ((ShiftLeft) part).lhs;
             Parsed rhs = ((ShiftLeft) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, "<<", methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, atTop ? MathWrap.Void : MathWrap.BaseObject);
+            generateMath(sourceBuilder, lhs, rhs, "<<", methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, atTop ? MathWrap.Void : MathWrap.BaseObject);
             return false;
         } else if (part instanceof ShiftRight) {
             Parsed lhs = ((ShiftRight) part).lhs;
             Parsed rhs = ((ShiftRight) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, ">>", methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, atTop ? MathWrap.Void : MathWrap.BaseObject);
+            generateMath(sourceBuilder, lhs, rhs, ">>", methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, atTop ? MathWrap.Void : MathWrap.BaseObject);
             return false;
         } else if (part instanceof Plus) {
             Parsed lhs = ((Plus) part).lhs;
             Parsed rhs = ((Plus) part).rhs;
             if(lhs == null) {
                 sourceBuilder.append("global.Number.fromValueOf(");
-                transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(")");
             } else
-                generateMath(sourceBuilder, lhs, rhs, '+', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, atTop ? MathWrap.Void : MathWrap.BaseObject);
+                generateMath(sourceBuilder, lhs, rhs, '+', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, atTop ? MathWrap.Void : MathWrap.BaseObject);
             return false;
         } else if (part instanceof Multiply) {
             Parsed lhs = ((Multiply) part).lhs;
             Parsed rhs = ((Multiply) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, '*', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, atTop ? MathWrap.Void : MathWrap.BaseObject);
+            generateMath(sourceBuilder, lhs, rhs, '*', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, atTop ? MathWrap.Void : MathWrap.BaseObject);
             return false;
         } else if (part instanceof Divide) {
             Parsed lhs = ((Divide) part).lhs;
             Parsed rhs = ((Divide) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, '/', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, atTop ? MathWrap.Void : MathWrap.BaseObject);
+            generateMath(sourceBuilder, lhs, rhs, '/', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, atTop ? MathWrap.Void : MathWrap.BaseObject);
             return false;
         } else if (part instanceof And) {
             Parsed lhs = ((And) part).lhs;
             Parsed rhs = ((And) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, '&', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, atTop ? MathWrap.Void : MathWrap.BaseObject);
+            generateMath(sourceBuilder, lhs, rhs, '&', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, atTop ? MathWrap.Void : MathWrap.BaseObject);
             return false;
         } else if (part instanceof Or) {
             Parsed lhs = ((Or) part).lhs;
             Parsed rhs = ((Or) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, '|', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, atTop ? MathWrap.Void : MathWrap.BaseObject);
+            generateMath(sourceBuilder, lhs, rhs, '|', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, atTop ? MathWrap.Void : MathWrap.BaseObject);
             return false;
         } else if (part instanceof Percent) {
             Parsed lhs = ((Percent) part).lhs;
             Parsed rhs = ((Percent) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, '%', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, atTop ? MathWrap.Void : MathWrap.BaseObject);
+            generateMath(sourceBuilder, lhs, rhs, '%', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, atTop ? MathWrap.Void : MathWrap.BaseObject);
             return false;
         } else if (part instanceof Minus) {
             Parsed lhs = ((Minus) part).lhs;
             Parsed rhs = ((Minus) part).rhs;
-            generateMath(sourceBuilder, lhs, rhs, '-', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, atTop ? MathWrap.Void : MathWrap.BaseObject);
+            generateMath(sourceBuilder, lhs, rhs, '-', methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, atTop ? MathWrap.Void : MathWrap.BaseObject);
             return false;
         } else if (part instanceof New) {
             boolean addComma;
@@ -2031,11 +2142,11 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append("constructTop(\"");
                 sourceBuilder.append(convertStringSource(((New) part).reference.toSimpleSource()));
                 sourceBuilder.append("\", ");
-                transpileParsedSource(sourceBuilder, ((New) part).reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, ((New) part).reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             } else {
                 addComma = false;
                 sourceBuilder.append("((BaseFunction)");
-                transpileParsedSource(sourceBuilder, ((New) part).reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, ((New) part).reference, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(").construct(");
             }
             if (((New) part).arguments != null) {
@@ -2045,13 +2156,13 @@ public class JavaTranspiler extends RegexCompiler {
                     } else {
                         addComma = true;
                     }
-                    transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, arg, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 }
             }
             sourceBuilder.append(")");
             return false;
         } else if (part instanceof RightReference) {
-            transpileParsedSource(sourceBuilder, ((RightReference) part).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((RightReference) part).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             for (java.lang.String key : ((RightReference) part).chain) {
                 sourceBuilder.append(".get(");
                 generateStringNumberIndex(sourceBuilder, key);
@@ -2060,7 +2171,7 @@ public class JavaTranspiler extends RegexCompiler {
             return false;
         } else if (part instanceof Throw) {
             sourceBuilder.append("throw new net.nexustools.njs.Error.Thrown(");
-            transpileParsedSource(sourceBuilder, ((Throw) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((Throw) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(")");
             return true;
         } else if (part instanceof Function) {
@@ -2069,13 +2180,14 @@ public class JavaTranspiler extends RegexCompiler {
                 name = "<anonymous>";
             }
 
-            name = scopeChain.toClassName(name);
+            name = scopeChain.refName(name);
             if (functionMap.containsKey(name)) {
                 int index = 2;
                 java.lang.String base = name + "_";
                 do {
                     name = base + index++;
                 } while (functionMap.containsKey(name));
+                name = scopeChain.refName(name);
             }
             functionMap.put(name, (Function) part);
 
@@ -2090,7 +2202,7 @@ public class JavaTranspiler extends RegexCompiler {
             return false;
         } else if(part instanceof Class) {
             java.lang.String name = ((Class) part).name;
-            name = scopeChain.toClassName(name);
+            name = scopeChain.refName(name);
             if (functionMap.containsKey(name)) {
                 int index = 2;
                 java.lang.String base = name + "_";
@@ -2149,24 +2261,24 @@ public class JavaTranspiler extends RegexCompiler {
                             if (set.rhs == null) {
                                 sourceBuilder.append("\"undefined\"");
                             } else {
-                                generateStringSource(sourceBuilder, set.rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                                generateStringSource(sourceBuilder, set.rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                             }
                         } else if (type.equals("boolean")) {
                             if (set.rhs == null) {
                                 sourceBuilder.append("false");
                             } else {
-                                generateBooleanSource(sourceBuilder, set.rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                                generateBooleanSource(sourceBuilder, set.rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                             }
                         } else if (type.equals("number")) {
                             if (set.rhs == null) {
                                 sourceBuilder.append("0");
                             } else {
-                                generateNumberSource(sourceBuilder, set.rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                                generateNumberSource(sourceBuilder, set.rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                             }
                         } else if (set.rhs == null) {
                             sourceBuilder.append("Undefined.INSTANCE");
                         } else {
-                            transpileParsedSource(sourceBuilder, set.rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                            transpileParsedSource(sourceBuilder, set.rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         }
                     } else {
                         sourceBuilder.append(baseScope);
@@ -2176,14 +2288,14 @@ public class JavaTranspiler extends RegexCompiler {
                         if (set.rhs == null) {
                             sourceBuilder.append("Undefined.INSTANCE");
                         } else {
-                            transpileParsedSource(sourceBuilder, set.rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                            transpileParsedSource(sourceBuilder, set.rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         }
                         sourceBuilder.append(")");
                     }
                 } else {
                     sourceBuilder.append(baseScope);
                     sourceBuilder.append(".multi" + _type + "(");
-                    transpileParsedSource(sourceBuilder, set.rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, set.rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     for(Map.Entry<java.lang.String, java.lang.String> name : ((NameSet)set.lhs).names.entrySet()) {
                         sourceBuilder.append(", \"");
                         sourceBuilder.append(convertStringSource(name.getValue()));
@@ -2198,16 +2310,16 @@ public class JavaTranspiler extends RegexCompiler {
             return false;
         } else if (part instanceof OrOr) {
             sourceBuilder.append("orOr(");
-            transpileParsedSource(sourceBuilder, ((OrOr) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((OrOr) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(", ");
-            transpileParsedSource(sourceBuilder, ((OrOr) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((OrOr) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(")");
             return false;
         } else if (part instanceof AndAnd) {
             sourceBuilder.append("andAnd(");
-            transpileParsedSource(sourceBuilder, ((AndAnd) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((AndAnd) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(", ");
-            transpileParsedSource(sourceBuilder, ((AndAnd) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((AndAnd) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(")");
             return false;
         } else if (part instanceof Equals) {
@@ -2215,15 +2327,15 @@ public class JavaTranspiler extends RegexCompiler {
             java.lang.String ltype = ((Equals) part).lhs.primaryType();
             java.lang.String rtype = ((Equals) part).rhs.primaryType();
             if (ltype.equals(rtype)) {
-                if (generateCommonComparison(sourceBuilder, ltype, false, ((Equals) part).lhs, ((Equals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak)) {
+                if (generateCommonComparison(sourceBuilder, ltype, false, ((Equals) part).lhs, ((Equals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context)) {
                     sourceBuilder.append(" ? global.Boolean.TRUE : global.Boolean.FALSE)");
                     return false;
                 }
             }
 
-            transpileParsedSource(sourceBuilder, ((Equals) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((Equals) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".equals(");
-            transpileParsedSource(sourceBuilder, ((Equals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((Equals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
             return false;
         } else if (part instanceof NotEquals) {
@@ -2231,15 +2343,15 @@ public class JavaTranspiler extends RegexCompiler {
             java.lang.String ltype = ((NotEquals) part).lhs.primaryType();
             java.lang.String rtype = ((NotEquals) part).rhs.primaryType();
             if (ltype.equals(rtype)) {
-                if (generateCommonComparison(sourceBuilder, ltype, true, ((NotEquals) part).lhs, ((NotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak)) {
+                if (generateCommonComparison(sourceBuilder, ltype, true, ((NotEquals) part).lhs, ((NotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context)) {
                     sourceBuilder.append(" ? global.Boolean.TRUE : global.Boolean.FALSE)");
                     return false;
                 }
             }
 
-            transpileParsedSource(sourceBuilder, ((NotEquals) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((NotEquals) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".equals(");
-            transpileParsedSource(sourceBuilder, ((NotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((NotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(") ? global.Boolean.FALSE : global.Boolean.TRUE)");
             return false;
         } else if (part instanceof StrictEquals) {
@@ -2247,15 +2359,15 @@ public class JavaTranspiler extends RegexCompiler {
             java.lang.String ltype = ((StrictEquals) part).lhs.primaryType();
             java.lang.String rtype = ((StrictEquals) part).rhs.primaryType();
             if (ltype.equals(rtype)) {
-                if (generateCommonComparison(sourceBuilder, ltype, false, ((StrictEquals) part).lhs, ((StrictEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak)) {
+                if (generateCommonComparison(sourceBuilder, ltype, false, ((StrictEquals) part).lhs, ((StrictEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context)) {
                     sourceBuilder.append(" ? global.Boolean.TRUE : global.Boolean.FALSE)");
                     return false;
                 }
             }
 
-            transpileParsedSource(sourceBuilder, ((StrictEquals) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((StrictEquals) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".strictEquals(");
-            transpileParsedSource(sourceBuilder, ((StrictEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((StrictEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
             return false;
         } else if (part instanceof StrictNotEquals) {
@@ -2263,24 +2375,29 @@ public class JavaTranspiler extends RegexCompiler {
             java.lang.String ltype = ((StrictNotEquals) part).lhs.primaryType();
             java.lang.String rtype = ((StrictNotEquals) part).rhs.primaryType();
             if (ltype.equals(rtype)) {
-                if (generateCommonComparison(sourceBuilder, ltype, true, ((StrictNotEquals) part).lhs, ((StrictNotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak)) {
+                if (generateCommonComparison(sourceBuilder, ltype, true, ((StrictNotEquals) part).lhs, ((StrictNotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context)) {
                     sourceBuilder.append(" ? global.Boolean.TRUE : global.Boolean.FALSE)");
                     return false;
                 }
             }
 
-            transpileParsedSource(sourceBuilder, ((StrictNotEquals) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((StrictNotEquals) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".strictEquals(");
-            transpileParsedSource(sourceBuilder, ((StrictNotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((StrictNotEquals) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(") ? global.Boolean.FALSE : global.Boolean.TRUE)");
             return false;
         } else if (part instanceof ReferenceChain) {
-            generateBaseScopeAccess(sourceBuilder, ((ReferenceChain) part).chain.remove(0), baseScope, expectedStack, localStack);
+            java.lang.String base = ((ReferenceChain) part).chain.remove(0);
+            if(context == TranspileContext.ClassMethod && base.equals("super"))
+                sourceBuilder.append("_super");
+            else
+                generateBaseScopeAccess(sourceBuilder, base, baseScope, expectedStack, localStack);
             for (java.lang.String ref : ((ReferenceChain) part).chain) {
                 sourceBuilder.append(".get(");
                 generateStringNumberIndex(sourceBuilder, ref);
                 sourceBuilder.append(")");
             }
+            ((ReferenceChain) part).chain.add(base);
             return false;
         } else if (part instanceof IntegerReference) {
             int key = (int)((IntegerReference) part).ref;
@@ -2302,14 +2419,14 @@ public class JavaTranspiler extends RegexCompiler {
                 return false;
             }
 
-            transpileParsedSource(sourceBuilder, ((IntegerReference) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((IntegerReference) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".get(");
             sourceBuilder.append(java.lang.String.valueOf(key));
             sourceBuilder.append(")");
             return false;
         } else if (part instanceof Not) {
             sourceBuilder.append("(");
-            generateBooleanSource(sourceBuilder, ((Not) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateBooleanSource(sourceBuilder, ((Not) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append("? global.Boolean.FALSE : global.Boolean.TRUE)");
             return false;
         } else if (part instanceof OpenArray) {
@@ -2323,7 +2440,7 @@ public class JavaTranspiler extends RegexCompiler {
                     } else {
                         sourceBuilder.append(", ");
                     }
-                    transpileParsedSource(sourceBuilder, subpart, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, subpart, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 }
                 sourceBuilder.append("}");
             }
@@ -2335,39 +2452,39 @@ public class JavaTranspiler extends RegexCompiler {
 
             if (lhs instanceof IntegerReference) {
                 if (atTop) {
-                    transpileParsedSource(sourceBuilder, ((IntegerReference) lhs).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, ((IntegerReference) lhs).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.append(".set(");
                     sourceBuilder.append(java.lang.String.valueOf(((IntegerReference) lhs).ref));
                     sourceBuilder.append(", ");
-                    transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.append(")");
                     return false;
                 }
 
                 sourceBuilder.append("callSet(");
-                transpileParsedSource(sourceBuilder, ((IntegerReference) lhs).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, ((IntegerReference) lhs).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(", ");
                 sourceBuilder.append(java.lang.String.valueOf(((IntegerReference) lhs).ref));
                 sourceBuilder.append(", ");
-                transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(")");
                 return false;
             } else if (lhs instanceof VariableReference) {
                 if (isNumber(((VariableReference) lhs).ref, localStack)) {
                     sourceBuilder.append("Utilities.set(");
-                    transpileParsedSource(sourceBuilder, ((VariableReference) lhs).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, ((VariableReference) lhs).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.append(", ");
-                    generateNumberSource(sourceBuilder, ((VariableReference) lhs).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    generateNumberSource(sourceBuilder, ((VariableReference) lhs).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.append(", ");
-                    transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.append(")");
                 } else {
                     sourceBuilder.append("Utilities.set(");
-                    transpileParsedSource(sourceBuilder, ((VariableReference) lhs).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, ((VariableReference) lhs).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.append(", ");
-                    transpileParsedSource(sourceBuilder, ((VariableReference) lhs).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, ((VariableReference) lhs).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.append(", ");
-                    transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.append(")");
                 }
                 return false;
@@ -2382,13 +2499,13 @@ public class JavaTranspiler extends RegexCompiler {
                         sourceBuilder.append(expectedStack.getReference(((Reference) lhs).ref));
                         sourceBuilder.append(" = ");
                         if (type.equals("string")) {
-                            generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                            generateStringSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         } else if (type.equals("number")) {
-                            generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                            generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         } else if (type.equals("boolean")) {
-                            generateBooleanSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                            generateBooleanSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         } else {
-                            transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                            transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         }
                         return false;
                     }
@@ -2399,7 +2516,7 @@ public class JavaTranspiler extends RegexCompiler {
                     sourceBuilder.append(".set(\"");
                     sourceBuilder.append(convertStringSource(((Reference) lhs).ref));
                     sourceBuilder.append("\", ");
-                    transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.append(")");
                     return false;
                 }
@@ -2409,7 +2526,7 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append(", \"");
                 sourceBuilder.append(convertStringSource(((Reference) lhs).ref));
                 sourceBuilder.append("\", ");
-                transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(")");
                 return false;
             } else if (lhs instanceof ReferenceChain) {
@@ -2426,7 +2543,7 @@ public class JavaTranspiler extends RegexCompiler {
                         sourceBuilder.append(".set(\"");
                         sourceBuilder.append(convertStringSource(key));
                         sourceBuilder.append("\", ");
-                        transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         sourceBuilder.append(")");
                         return false;
                     }
@@ -2441,12 +2558,12 @@ public class JavaTranspiler extends RegexCompiler {
                     sourceBuilder.append(", \"");
                     sourceBuilder.append(convertStringSource(key));
                     sourceBuilder.append("\", ");
-                    transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.append(")");
                     return false;
                 }
             } else if(lhs instanceof Set) {
-                transpileParsedSource(sourceBuilder, new Set(((Set)lhs).lhs, new Set(((Set)lhs).rhs, rhs)), methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, new Set(((Set)lhs).lhs, new Set(((Set)lhs).rhs, rhs)), methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 return false;
             }
 
@@ -2458,7 +2575,7 @@ public class JavaTranspiler extends RegexCompiler {
             if (c != null && f != null) {
                 sourceBuilder.appendln("try {");
                 sourceBuilder.indent();
-                hasReturn = generateBlockSource(sourceBuilder, ((Try) part).impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                hasReturn = generateBlockSource(sourceBuilder, ((Try) part).impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.unindent();
                 sourceBuilder.appendln("} catch(net.nexustools.njs.Error.InvisibleException ex) {");
                 sourceBuilder.appendln("\tthrow ex;");
@@ -2478,7 +2595,7 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append(".let(\"");
                 sourceBuilder.append(convertStringSource(((Reference) c.condition).ref));
                 sourceBuilder.appendln("\", global.wrap(t));");
-                hasReturn = generateBlockSource(sourceBuilder, c.impl, methodPrefix, newScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak) && hasReturn;
+                hasReturn = generateBlockSource(sourceBuilder, c.impl, methodPrefix, newScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context) && hasReturn;
                 sourceBuilder.unindent();
                 sourceBuilder.appendln("} finally {");
                 sourceBuilder.append("\t");
@@ -2488,14 +2605,14 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.unindent();
                 sourceBuilder.appendln("} finally {");
                 sourceBuilder.indent();
-                hasReturn = generateBlockSource(sourceBuilder, f.impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak) || hasReturn;
+                hasReturn = generateBlockSource(sourceBuilder, f.impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context) || hasReturn;
                 sourceBuilder.unindent();
                 sourceBuilder.appendln("}");
                 return hasReturn;
             } else if (c != null) {
                 sourceBuilder.appendln("try {");
                 sourceBuilder.indent();
-                hasReturn = generateBlockSource(sourceBuilder, ((Try) part).impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                hasReturn = generateBlockSource(sourceBuilder, ((Try) part).impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.unindent();
                 sourceBuilder.appendln("} catch(net.nexustools.njs.Error.InvisibleException ex) {");
                 sourceBuilder.appendln("\tthrow ex;");
@@ -2526,7 +2643,7 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append(".let(\"");
                 sourceBuilder.append(convertStringSource(((Reference) c.condition).ref));
                 sourceBuilder.appendln("\", global.wrap(t));");
-                hasReturn = generateBlockSource(sourceBuilder, c.impl, methodPrefix, newScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak) && hasReturn;
+                hasReturn = generateBlockSource(sourceBuilder, c.impl, methodPrefix, newScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context) && hasReturn;
                 sourceBuilder.unindent();
                 sourceBuilder.appendln("} finally {");
                 sourceBuilder.append("\t");
@@ -2540,11 +2657,11 @@ public class JavaTranspiler extends RegexCompiler {
 
             sourceBuilder.appendln("try {");
             sourceBuilder.indent();
-            hasReturn = generateBlockSource(sourceBuilder, ((Try) part).impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            hasReturn = generateBlockSource(sourceBuilder, ((Try) part).impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.unindent();
             sourceBuilder.appendln("} finally {");
             sourceBuilder.indent();
-            hasReturn = generateBlockSource(sourceBuilder, f.impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak) || hasReturn;
+            hasReturn = generateBlockSource(sourceBuilder, f.impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context) || hasReturn;
             sourceBuilder.unindent();
             sourceBuilder.appendln("}");
             return hasReturn;
@@ -2552,10 +2669,10 @@ public class JavaTranspiler extends RegexCompiler {
             boolean hasReturn;
             if (((If) part).simpleimpl != null) {
                 sourceBuilder.append("if(");
-                generateBooleanSource(sourceBuilder, ((If) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateBooleanSource(sourceBuilder, ((If) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.appendln(") {");
                 sourceBuilder.indent();
-                hasReturn = transpileParsedSource(sourceBuilder, ((If) part).simpleimpl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, true);
+                hasReturn = transpileParsedSource(sourceBuilder, ((If) part).simpleimpl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, true);
                 if(!(((If) part).simpleimpl instanceof Block))
                     sourceBuilder.appendln(";");
                 else
@@ -2563,26 +2680,26 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.unindent();
                 sourceBuilder.append("}");
 
-                return generateIfBlockSource(sourceBuilder, ((If) part).el, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak) && hasReturn;
+                return generateIfBlockSource(sourceBuilder, ((If) part).el, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context) && hasReturn;
             }
 
             sourceBuilder.append("if(");
-            generateBooleanSource(sourceBuilder, ((If) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateBooleanSource(sourceBuilder, ((If) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.appendln(") {");
             sourceBuilder.indent();
-            hasReturn = generateBlockSource(sourceBuilder, ((If) part).impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            hasReturn = generateBlockSource(sourceBuilder, ((If) part).impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.unindent();
             sourceBuilder.append("}");
 
-            return generateIfBlockSource(sourceBuilder, ((If) part).el, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak) && hasReturn;
+            return generateIfBlockSource(sourceBuilder, ((If) part).el, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context) && hasReturn;
         } else if (part instanceof While) {
             boolean hasReturn = ((While) part).condition.isTrue();
             if (((While) part).simpleimpl != null) {
                 sourceBuilder.append("while(");
-                generateBooleanSource(sourceBuilder, ((While) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateBooleanSource(sourceBuilder, ((While) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.appendln(") {");
                 sourceBuilder.indent();
-                transpileParsedSource(sourceBuilder, ((While) part).simpleimpl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, true);
+                transpileParsedSource(sourceBuilder, ((While) part).simpleimpl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, true);
                 if(!(((While) part).simpleimpl instanceof Block))
                     sourceBuilder.appendln(";");
                 else
@@ -2592,10 +2709,10 @@ public class JavaTranspiler extends RegexCompiler {
             }
 
             sourceBuilder.append("while(");
-            generateBooleanSource(sourceBuilder, ((While) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateBooleanSource(sourceBuilder, ((While) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.appendln(") {");
             sourceBuilder.indent();
-            hasReturn = !generateBlockSource(sourceBuilder, ((While) part).impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak) && hasReturn;
+            hasReturn = !generateBlockSource(sourceBuilder, ((While) part).impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context) && hasReturn;
             sourceBuilder.unindent();
             sourceBuilder.append("}");
             return hasReturn;
@@ -2604,10 +2721,10 @@ public class JavaTranspiler extends RegexCompiler {
 
             sourceBuilder.append("do {");
             sourceBuilder.indent();
-            hasReturn = !generateBlockSource(sourceBuilder, ((Do) part).impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak) && hasReturn;
+            hasReturn = !generateBlockSource(sourceBuilder, ((Do) part).impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context) && hasReturn;
             sourceBuilder.unindent();
             sourceBuilder.append("} while(");
-            generateBooleanSource(sourceBuilder, ((Do) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateBooleanSource(sourceBuilder, ((Do) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(");");
             return hasReturn;
         } else if (part instanceof For) {
@@ -2620,7 +2737,7 @@ public class JavaTranspiler extends RegexCompiler {
                         sourceBuilder.indent();
                         final Var var = (Var)((For) part).init;
                         sourceBuilder.append("Iterator<java.lang.String> it = ");
-                        transpileParsedSource(sourceBuilder, var.sets.get(0).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        transpileParsedSource(sourceBuilder, var.sets.get(0).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         sourceBuilder.appendln(".deepPropertyNameIterator();");
                         sourceBuilder.appendln("while(it.hasNext()) {");
                         sourceBuilder.indent();
@@ -2628,7 +2745,7 @@ public class JavaTranspiler extends RegexCompiler {
                         sourceBuilder.append(".var(\"");
                         sourceBuilder.append(((Reference)var.sets.get(0).lhs).ref);
                         sourceBuilder.appendln("\", global.String.wrap(it.next()));");
-                        hasReturn = transpileParsedSource(sourceBuilder, ((For) part).simpleimpl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak) && hasReturn;
+                        hasReturn = transpileParsedSource(sourceBuilder, ((For) part).simpleimpl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context) && hasReturn;
                         if(!(((For) part).simpleimpl instanceof Block))
                             sourceBuilder.appendln(";");
                         else
@@ -2644,14 +2761,14 @@ public class JavaTranspiler extends RegexCompiler {
                     {
                         final Var set = (Var)((For) part).init;
                         sourceBuilder.append("for(BaseObject forObject : ");
-                        transpileParsedSource(sourceBuilder, set.sets.get(0).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        transpileParsedSource(sourceBuilder, set.sets.get(0).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         sourceBuilder.appendln(") {");
                         sourceBuilder.indent();
                         sourceBuilder.append(baseScope);
                         sourceBuilder.append(".var(\"");
                         sourceBuilder.append(((Reference) set.sets.get(0).lhs).ref);
                         sourceBuilder.appendln("\", forObject);");
-                        hasReturn = transpileParsedSource(sourceBuilder, ((For) part).simpleimpl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak) && hasReturn;
+                        hasReturn = transpileParsedSource(sourceBuilder, ((For) part).simpleimpl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context) && hasReturn;
                         if(!(((For) part).simpleimpl instanceof Block))
                             sourceBuilder.appendln(";");
                         else
@@ -2663,14 +2780,14 @@ public class JavaTranspiler extends RegexCompiler {
 
                     case Standard:
                         if(((For)part).init != null) {
-                            transpileParsedSource(sourceBuilder, ((For)part).init, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, true);
+                            transpileParsedSource(sourceBuilder, ((For)part).init, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, true);
                             if(!(((For)part).init instanceof Block))
                                 sourceBuilder.appendln(";");
                             else
                                 sourceBuilder.appendln();
                         }
                         sourceBuilder.append("for(; ");
-                        generateBooleanSource(sourceBuilder, ((For) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        generateBooleanSource(sourceBuilder, ((For) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         sourceBuilder.append("; ");
                         boolean first = true;
                         for(Parsed _part : ((For)part).loop) {
@@ -2678,11 +2795,11 @@ public class JavaTranspiler extends RegexCompiler {
                                 first = false;
                             else
                                 sourceBuilder.appendln(", ");
-                            transpileParsedSource(sourceBuilder, _part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                            transpileParsedSource(sourceBuilder, _part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                         }
                         sourceBuilder.appendln(") {");
                         sourceBuilder.indent();
-                        hasReturn = transpileParsedSource(sourceBuilder, ((For) part).simpleimpl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, true) && hasReturn;
+                        hasReturn = transpileParsedSource(sourceBuilder, ((For) part).simpleimpl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, true) && hasReturn;
                         if(!(((For) part).simpleimpl instanceof Block))
                             sourceBuilder.appendln(";");
                         else
@@ -2712,7 +2829,7 @@ public class JavaTranspiler extends RegexCompiler {
                         scope = baseScope;
                     }
                     sourceBuilder.append("Iterator<java.lang.String> it = ");
-                    transpileParsedSource(sourceBuilder, var.sets.get(0).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, var.sets.get(0).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.appendln(".deepPropertyNameIterator();");
                     sourceBuilder.appendln("while(it.hasNext()) {");
                     sourceBuilder.indent();
@@ -2724,7 +2841,7 @@ public class JavaTranspiler extends RegexCompiler {
                     }
                     sourceBuilder.append(((Reference)var.sets.get(0).lhs).ref);
                     sourceBuilder.appendln("\", global.String.wrap(it.next()));");
-                    hasReturn = !generateBlockSource(sourceBuilder, ((For) part).impl, methodPrefix, scope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak) && hasReturn;
+                    hasReturn = !generateBlockSource(sourceBuilder, ((For) part).impl, methodPrefix, scope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context) && hasReturn;
                     sourceBuilder.unindent();
                     sourceBuilder.appendln("}");
                     sourceBuilder.unindent();
@@ -2749,7 +2866,7 @@ public class JavaTranspiler extends RegexCompiler {
                         scope = baseScope;
                     }
                     sourceBuilder.append("for(BaseObject forObject : ");
-                    transpileParsedSource(sourceBuilder, var.sets.get(0).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, var.sets.get(0).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.appendln(") {");
                     sourceBuilder.indent();
                     Parsed lhs = var.sets.get(0).lhs;
@@ -2790,7 +2907,7 @@ public class JavaTranspiler extends RegexCompiler {
                             sourceBuilder.appendln("\"));");
                         }
                     }
-                    hasReturn = !generateBlockSource(sourceBuilder, ((For) part).impl, methodPrefix, scope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak) && hasReturn;
+                    hasReturn = !generateBlockSource(sourceBuilder, ((For) part).impl, methodPrefix, scope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context) && hasReturn;
                     sourceBuilder.unindent();
                     sourceBuilder.append("}");
                     if (let) {
@@ -2803,7 +2920,7 @@ public class JavaTranspiler extends RegexCompiler {
 
                 case Standard:
                     if(((For)part).init != null) {
-                        transpileParsedSource(sourceBuilder, ((For)part).init, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, true);
+                        transpileParsedSource(sourceBuilder, ((For)part).init, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context, true);
                         if(!(((For)part).init instanceof Block))
                             sourceBuilder.appendln(";");
                         else
@@ -2811,7 +2928,7 @@ public class JavaTranspiler extends RegexCompiler {
                     }
                     sourceBuilder.append("for(; ");
                     if(((For) part).condition != null)
-                        generateBooleanSource(sourceBuilder, ((For) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        generateBooleanSource(sourceBuilder, ((For) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.append("; ");
                     boolean first = true;
                     for(Parsed _part : ((For)part).loop) {
@@ -2819,11 +2936,11 @@ public class JavaTranspiler extends RegexCompiler {
                             first = false;
                         else
                             sourceBuilder.appendln(", ");
-                        transpileParsedSource(sourceBuilder, _part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                        transpileParsedSource(sourceBuilder, _part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     }
                     sourceBuilder.appendln(") {");
                     sourceBuilder.indent();
-                    hasReturn = !generateBlockSource(sourceBuilder, ((For) part).impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak) && hasReturn;
+                    hasReturn = !generateBlockSource(sourceBuilder, ((For) part).impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context) && hasReturn;
                     sourceBuilder.unindent();
                     sourceBuilder.append("}");
             }
@@ -2898,9 +3015,9 @@ public class JavaTranspiler extends RegexCompiler {
                     sourceBuilder.append("\")");
                 }
             } else if(ref instanceof VariableReference) {
-                transpileParsedSource(sourceBuilder, ((VariableReference)ref).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, ((VariableReference)ref).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(", ");
-                transpileParsedSource(sourceBuilder, ((VariableReference)ref).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, ((VariableReference)ref).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             } else {
                 throw new UnsupportedOperationException("Cannot compile ++: " + describe(ref));
             }
@@ -2919,7 +3036,7 @@ public class JavaTranspiler extends RegexCompiler {
 
                     sourceBuilder.append(expectedStack.getReference(((Reference) ref).ref));
                     sourceBuilder.append(" += ");
-                    generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     if (!atTop) {
                         sourceBuilder.append(")");
                     }
@@ -2934,7 +3051,7 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append("\"");
                 sourceBuilder.append(convertStringSource(((Reference) ref).ref));
                 sourceBuilder.append("\", ");
-                transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(", ");
                 sourceBuilder.append(baseScope);
             } else if(ref instanceof ReferenceChain) {
@@ -2944,7 +3061,7 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append("\"");
                 sourceBuilder.append(convertStringSource(last));
                 sourceBuilder.append("\", ");
-                transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(", ");
                 generateBaseScopeAccess(sourceBuilder, first, baseScope, expectedStack, localStack);
                 for (java.lang.String key : ((ReferenceChain) ref).chain) {
@@ -2970,7 +3087,7 @@ public class JavaTranspiler extends RegexCompiler {
 
                     sourceBuilder.append(expectedStack.getReference(((Reference) ref).ref));
                     sourceBuilder.append(" |= ");
-                    generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     if (!atTop) {
                         sourceBuilder.append(")");
                     }
@@ -2985,7 +3102,7 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append("\"");
                 sourceBuilder.append(convertStringSource(((Reference) ref).ref));
                 sourceBuilder.append("\", ");
-                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(", ");
                 sourceBuilder.append(baseScope);
             } else {
@@ -3006,7 +3123,7 @@ public class JavaTranspiler extends RegexCompiler {
 
                     sourceBuilder.append(expectedStack.getReference(((Reference) ref).ref));
                     sourceBuilder.append(" &= ");
-                    generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     if (!atTop) {
                         sourceBuilder.append(")");
                     }
@@ -3021,7 +3138,7 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append("\"");
                 sourceBuilder.append(convertStringSource(((Reference) ref).ref));
                 sourceBuilder.append("\", ");
-                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(", ");
                 sourceBuilder.append(baseScope);
             } else {
@@ -3038,7 +3155,7 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append("\"");
                 sourceBuilder.append(convertStringSource(((Reference) ref).ref));
                 sourceBuilder.append("\", ");
-                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(", ");
                 sourceBuilder.append(baseScope);
             } else {
@@ -3055,7 +3172,7 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append("\"");
                 sourceBuilder.append(convertStringSource(((Reference) ref).ref));
                 sourceBuilder.append("\", ");
-                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(", ");
                 sourceBuilder.append(baseScope);
             } else {
@@ -3072,7 +3189,7 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append("\"");
                 sourceBuilder.append(convertStringSource(((Reference) ref).ref));
                 sourceBuilder.append("\", ");
-                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(", ");
                 sourceBuilder.append(baseScope);
             } else if(ref instanceof ReferenceChain) {
@@ -3082,7 +3199,7 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append("\"");
                 sourceBuilder.append(convertStringSource(last));
                 sourceBuilder.append("\", ");
-                transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(", ");
                 generateBaseScopeAccess(sourceBuilder, first, baseScope, expectedStack, localStack);
                 for (java.lang.String key : ((ReferenceChain) ref).chain) {
@@ -3104,7 +3221,7 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append("\"");
                 sourceBuilder.append(convertStringSource(((Reference) ref).ref));
                 sourceBuilder.append("\", ");
-                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateNumberSource(sourceBuilder, rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(", ");
                 sourceBuilder.append(baseScope);
             } else {
@@ -3185,7 +3302,7 @@ public class JavaTranspiler extends RegexCompiler {
                     sourceBuilder.append("setDirectly(\"");
                     sourceBuilder.append(convertStringSource(entry.getKey()));
                     sourceBuilder.append("\", ");
-                    transpileParsedSource(sourceBuilder, entry.getValue(), methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    transpileParsedSource(sourceBuilder, entry.getValue(), methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                     sourceBuilder.appendln(");");
                 }
                 sourceBuilder.unindent();
@@ -3196,7 +3313,7 @@ public class JavaTranspiler extends RegexCompiler {
             return false;
         } else if (part instanceof Delete) {
             if (atTop) {
-                generateBooleanSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                generateBooleanSource(sourceBuilder, part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 return false;
             }
 
@@ -3229,9 +3346,9 @@ public class JavaTranspiler extends RegexCompiler {
                 return false;
             } else if(rhs instanceof VariableReference) {
                 sourceBuilder.append("(Utilities.delete(");
-                transpileParsedSource(sourceBuilder, ((VariableReference) rhs).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, ((VariableReference) rhs).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(", ");
-                transpileParsedSource(sourceBuilder, ((VariableReference) rhs).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, ((VariableReference) rhs).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
                 return false;
             }
@@ -3239,30 +3356,30 @@ public class JavaTranspiler extends RegexCompiler {
             throw new UnsupportedOperationException("Cannot compile delete : " + describe(rhs));
         } else if (part instanceof MoreThan) {
             sourceBuilder.append("(moreThan(");
-            transpileParsedSource(sourceBuilder, ((MoreThan) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((MoreThan) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(", ");
-            transpileParsedSource(sourceBuilder, ((MoreThan) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((MoreThan) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
             return false;
         } else if (part instanceof LessThan) {
             sourceBuilder.append("(lessThan(");
-            transpileParsedSource(sourceBuilder, ((LessThan) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((LessThan) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(", ");
-            transpileParsedSource(sourceBuilder, ((LessThan) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((LessThan) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
             return false;
         } else if (part instanceof MoreEqual) {
             sourceBuilder.append("(moreEqual(");
-            transpileParsedSource(sourceBuilder, ((MoreEqual) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((MoreEqual) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(", ");
-            transpileParsedSource(sourceBuilder, ((MoreEqual) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((MoreEqual) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
             return false;
         } else if (part instanceof LessEqual) {
             sourceBuilder.append("(lessEqual(");
-            transpileParsedSource(sourceBuilder, ((LessEqual) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((LessEqual) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(", ");
-            transpileParsedSource(sourceBuilder, ((LessEqual) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((LessEqual) part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
             return false;
         } else if (part instanceof VariableReference) {
@@ -3274,13 +3391,13 @@ public class JavaTranspiler extends RegexCompiler {
                         if (type != null) {
                             if (type.equals("number")) {
                                 sourceBuilder.append("Utilities.get(");
-                                transpileParsedSource(sourceBuilder, ((VariableReference) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                                transpileParsedSource(sourceBuilder, ((VariableReference) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                                 sourceBuilder.append(", ");
-                                generateNumberSource(sourceBuilder, ((VariableReference) part).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                                generateNumberSource(sourceBuilder, ((VariableReference) part).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                                 sourceBuilder.append(")");
                                 return false;
                             } else if (type.equals("string")) {
-                                transpileParsedSource(sourceBuilder, ((VariableReference) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                                transpileParsedSource(sourceBuilder, ((VariableReference) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                                 sourceBuilder.append(".get(");
                                 sourceBuilder.append(expectedStack.getReference(((Reference) ref).ref));
                                 sourceBuilder.append(")");
@@ -3293,18 +3410,18 @@ public class JavaTranspiler extends RegexCompiler {
                 }
             }
             sourceBuilder.append("Utilities.get(");
-            transpileParsedSource(sourceBuilder, ((VariableReference) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((VariableReference) part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(", ");
-            transpileParsedSource(sourceBuilder, ((VariableReference) part).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((VariableReference) part).ref, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(")");
             return false;
         } else if (part instanceof Fork) {
             sourceBuilder.append("(");
-            generateBooleanSource(sourceBuilder, ((Fork) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateBooleanSource(sourceBuilder, ((Fork) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(" ? (");
-            transpileParsedSource(sourceBuilder, ((Fork) part).success, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((Fork) part).success, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(") : (");
-            transpileParsedSource(sourceBuilder, ((Fork) part).failure, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((Fork) part).failure, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append("))");
             return false;
         } else if(part instanceof RegEx) {
@@ -3334,14 +3451,14 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.append("switch(");
             if(type == SwitchType.Integer) {
                 switchEnum = null;
-                transpileParsedSource(sourceBuilder, ((Switch) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, ((Switch) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(".toInt()");
             } else {
                 switchEnum = new SwitchEnum();
                 sourceBuilder.append("__switch_enum");
                 sourceBuilder.append(java.lang.String.valueOf(extras.size()));
                 sourceBuilder.append("__(");
-                transpileParsedSource(sourceBuilder, ((Switch) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, ((Switch) part).condition, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.append(")");
                 extras.add(switchEnum);
             }
@@ -3370,7 +3487,7 @@ public class JavaTranspiler extends RegexCompiler {
                 } else if(_part instanceof Default) {
                     sourceBuilder.appendln("default:");
                 } else {
-                    transpileParsedSource(sourceBuilder, _part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, myBreak, true);
+                    transpileParsedSource(sourceBuilder, _part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, myBreak, context, true);
                     if(!(_part instanceof Block))
                         sourceBuilder.appendln(";");
                     else
@@ -3388,7 +3505,7 @@ public class JavaTranspiler extends RegexCompiler {
                     first = false;
                 else
                     sourceBuilder.append(", ");
-                transpileParsedSource(sourceBuilder, _part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                transpileParsedSource(sourceBuilder, _part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             }
             sourceBuilder.append(")");
             return false;
@@ -3415,7 +3532,7 @@ public class JavaTranspiler extends RegexCompiler {
                 else
                     sourceBuilder.append(" + ");
                 if(_part instanceof Parsed)
-                    generateStringSource(sourceBuilder, (Parsed)_part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+                    generateStringSource(sourceBuilder, (Parsed)_part, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 else {
                     sourceBuilder.append("\"");
                     sourceBuilder.append(convertStringSource(_part.toString()));
@@ -3426,9 +3543,9 @@ public class JavaTranspiler extends RegexCompiler {
             return false;
         } else if (part instanceof In) {
             sourceBuilder.append("(");
-            transpileParsedSource(sourceBuilder, ((In)part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            transpileParsedSource(sourceBuilder, ((In)part).rhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(".in(");
-            generateStringSource(sourceBuilder, ((In)part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak);
+            generateStringSource(sourceBuilder, ((In)part).lhs, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
             sourceBuilder.append(") ? global.Boolean.TRUE : global.Boolean.FALSE)");
             return false;
         } else if(part instanceof Break) {
@@ -3470,7 +3587,7 @@ public class JavaTranspiler extends RegexCompiler {
         }
     }
 
-    protected void transpileScriptSource(SourceBuilder sourceBuilder, LocalStack localStack, ScriptData script, java.lang.String methodPrefix, java.lang.String fileName, ClassNameScopeChain scopeChain, SourceScope scope, List<java.lang.Object> extras, boolean[] hasBreak) {
+    protected void transpileScriptSource(SourceBuilder sourceBuilder, LocalStack localStack, ScriptData script, java.lang.String methodPrefix, java.lang.String fileName, ClassNameScopeChain scopeChain, SourceScope scope, List<java.lang.Object> extras, boolean[] hasBreak, TranspileContext context) {
         if (addDebugging || !scope.isFunction()) {
             sourceBuilder.appendln("@Override");
             sourceBuilder.appendln("public String source() {");
@@ -3483,9 +3600,16 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.appendln("\";");
             sourceBuilder.appendln("}");
         }
+        
+        Map<java.lang.String, Class> classes = new HashMap();
+        Map<java.lang.String, Function> functionsMap = new HashMap();
+        for(Map.Entry<java.lang.String, Function> entry : script.functions.entrySet()) {
+            functionsMap.put(scopeChain.refName(entry.getKey()), entry.getValue());
+        }
+        
         StackOptimizations opt = (StackOptimizations) script.optimizations;
         boolean usesStackClass = opt != null && opt.stackType() != ScopeOptimizer.StackType.TypedLocal;
-        java.lang.String stackName = usesStackClass ? scopeChain.toClassName("Stack") : null;
+        java.lang.String stackName = usesStackClass ? scopeChain.refName("Stack") : null;
         if (!scope.isGlobal()) {
             sourceBuilder.appendln("@Override");
             sourceBuilder.appendln("public String name() {");
@@ -3711,7 +3835,7 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.appendln("\", SOURCE_MAP);");
         }
         if (opt != null) {
-            for (Map.Entry<java.lang.String, Function> entry : script.functions.entrySet()) {
+            for (Map.Entry<java.lang.String, Function> entry : functionsMap.entrySet()) {
                 Function function = entry.getValue();
                 java.lang.String functionName = entry.getKey();
                 if (usesStackClass) {
@@ -3731,7 +3855,7 @@ public class JavaTranspiler extends RegexCompiler {
                 localStack.put(function.name, "function");
             }
         } else {
-            for (Map.Entry<java.lang.String, Function> entry : script.functions.entrySet()) {
+            for (Map.Entry<java.lang.String, Function> entry : functionsMap.entrySet()) {
                 sourceBuilder.append("baseScope.var(\"");
                 sourceBuilder.append(convertStringSource(entry.getValue().name));
                 sourceBuilder.append("\", new ");
@@ -3761,7 +3885,7 @@ public class JavaTranspiler extends RegexCompiler {
                 if (addDebugging) {
                     addSourceMapEntry(sourceBuilder, sourceMap, part);
                 }
-                hasReturn = transpileParsedSource(sourceBuilder, part, methodPrefix, "baseScope", fileName, localStack, expectedStack, script.functions, script.classes, scopeChain, sourceMap, extras, hasBreak, i++ != last || lastAtTop) || hasReturn;
+                hasReturn = transpileParsedSource(sourceBuilder, part, methodPrefix, "baseScope", fileName, localStack, expectedStack, functionsMap, classes, scopeChain, sourceMap, extras, hasBreak, context, i++ != last || lastAtTop) || hasReturn;
                 if(!(part instanceof Block))
                     sourceBuilder.appendln(";");
                 else
@@ -3785,7 +3909,7 @@ public class JavaTranspiler extends RegexCompiler {
                 if (addDebugging) {
                     addSourceMapEntry(sourceBuilder, sourceMap, part);
                 }
-                hasReturn = transpileParsedSource(sourceBuilder, part, methodPrefix, "baseScope", fileName, localStack, expectedStack, script.functions, script.classes, scopeChain, sourceMap, extras, hasBreak, i != last || lastAtTop) || hasReturn;
+                hasReturn = transpileParsedSource(sourceBuilder, part, methodPrefix, "baseScope", fileName, localStack, expectedStack, functionsMap, classes, scopeChain, sourceMap, extras, hasBreak, context, i != last || lastAtTop) || hasReturn;
                 if(!(part instanceof Block))
                     sourceBuilder.appendln(";");
                 else
@@ -3924,8 +4048,8 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.appendln("}");
         }
         
-        for (Map.Entry<java.lang.String, Class> entry : script.classes.entrySet()) {
-            ClassNameScopeChain _scopeChain = new ExtendedClassNameScopeChain(scopeChain);
+        for (Map.Entry<java.lang.String, Class> entry : classes.entrySet()) {
+            ClassNameScopeChain _scopeChain = scopeChain.extend();
             Map<java.lang.String, Function> functionMap = new HashMap();
             
             Class clazz = entry.getValue();
@@ -3979,18 +4103,22 @@ public class JavaTranspiler extends RegexCompiler {
                         
                         java.lang.String name = classMethod.name;
 
-                        name = _scopeChain.toClassName(name);
+                        name = _scopeChain.refName(name);
                         if (functionMap.containsKey(name)) {
                             int index = 2;
                             java.lang.String base = name + "_";
                             do {
                                 name = base + index++;
                             } while (functionMap.containsKey(name));
+                            name = _scopeChain.refName(name);
                         }
                         functionMap.put(name, classMethod);
 
                         sourceBuilder.append(name);
-                        sourceBuilder.appendln("(_super, global, scope));");
+                        sourceBuilder.append("(");
+                        if(_extends)
+                            sourceBuilder.append("_super, ");
+                        sourceBuilder.appendln("global, scope));");
                 }
             }
             for(Map.Entry<java.lang.String, GetterSetter> _entry : properties.entrySet()) {
@@ -4003,13 +4131,14 @@ public class JavaTranspiler extends RegexCompiler {
                 else {
                     java.lang.String name = "get_" + _getset.getter.name;
 
-                    name = _scopeChain.toClassName(name);
+                    name = _scopeChain.refName(name);
                     if (functionMap.containsKey(name)) {
                         int index = 2;
                         java.lang.String base = name + "_";
                         do {
                             name = base + index++;
                         } while (functionMap.containsKey(name));
+                        name = _scopeChain.refName(name);
                     }
                     functionMap.put(name, _getset.getter);
                     
@@ -4026,13 +4155,14 @@ public class JavaTranspiler extends RegexCompiler {
                 else {
                     java.lang.String name = "set_" + _getset.setter.name;
 
-                    name = _scopeChain.toClassName(name);
+                    name = _scopeChain.refName(name);
                     if (functionMap.containsKey(name)) {
                         int index = 2;
                         java.lang.String base = name + "_";
                         do {
                             name = base + index++;
                         } while (functionMap.containsKey(name));
+                        name = _scopeChain.refName(name);
                     }
                     functionMap.put(name, _getset.setter);
                     
@@ -4062,26 +4192,19 @@ public class JavaTranspiler extends RegexCompiler {
                 impl[impl.length-1] = new Return(new Reference("this"));
                 constructor.impl = new ScriptData(impl, "[java_code]", 0, 0);
             }
-            if(constructor != null) {
-                List<java.lang.Object> _extras = new ArrayList();
-                LocalStack funcLocalStack = constructor.impl.optimizations == null ? null : new LocalStack(true);
-                transpileScriptSource(sourceBuilder, funcLocalStack, constructor.impl, methodPrefix, fileName, scopeChain.extend(), scope.isNonGlobalFunction() ? SourceScope.SubFunction : SourceScope.Function, _extras, null);
-                generateExtras(sourceBuilder, extras);
-            }
-            generateFunctions(sourceBuilder, functionMap, methodPrefix, fileName, _scopeChain, SourceScope.SubFunction, _extends);
+            List<java.lang.Object> _extras = new ArrayList();
+            LocalStack funcLocalStack = constructor.impl.optimizations == null ? null : new LocalStack(true);
+            transpileScriptSource(sourceBuilder, funcLocalStack, constructor.impl, methodPrefix, fileName, _scopeChain, scope.isNonGlobalFunction() ? SourceScope.SubFunction : SourceScope.Function, _extras, null, TranspileContext.ClassMethod);
+            generateExtras(sourceBuilder, extras);
+            generateFunctions(sourceBuilder, functionMap, methodPrefix, fileName, _scopeChain, SourceScope.SubFunction, _extends, TranspileContext.ClassMethod);
             sourceBuilder.appendln("Scope extendScope(BaseObject _this) {");
-            if(_extends) {
-                sourceBuilder.appendln("\tScope scope = baseScope.extend(_this);");
-                sourceBuilder.appendln("\tscope.var(\"super\", _super);");
-                sourceBuilder.appendln("\treturn scope;");
-            } else
-                sourceBuilder.appendln("\treturn baseScope.extend(_this);");
+            sourceBuilder.appendln("\treturn baseScope.extend(_this);");
             sourceBuilder.appendln("}");
             sourceBuilder.unindent();
             sourceBuilder.appendln("}");
         }
 
-        generateFunctions(sourceBuilder, script.functions, methodPrefix, fileName, scopeChain, scope.isNonGlobalFunction() ? SourceScope.SubFunction : SourceScope.Function, false);
+        generateFunctions(sourceBuilder, functionsMap, methodPrefix, fileName, scopeChain, scope.isNonGlobalFunction() ? SourceScope.SubFunction : SourceScope.Function, false, TranspileContext.Function);
 
         if (addDebugging) {
             sourceBuilder.append("public");
@@ -4111,8 +4234,9 @@ public class JavaTranspiler extends RegexCompiler {
         }
     }
     
-    protected void generateFunctions(SourceBuilder sourceBuilder, Map<java.lang.String, Function> functionMap, java.lang.String methodPrefix, java.lang.String fileName, ClassNameScopeChain scopeChain, SourceScope scope, boolean _scopeHasSuper) {
+    protected void generateFunctions(SourceBuilder sourceBuilder, Map<java.lang.String, Function> functionMap, java.lang.String methodPrefix, java.lang.String fileName, ClassNameScopeChain scopeChain, SourceScope scope, boolean _scopeHasSuper, TranspileContext context) {
         for (Map.Entry<java.lang.String, Function> entry : functionMap.entrySet()) {
+            ClassNameScopeChain _scopeChain = scopeChain.extend();
             java.lang.String functionName = entry.getKey();
             Function function = entry.getValue();
             
@@ -4153,31 +4277,21 @@ public class JavaTranspiler extends RegexCompiler {
 
             List<java.lang.Object> extras = new ArrayList();
             LocalStack funcLocalStack = function.impl.optimizations == null ? null : new LocalStack(true);
-            transpileScriptSource(sourceBuilder, funcLocalStack, function.impl, methodPrefix, fileName, scopeChain.extend(), scope, extras, null);
+            transpileScriptSource(sourceBuilder, funcLocalStack, function.impl, methodPrefix, fileName, _scopeChain, scope, extras, null, context);
 
             if (funcopt == null || (funcopt.stackType() != ScopeOptimizer.StackType.TypedLocal && (funcopt.stackType() == ScopeOptimizer.StackType.TypedClass || funcLocalStack.isEmpty()))) {
                 sourceBuilder.append("Scope extendScope(");
                 if(!function.isLambda())
                     sourceBuilder.append("BaseObject _this");
                 sourceBuilder.appendln(") {");
-                if(scopeHasSuper) {
-                    sourceBuilder.appendln("\tScope scope = baseScope.extend(_this);");
-                    sourceBuilder.appendln("\tscope.var(\"super\", _super.prototype());");
-                    sourceBuilder.appendln("\treturn scope;");
-                } else
-                    sourceBuilder.appendln("\treturn baseScope.extend(_this);");
+                sourceBuilder.appendln("\treturn baseScope.extend(_this);");
                 sourceBuilder.appendln("}");
             } else if (funcopt.stackType() != ScopeOptimizer.StackType.TypedLocal) {
                 sourceBuilder.appendln("Scope extendScope(");
                 if(!function.isLambda())
                     sourceBuilder.append("BaseObject _this, ");
                 sourceBuilder.appendln("Scopable stack) {");
-                if(scopeHasSuper) {
-                    sourceBuilder.appendln("\tScope scope = baseScope.extend(_this, stack);");
-                    sourceBuilder.appendln("\tscope.var(\"super\", _super.prototype());");
-                    sourceBuilder.appendln("\treturn scope;");
-                } else
-                    sourceBuilder.appendln("\treturn baseScope.extend(_this, stack);");
+                sourceBuilder.appendln("\treturn baseScope.extend(_this, stack);");
                 sourceBuilder.appendln("}");
             }
             
@@ -4281,7 +4395,6 @@ public class JavaTranspiler extends RegexCompiler {
         sourceBuilder.appendln();
 
         sourceBuilder.append("public final class ");
-        BASE_CLASS_NAME_SCOPE_CHAIN.toClassName(className, true);
         sourceBuilder.append(className);
         sourceBuilder.append(" extends CompiledScript.");
         sourceBuilder.append(addDebugging ? "Debuggable" : "Optimized");
@@ -4311,7 +4424,7 @@ public class JavaTranspiler extends RegexCompiler {
                     }
                 }
             }
-            transpileScriptSource(sourceBuilder, script.optimizations == null ? null : new LocalStack(!inFunction), script, script.methodName, fileName, BASE_CLASS_NAME_SCOPE_CHAIN.extend(), inFunction ? SourceScope.GlobalFunction : SourceScope.GlobalScript, extras, null);
+            transpileScriptSource(sourceBuilder, script.optimizations == null ? null : new LocalStack(!inFunction), script, script.methodName, fileName, BASE_CLASS_NAME_SCOPE_CHAIN, inFunction ? SourceScope.GlobalFunction : SourceScope.GlobalScript, extras, null, inFunction ? TranspileContext.Function : TranspileContext.Script);
         } catch (RuntimeException t) {
             System.err.println(sourceBuilder.toString());
             throw t;
@@ -4354,9 +4467,9 @@ public class JavaTranspiler extends RegexCompiler {
     protected Script compileScript(ScriptData script, java.lang.String fileName, boolean inFunction) {
         final java.lang.String className;
         if (fileName.endsWith(".js")) {
-            className = BASE_CLASS_NAME_SCOPE_CHAIN.toClassName(fileName.substring(0, fileName.length() - 3));
+            className = BASE_CLASS_NAME_SCOPE_CHAIN.refName(fileName.substring(0, fileName.length() - 3));
         } else {
-            className = BASE_CLASS_NAME_SCOPE_CHAIN.toClassName(fileName);
+            className = BASE_CLASS_NAME_SCOPE_CHAIN.refName(fileName);
         }
         final java.lang.String source = transpileJavaClassSource(script, className, fileName, "net.nexustools.njs.gen", inFunction, false);
         final java.lang.String classPath = "net.nexustools.njs.gen." + className;
@@ -4457,11 +4570,11 @@ public class JavaTranspiler extends RegexCompiler {
             baseName = output;
         }
         if(rclassname != null) {
-            className = rclassname;
+            className = compiler.BASE_CLASS_NAME_SCOPE_CHAIN.refName(rclassname);
         } else if (baseName.endsWith(".java")) {
-            className = compiler.BASE_CLASS_NAME_SCOPE_CHAIN.toClassName(baseName.substring(0, baseName.length() - 5));
+            className = compiler.BASE_CLASS_NAME_SCOPE_CHAIN.refName(baseName.substring(0, baseName.length() - 5));
         } else {
-            className = compiler.BASE_CLASS_NAME_SCOPE_CHAIN.toClassName(baseName);
+            className = compiler.BASE_CLASS_NAME_SCOPE_CHAIN.refName(baseName);
         }
         if (pkg == null) {
             if (pos > -1) {

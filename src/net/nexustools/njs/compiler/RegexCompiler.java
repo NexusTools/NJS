@@ -134,11 +134,9 @@ public abstract class RegexCompiler implements Compiler {
         final int rows, columns;
         java.lang.Object optimizations;
         java.lang.String methodName = null, source;
-        final Map<java.lang.String, Class> classes;
         final Map<java.lang.String, Function> functions;
 
         public ScriptData(Parsed[] impl, java.lang.String source, int rows, int columns) {
-            classes = new HashMap();
             functions = new HashMap();
             List<Parsed> imp = new ArrayList();
             for (int i = 0; i < impl.length; i++) {
