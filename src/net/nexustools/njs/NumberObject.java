@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -49,16 +49,14 @@ public abstract class NumberObject implements BaseObject {
 
     @Override
     public Number.Instance toNumber() {
-        double num;
         try {
-            num = Double.valueOf(toString());
-        } catch (NumberFormatException ex) {
-            num = Double.NaN;
-        }
-        try {
-            return Number.wrap(num);
-        } catch (NullPointerException ex) {
-            System.err.println(getClass());
+            try {
+                return Number.wrap(Double.valueOf(toString()));
+            } catch (NumberFormatException ex) {
+                return Number.NaN;
+            }
+        } catch(NullPointerException ex) {
+            System.out.println(getClass());
             throw ex;
         }
     }

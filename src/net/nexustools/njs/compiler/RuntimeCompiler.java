@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -1097,6 +1097,56 @@ public class RuntimeCompiler extends RegexCompiler {
                     return UNDEFINED_REFERENCE;
                 }
             };
+        } else if (object instanceof Class) {
+            final java.lang.String name = ((Class)object).name;
+            final Map<java.lang.String, Impl> methods = new HashMap();
+            final java.lang.String _extends = ((Class)object)._extends;
+            final Impl constructor;
+            Impl construct = null;
+            
+            for(ClassMethod method : ((Class)object).methods) {
+                switch(method.type) {
+                    case Constructor:
+                        construct = compile(data, method);
+                        break;
+                    case Normal:
+                        methods.put(method.name, compile(data, method));
+                }
+            }
+            if(construct == null) {
+                ClassMethod _constructor = new ClassMethod((Class)object);
+                _constructor.type = ClassMethod.Type.Constructor;
+                _constructor.name = "<constructor>";
+                Parsed[] impl;
+                if(_extends != null)
+                    impl = new Parsed[]{
+                        new Call(new Reference("super")),
+                        null
+                    };
+                else
+                    impl = new Parsed[1];
+                impl[impl.length-1] = new RegexCompiler.Return(new Reference("this"));
+                _constructor.impl = new ScriptData(impl, "[java_code]", 0, 0);
+                construct = compile(data, _constructor);
+            }
+            constructor = construct;
+            
+            return new Impl() {
+                @Override
+                public Referencable run(Global global, Scope topScope) {
+                    Scope scope;
+                    BaseFunction _super;
+                    if(_extends != null) {
+                        _super = (BaseFunction)topScope.get(_extends);
+                        scope = topScope.beginBlock();
+                        scope.let("super", ((BaseFunction)_super.get("bind")).call(_super, topScope._this));
+                    } else
+                        scope = topScope;
+                    BaseFunction construct = (BaseFunction)constructor.run(global, scope).get();
+                    
+                    return new ValueReferenceable(topScope.let(name, construct), rows, columns);
+                }
+            };
         } else if (object instanceof Function) {
             final java.lang.String[] args = ((Function) object).arguments.toArray(new java.lang.String[((Function) object).arguments.size()]);
             final java.lang.String name = ((Function) object).name == null ? "<anonymous>" : ((Function) object).name;
@@ -1308,7 +1358,7 @@ public class RuntimeCompiler extends RegexCompiler {
                 if (((If) object).el != null) {
                     Else el = ((If) object).el;
                     if (el instanceof ElseIf) {
-
+                        throw new RuntimeException("Not implemented yet");
                     } else {
                         if (el.simpleimpl != null) {
                             final Impl elimpl = compile(data, el.simpleimpl);
@@ -1360,7 +1410,7 @@ public class RuntimeCompiler extends RegexCompiler {
                 if (((If) object).el != null) {
                     Else el = ((If) object).el;
                     if (el instanceof ElseIf) {
-
+                        throw new RuntimeException("Not implemented yet");
                     } else {
                         if (el.simpleimpl != null) {
                             final Impl elimpl = compile(data, el.simpleimpl);

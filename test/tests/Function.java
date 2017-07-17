@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -66,6 +66,11 @@ public class Function {
     public void call() {
         test("call");
     }
+
+//    @Test
+//    public void generator() {
+//        test("generator");
+//    }
 
     @Test
     public void lambda() {

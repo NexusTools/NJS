@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -71,6 +71,11 @@ public class Standards {
         test("scopeName");
     }
 
+//    @Test
+//    public void deleteProp() {
+//        test("deleteProp");
+//    }
+
     @Test
     public void regex() {
         test("regex");
@@ -86,20 +91,20 @@ public class Standards {
         test("numbers");
     }
 
-    @Test
-    public void _class() {
-        test("class");
-    }
+//    @Test
+//    public void _class() {
+//        test("class");
+//    }
 
     @Test
     public void group() {
         test("group");
     }
 
-    @Test
-    public void let() {
-        test("let");
-    }
+//    @Test
+//    public void let() {
+//        test("let");
+//    }
     
     public void test(java.lang.String name) {
         for (Compiler compiler : compilers) {

@@ -1,5 +1,5 @@
-/*
- * Copyright (C) 2016 NexusTools.
+/* 
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -13,17 +13,15 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package net.nexustools.njs;
 
-/**
- *
- * @author Katelyn Slater <kate@nexustools.com>
- */
-public class ConstructString extends String {
+var Assert = importClass("org.junit.Assert");
 
-	@Override
-	public Instance wrap(java.lang.String string) {
-		return new Instance(global, string, true);
-	}
-	
-}
+
+var test = {
+    delete: function() {
+        return "Test";
+    }
+};
+
+Assert.assertTrue(test.delete() == "Test");
+

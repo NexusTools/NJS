@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -259,10 +259,13 @@ public class Utilities {
 
     public static java.lang.Object jsToJava(Global global, final BaseObject jsObject, Class<?> desiredClass, ConversionAccuracy accuracy) {
         if (isUndefined(jsObject)) {
+            if(!desiredClass.isPrimitive())
+                accuracy.accuracy = desiredClass == java.lang.Object.class ? 1 : 0.8;
             return null;
         }
 
         if (desiredClass == java.lang.Object.class) {
+            accuracy.accuracy = 0.5;
             return jsObject;
         }
 
@@ -270,7 +273,13 @@ public class Utilities {
             Class<?> desiredArrayType = desiredClass.getComponentType();
 
             if (desiredArrayType == Character.TYPE) {
-                if (jsObject instanceof String.Instance) {
+                if (jsObject.instanceOf(global.Array)) {
+                    accuracy.accuracy = 0.8;
+                    char[] data = new char[jsObject.get("length").toInt()];
+                    for(int i=0; i<data.length; i++)
+                        data[i] = (char)jsObject.get(i).toInt();
+                    return data;
+                } else if (jsObject instanceof String.Instance) {
                     accuracy.accuracy = 1;
                 } else if (jsObject instanceof Number.Instance) {
                     accuracy.accuracy = 0.75;
@@ -282,11 +291,23 @@ public class Utilities {
                 if (jsObject instanceof Float64Array.Instance) {
                     accuracy.accuracy = 1;
                     return ((Float64Array.Instance) jsObject).arrayStorage;
+                } else if (jsObject.instanceOf(global.Array)) {
+                    accuracy.accuracy = 0.8;
+                    double[] data = new double[jsObject.get("length").toInt()];
+                    for(int i=0; i<data.length; i++)
+                        data[i] = jsObject.get(i).toDouble();
+                    return data;
                 }
             } else if (desiredArrayType == Float.TYPE) {
                 if (jsObject instanceof Float32Array.Instance) {
                     accuracy.accuracy = 1;
                     return ((Float32Array.Instance) jsObject).arrayStorage;
+                } else if (jsObject.instanceOf(global.Array)) {
+                    accuracy.accuracy = 0.8;
+                    float[] data = new float[jsObject.get("length").toInt()];
+                    for(int i=0; i<data.length; i++)
+                        data[i] = jsObject.get(i).toFloat();
+                    return data;
                 }
             } else if (desiredArrayType == Integer.TYPE) {
                 if (jsObject instanceof Uint32Array.Instance) {
@@ -295,6 +316,12 @@ public class Utilities {
                 } else if (jsObject instanceof Int32Array.Instance) {
                     accuracy.accuracy = 1;
                     return ((Int32Array.Instance) jsObject).arrayStorage;
+                } else if (jsObject.instanceOf(global.Array)) {
+                    accuracy.accuracy = 0.8;
+                    int[] data = new int[jsObject.get("length").toInt()];
+                    for(int i=0; i<data.length; i++)
+                        data[i] = jsObject.get(i).toInt();
+                    return data;
                 }
             } else if (desiredArrayType == Short.TYPE) {
                 if (jsObject instanceof Uint16Array.Instance) {
@@ -303,6 +330,12 @@ public class Utilities {
                 } else if (jsObject instanceof Int16Array.Instance) {
                     accuracy.accuracy = 1;
                     return ((Int16Array.Instance) jsObject).arrayStorage;
+                } else if (jsObject.instanceOf(global.Array)) {
+                    accuracy.accuracy = 0.8;
+                    short[] data = new short[jsObject.get("length").toInt()];
+                    for(int i=0; i<data.length; i++)
+                        data[i] = jsObject.get(i).toShort();
+                    return data;
                 }
             } else if (desiredArrayType == Byte.TYPE) {
                 if (jsObject instanceof Uint8Array.Instance) {
@@ -311,6 +344,12 @@ public class Utilities {
                 } else if (jsObject instanceof Int8Array.Instance) {
                     accuracy.accuracy = 1;
                     return ((Int8Array.Instance) jsObject).arrayStorage;
+                } else if (jsObject.instanceOf(global.Array)) {
+                    accuracy.accuracy = 0.8;
+                    byte[] data = new byte[jsObject.get("length").toInt()];
+                    for(int i=0; i<data.length; i++)
+                        data[i] = jsObject.get(i).toByte();
+                    return data;
                 } else if (jsObject instanceof String.Instance) {
                     accuracy.accuracy = 0.8;
                 } else {
@@ -534,28 +573,23 @@ public class Utilities {
     }
 
     public static BaseObject javaToJS(Global global, java.lang.Object javaObject, Class<?> desiredClass) {
-        if (javaObject == null) {
+        if (javaObject == null)
             return Null.INSTANCE;
-        }
 
-        if (javaObject instanceof BaseObject) {
+        if (javaObject instanceof BaseObject)
             return (BaseObject) javaObject;
-        }
 
-        if (javaObject instanceof java.lang.String) {
+        if (javaObject instanceof java.lang.String)
             return global.wrap(((java.lang.String) javaObject));
-        }
 
-        if (javaObject instanceof java.lang.Number) {
+        if (javaObject instanceof java.lang.Number)
             return global.wrap(((java.lang.Number) javaObject).doubleValue());
-        }
-        if (java.lang.Integer.TYPE.isInstance(javaObject)) {
-            return global.wrap((int) (Integer) javaObject);
-        }
+        
+        if(javaObject instanceof java.lang.Boolean)
+            return ((java.lang.Boolean)javaObject) ? global.Boolean.TRUE : global.Boolean.FALSE;
 
-        if (javaObject instanceof Class) {
+        if (javaObject instanceof Class)
             return global.wrap((Class) javaObject);
-        }
         
         synchronized(CONVERTERS) {
             for(Converter converter : CONVERTERS) {
@@ -583,26 +617,29 @@ public class Utilities {
                 return new Float64Array.Instance(global, (Float64Array) global.get("Float64Array"), (double[]) javaObject);
             }
 
-            throw new RuntimeException("Cannot convert array of " + javaClass.getComponentType() + " to BaseObject");
+            GenericArray array = new GenericArray(global, java.lang.reflect.Array.getLength(javaObject));
+            for(int i=0; i<array.length(); i++)
+                array.set(i, global.wrap(java.lang.reflect.Array.get(javaObject, i)));
+            return array;
         } else {
             return global.wrap(javaObject, desiredClass);
         }
     }
 
     public static Global createStandardGlobal() {
-        return createGlobal("eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float32Array", "Float64Array");
+        return createGlobal("eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float32Array", "Float64Array", "parseInt", "parseFloat");
     }
 
     public static Global createStandardGlobal(net.nexustools.njs.compiler.Compiler compiler) {
-        return createGlobal(compiler, "eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float32Array", "Float64Array");
+        return createGlobal(compiler, "eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float32Array", "Float64Array", "parseInt", "parseFloat");
     }
 
     public static Global createExtendedGlobal() {
-        return createGlobal("eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float32Array", "Float64Array", "GeneratorFunction", "importClass", "isJavaClass", "isJavaObject", "isJavaPackage", "PackageRoot", "java", "javax", "print", "JavaClass");
+        return createGlobal("eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float32Array", "Float64Array", "parseInt", "parseFloat", "GeneratorFunction", "importClass", "isJavaClass", "isJavaObject", "isJavaPackage", "PackageRoot", "java", "javax", "print", "JavaClass");
     }
 
     public static Global createExtendedGlobal(net.nexustools.njs.compiler.Compiler compiler) {
-        return createGlobal(compiler, "eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float32Array", "Float64Array", "GeneratorFunction", "importClass", "isJavaClass", "isJavaObject", "isJavaPackage", "PackageRoot", "java", "javax", "print", "JavaClass");
+        return createGlobal(compiler, "eval", "Math", "Date", "JSON", "Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float32Array", "Float64Array", "parseInt", "parseFloat", "GeneratorFunction", "importClass", "isJavaClass", "isJavaObject", "isJavaPackage", "PackageRoot", "java", "javax", "print", "JavaClass");
     }
 
     public static Global createGlobal(java.lang.String... standards) {
@@ -734,6 +771,38 @@ public class Utilities {
                     @Override
                     public java.lang.String name() {
                         return "importClass";
+                    }
+                });
+            } else if(standard.equals("parseInt")) {
+                global.setHidden("parseInt", new AbstractFunction(global) {
+                    @Override
+                    public BaseObject call(BaseObject _this, BaseObject... params) {
+                        try {
+                            return Number.wrap(Integer.valueOf(params[0].toString()));
+                        } catch (NumberFormatException ex) {
+                            return Number.NaN;
+                        }
+                    }
+
+                    @Override
+                    public java.lang.String name() {
+                        return "parseInt";
+                    }
+                });
+            } else if(standard.equals("parseFloat")) {
+                global.setHidden("parseFloat", new AbstractFunction(global) {
+                    @Override
+                    public BaseObject call(BaseObject _this, BaseObject... params) {
+                        try {
+                            return Number.wrap(Double.valueOf(params[0].toString()));
+                        } catch (NumberFormatException ex) {
+                            return Number.NaN;
+                        }
+                    }
+
+                    @Override
+                    public java.lang.String name() {
+                        return "parseFloat";
                     }
                 });
             } else {

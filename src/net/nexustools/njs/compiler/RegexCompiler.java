@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -38,6 +38,14 @@ import net.nexustools.njs.Error;
 public abstract class RegexCompiler implements Compiler {
 
     public static final boolean DEBUG = System.getProperty("NJSDEBUG", "false").equals("true");
+    
+    public static class Unexpected extends RuntimeException {
+        private final Parsed current, next;
+        public Unexpected(Parsed current, Parsed next) {
+            this.current = current;
+            this.next = next;
+        }
+    }
 
     public static java.lang.String convertStringSource(java.lang.String string) {
         StringBuilder builder = new StringBuilder();
@@ -54,9 +62,6 @@ public abstract class RegexCompiler implements Compiler {
                     continue;
                 case '"':
                     builder.append("\\\"");
-                    continue;
-                case '\'':
-                    builder.append("\\'");
                     continue;
                 case '\\':
                     builder.append("\\\\");
@@ -80,6 +85,13 @@ public abstract class RegexCompiler implements Compiler {
             return "<unparsed>";
         }
         return object.toString();
+    }
+
+    public static java.lang.String unparsedToSource(Parsed object) {
+        if (object == null) {
+            return "<unparsed>";
+        }
+        return object.toSource();
     }
 
     public static java.lang.String describe(java.lang.Object object) {
@@ -127,14 +139,25 @@ public abstract class RegexCompiler implements Compiler {
         }
     }
 
+    public static void joinToSource(Iterable<Parsed> able, char with, StringBuilder builder) {
+        Iterator<Parsed> it = able.iterator();
+        if (it.hasNext()) {
+            builder.append(it.next().toSource());
+            while (it.hasNext()) {
+                builder.append(with);
+                builder.append(it.next().toSource());
+            }
+        }
+    }
+
     public static class ScriptData {
 
-        Function callee;
-        final Parsed[] impl;
-        final int rows, columns;
-        java.lang.Object optimizations;
-        java.lang.String methodName = null, source;
-        final Map<java.lang.String, Function> functions;
+        public Function callee;
+        public final Parsed[] impl;
+        public final int rows, columns;
+        public java.lang.Object optimizations;
+        public java.lang.String methodName = null, source;
+        public final Map<java.lang.String, Function> functions;
 
         public ScriptData(Parsed[] impl, java.lang.String source, int rows, int columns) {
             functions = new HashMap();
@@ -153,6 +176,13 @@ public abstract class RegexCompiler implements Compiler {
             this.source = source;
             this.columns = columns;
             this.rows = rows;
+        }
+        
+        public void transform(Transformer transformer) {
+            for(int i=0; i<impl.length; i++)
+                impl[i] = impl[i].transform(transformer);
+            for(Function func : functions.values())
+                func.impl.transform(transformer);
         }
 
         @Override
@@ -233,17 +263,26 @@ public abstract class RegexCompiler implements Compiler {
             this.source = source;
         }
     }
+    public static interface Transformer {
+        public Parsed transform(Parsed input);
+    }
 
     public static abstract class Parsed {
 
         public int columns, rows;
 
         public abstract Parsed transform(Parsed part);
+        public Parsed transform(Transformer transformer) {
+            return transformer.transform(this);
+        }
 
-        public abstract java.lang.String toSource();
+        public java.lang.String toSource() {
+            return toSource(false);
+        }
+        public abstract java.lang.String toSource(boolean simple);
 
         public java.lang.String toSimpleSource() {
-            return toSource();
+            return toSource(true);
         }
 
         @Override
@@ -303,8 +342,6 @@ public abstract class RegexCompiler implements Compiler {
 
     public static abstract class PrimitiveReferency extends Parsed implements BaseReferency {
 
-        public boolean newline;
-
         public PrimitiveReferency extend(DirectReference reference) {
             return new RightReference(this, reference.ref);
         }
@@ -321,10 +358,6 @@ public abstract class RegexCompiler implements Compiler {
 
             if (part instanceof SemiColon) {
                 throw new CompleteException();
-            }
-            if (part instanceof NewLine) {
-                newline = true;
-                return this;
             }
 
             if (part instanceof DirectReference) {
@@ -389,11 +422,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         public Parsed transformFallback(Parsed part) {
-            if (newline) {
-                throw new CompleteException(part);
-            }
-
-            throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + describe(this));
+            throw new Unexpected(this, part);
         }
 
         @Override
@@ -449,12 +478,12 @@ public abstract class RegexCompiler implements Compiler {
 
         @Override
         public Referency extend(DirectReference reference) {
-            throw new Error.JavaException("SyntaxError", "Unexpected " + reference);
+            throw new Unexpected(this, reference);
         }
 
         @Override
         public Referency extend(IntegerReference reference) {
-            throw new Error.JavaException("SyntaxError", "Unexpected " + reference);
+            throw new Unexpected(this, reference);
         }
     }
 
@@ -462,12 +491,18 @@ public abstract class RegexCompiler implements Compiler {
 
         public Parsed ref;
         private boolean closed;
-        public final Referency lhs;
+        public Referency lhs;
 
         public VariableReference(Referency lhs) {
             this.lhs = lhs;
         }
 
+        @Override
+        public Parsed transform(Transformer transformer) {
+            lhs = (Referency)lhs.transform(transformer);
+            return super.transform(transformer);
+        }
+        
         @Override
         public Parsed transform(Parsed part) {
             if (closed) {
@@ -497,10 +532,10 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
-            StringBuilder builder = new StringBuilder(unparsed(lhs));
+        public java.lang.String toSource(boolean simple) {
+            StringBuilder builder = new StringBuilder(unparsedToSource(lhs));
             builder.append('[');
-            builder.append(unparsed(ref));
+            builder.append(unparsedToSource(ref));
             if (closed) {
                 builder.append(']');
             }
@@ -523,7 +558,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return ref;
         }
 
@@ -601,7 +636,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return ":";
         }
     }
@@ -615,14 +650,14 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return '.' + ref;
         }
     }
 
     public static class IntegerReference extends Referency {
 
-        public final Parsed lhs;
+        public Parsed lhs;
         public final long ref;
 
         public IntegerReference(Parsed lhs, long ref) {
@@ -636,7 +671,13 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public Parsed transform(Transformer transformer) {
+            lhs = lhs.transform(transformer);
+            return super.transform(transformer);
+        }
+
+        @Override
+        public java.lang.String toSource(boolean simple) {
             return lhs + "[" + ref + ']';
         }
 
@@ -677,7 +718,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder(ref.toString());
             if (!chain.isEmpty()) {
                 builder.append('.');
@@ -700,8 +741,8 @@ public abstract class RegexCompiler implements Compiler {
 
     public static class Call extends Referency {
 
-        final List<Parsed> arguments = new ArrayList();
-        Parsed reference;
+        public Parsed reference;
+        public final List<Parsed> arguments = new ArrayList();
         Parsed currentArgumentPart;
         boolean closed;
 
@@ -744,7 +785,7 @@ public abstract class RegexCompiler implements Compiler {
                         return this;
                     } else if (part instanceof Comma) {
                         if (currentArgumentPart.isIncomplete()) {
-                            throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource());
+                            throw new Unexpected(this, part);
                         }
                         arguments.add(currentArgumentPart);
                         currentArgumentPart = null;
@@ -768,7 +809,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder(reference.toString());
             builder.append('(');
             builder.append(join(arguments, ','));
@@ -904,7 +945,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return "break";
         }
 
@@ -940,7 +981,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return "case " + ref + ":";
         }
 
@@ -955,8 +996,7 @@ public abstract class RegexCompiler implements Compiler {
             } else if(part instanceof Colon) {
                 closed = true;
                 return this;
-            } else if(part instanceof NewLine)
-                throw new CompleteException();
+            }
             
             if(closed)
                 throw new CompleteException(part);
@@ -988,7 +1028,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return "default:";
         }
 
@@ -997,8 +1037,7 @@ public abstract class RegexCompiler implements Compiler {
             if(part instanceof Colon) {
                 closed = true;
                 return this;
-            } else if(part instanceof NewLine)
-                throw new CompleteException();
+            }
             
             if(closed)
                 throw new CompleteException(part);
@@ -1030,7 +1069,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return join(chain, '.');
         }
 
@@ -1061,7 +1100,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder source = new StringBuilder("(");
             for(Parsed parsed : parts) {
                 if(source.length() > 1)
@@ -1118,7 +1157,7 @@ public abstract class RegexCompiler implements Compiler {
                 try {
                     currentPart = currentPart.transform(part);
                 } catch (CompleteException ex) {
-                    throw new Error.JavaException("SyntaxError", "CompleteException thrown when not needed: " + ex.part, ex);
+                    throw new Error.JavaException("SyntaxError", "CompleteException thrown when not needed: " + describe(ex.part), ex);
                 }
             }
 
@@ -1146,9 +1185,11 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder("(");
-            builder.append(unparsed(contents));
+            builder.append(unparsedToSource(contents));
+            if(closed)
+                builder.append(")");
             return builder.toString();
         }
 
@@ -1189,7 +1230,8 @@ public abstract class RegexCompiler implements Compiler {
                 try {
                     contents = contents.transform(part);
                 } catch (CompleteException ex) {
-                    throw new Error.JavaException("SyntaxError", "CompleteException thrown when not needed: " + ex.part, ex);
+                    if(ex.part != null)
+                        throw new Error.JavaException("SyntaxError", "CompleteException thrown when not needed: " + describe(ex.part), ex);
                 }
             }
 
@@ -1254,9 +1296,9 @@ public abstract class RegexCompiler implements Compiler {
             Complete
         }
         State state;
-        Parsed condition;
-        Parsed simpleimpl;
-        ScriptData impl;
+        public Parsed condition;
+        public Parsed simpleimpl;
+        public ScriptData impl;
 
         public Block(State state) {
             this.state = state;
@@ -1264,6 +1306,18 @@ public abstract class RegexCompiler implements Compiler {
 
         public Block() {
             state = State.BeforeCondition;
+        }
+
+        @Override
+        public Parsed transform(Transformer transformer) {
+            if(simpleimpl == null)
+                for(int i=0; i<impl.impl.length; i++)
+                    impl.impl[i] = impl.impl[i].transform(transformer);
+            else
+                simpleimpl = simpleimpl.transform(transformer);
+            if(condition != null)
+                condition = condition.transform(transformer);
+            return super.transform(transformer);
         }
         
         public void complete() {
@@ -1283,9 +1337,6 @@ public abstract class RegexCompiler implements Compiler {
                     transformCondition(part);
                     return this;
                 case AfterCondition:
-                    if (part instanceof NewLine) {
-                        return this;
-                    }
                     if (part instanceof OpenGroup) {
                         return parse();
                     } else if (part instanceof If && this instanceof Else) {
@@ -1310,13 +1361,21 @@ public abstract class RegexCompiler implements Compiler {
                             return this;
                         }
                     }
-                    simpleimpl = simpleimpl.transform(part);
+                    try {
+                        simpleimpl = simpleimpl.transform(part);
+                    } catch(CompleteException ex) {
+                        if (!simpleimpl.isIncomplete()) {
+                            state = State.Complete;
+                            simpleimpl = simpleimpl.finish();
+                            return complete(part);
+                        }
+                    }
                     return this;
                 case Complete:
                     return complete(part);
             }
 
-            throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " (" + state + ":" + getClass().getSimpleName() + ")");
+            throw new Unexpected(this, part);
         }
 
         public void transformCondition(Parsed part) {
@@ -1333,7 +1392,7 @@ public abstract class RegexCompiler implements Compiler {
                 try {
                     condition = condition.transform(part);
                 } catch (CompleteException ex) {
-                    throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part);
+                    throw new Unexpected(this, part);
                 }
             }
         }
@@ -1384,16 +1443,16 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder("while (");
-            builder.append(condition);
+            builder.append(condition.toSource());
             builder.append(") {");
             if (simpleimpl != null) {
                 builder.append(simpleimpl);
             } else if (impl == null) {
                 builder.append("<unparsed>");
             } else {
-                join(Arrays.asList(impl), ';', builder);
+                joinToSource(Arrays.asList(impl.impl), ';', builder);
             }
             builder.append("}");
             return builder.toString();
@@ -1451,7 +1510,7 @@ public abstract class RegexCompiler implements Compiler {
                     throw new CompleteException(part);
             }
 
-            throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " (" + state + ":" + getClass().getSimpleName() + ")");
+            throw new Unexpected(this, part);
         }
 
         @Override
@@ -1460,14 +1519,14 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder("do {");
             if (simpleimpl != null) {
                 builder.append(simpleimpl);
             } else if (impl == null) {
                 builder.append("<unparsed>");
             } else {
-                join(Arrays.asList(impl), ';', builder);
+                joinToSource(Arrays.asList(impl.impl), ';', builder);
             }
             builder.append("} while(");
             builder.append(condition);
@@ -1503,12 +1562,12 @@ public abstract class RegexCompiler implements Compiler {
         
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder("try {");
             if (impl == null) {
                 builder.append("<unparsed>");
             } else {
-                join(Arrays.asList(impl), ';', builder);
+                joinToSource(Arrays.asList(impl.impl), ';', builder);
             }
             builder.append("}");
             if (c != null) {
@@ -1524,34 +1583,32 @@ public abstract class RegexCompiler implements Compiler {
 
         @Override
         public Parsed complete(Parsed part) {
-            if (!(part instanceof NewLine)) {
-                if (f != null) {
-                    if (f.isIncomplete()) {
-                        f = (Finally) f.transform(part);
-                    } else {
-                        throw new CompleteException(part);
-                    }
-                } else if (c != null) {
-                    if (c.isIncomplete()) {
-                        c = (Catch) c.transform(part);
-                    } else if (part instanceof Finally) {
-                        if (f != null) {
-                            f = (Finally) f.transform(part);
-                        } else if (part instanceof Finally) {
-                            f = (Finally) part;
-                        } else {
-                            throw new CompleteException(part);
-                        }
-                    } else {
-                        throw new CompleteException(part);
-                    }
-                } else if (part instanceof Catch) {
-                    c = (Catch) part;
-                } else if (part instanceof Finally) {
-                    f = (Finally) part;
+            if (f != null) {
+                if (f.isIncomplete()) {
+                    f = (Finally) f.transform(part);
                 } else {
-                    return super.complete(part);
+                    throw new CompleteException(part);
                 }
+            } else if (c != null) {
+                if (c.isIncomplete()) {
+                    c = (Catch) c.transform(part);
+                } else if (part instanceof Finally) {
+                    if (f != null) {
+                        f = (Finally) f.transform(part);
+                    } else if (part instanceof Finally) {
+                        f = (Finally) part;
+                    } else {
+                        throw new CompleteException(part);
+                    }
+                } else {
+                    throw new CompleteException(part);
+                }
+            } else if (part instanceof Catch) {
+                c = (Catch) part;
+            } else if (part instanceof Finally) {
+                f = (Finally) part;
+            } else {
+                return super.complete(part);
             }
 
             return this;
@@ -1574,14 +1631,14 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder("catch (");
-            builder.append(condition);
+            builder.append(condition.toSource());
             builder.append(") {");
             if (impl == null) {
                 builder.append("<unparsed>");
             } else {
-                join(Arrays.asList(impl), ';', builder);
+                joinToSource(Arrays.asList(impl.impl), ';', builder);
             }
             builder.append("}");
             return builder.toString();
@@ -1613,14 +1670,14 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder("switch (");
-            builder.append(condition);
+            builder.append(condition.toSource());
             builder.append(") {");
             if (impl == null) {
                 builder.append("<unparsed>");
             } else {
-                join(Arrays.asList(impl), ';', builder);
+                joinToSource(Arrays.asList(impl.impl), ';', builder);
             }
             builder.append("}");
             return builder.toString();
@@ -1647,18 +1704,18 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return java.lang.String.valueOf(value);
         }
 
         @Override
         public Referency extend(DirectReference reference) {
-            throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + reference);
+            throw new Unexpected(this, reference);
         }
 
         @Override
         public Referency extend(IntegerReference reference) {
-            throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + reference);
+            throw new Unexpected(this, reference);
         }
 
         @Override
@@ -1689,12 +1746,12 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder("finally {");
             if (impl == null) {
                 builder.append("<unparsed>");
             } else {
-                join(Arrays.asList(impl), ';', builder);
+                joinToSource(Arrays.asList(impl.impl), ';', builder);
             }
             builder.append("}");
             return builder.toString();
@@ -1721,29 +1778,45 @@ public abstract class RegexCompiler implements Compiler {
             OfLoop
         }
 
-        Parsed init, storage;
-        ForType type = ForType.Standard;
-        List<Parsed> loop = new ArrayList();
+        public Parsed init, storage;
+        public ForType type = ForType.Standard;
+        public List<Parsed> loop = new ArrayList();
         ForConditionState state = ForConditionState.DuringInit;
 
         public For() {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder("for (");
-            builder.append(unparsed(init));
-            builder.append("; ");
-            builder.append(unparsed(condition));
-            builder.append("; ");
-            builder.append(unparsed(loop));
+            switch(type) {
+                case InLoop:
+                    builder.append(unparsedToSource(init));
+                    builder.append(" in ");
+                    builder.append(unparsedToSource(condition));
+                    break;
+                case OfLoop:
+                    builder.append(unparsedToSource(init));
+                    builder.append(" of ");
+                    builder.append(unparsedToSource(condition));
+                    break;
+                case Standard:
+                    builder.append(unparsedToSource(init));
+                    builder.append("; ");
+                    builder.append(unparsedToSource(condition));
+                    for(Parsed l : loop) {
+                        builder.append("; ");
+                        builder.append(unparsedToSource(l));
+                    }
+                    break;
+            }
             builder.append(") {");
             if (simpleimpl != null) {
-                builder.append(simpleimpl);
+                builder.append(simpleimpl.toSource());
             } else if (impl == null) {
                 builder.append("<unparsed>");
             } else {
-                join(Arrays.asList(impl), ';', builder);
+                joinToSource(Arrays.asList(impl.impl), ';', builder);
             }
             builder.append("}");
             return builder.toString();
@@ -1785,7 +1858,8 @@ public abstract class RegexCompiler implements Compiler {
                         try {
                             init = init.transform(part);
                         } catch (CompleteException ex) {
-                            throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part + " near " + describe(this));
+                            condition = condition.finish();
+                            state = ForConditionState.DuringCondition;
                         }
                     }
                     break;
@@ -1807,7 +1881,8 @@ public abstract class RegexCompiler implements Compiler {
                         try {
                             condition = condition.transform(part);
                         } catch (CompleteException ex) {
-                            throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part);
+                            condition = condition.finish();
+                            state = ForConditionState.DuringLoop;
                         }
                     }
                     break;
@@ -1835,7 +1910,7 @@ public abstract class RegexCompiler implements Compiler {
                         try {
                             storage = storage.transform(part);
                         } catch (CompleteException ex) {
-                            throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part);
+                            storage = storage.finish();
                         }
                     }
                     break;
@@ -1850,7 +1925,7 @@ public abstract class RegexCompiler implements Compiler {
                     try {
                         init = init.transform(part);
                     } catch (CompleteException ex) {
-                        throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part);
+                        throw new Unexpected(this, part);
                     }
                     break;
                     
@@ -1868,7 +1943,14 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public Parsed transform(Transformer transformer) {
+            if(el != null)
+                el = (Else)el.transform(transformer);
+            return super.transform(transformer);
+        }
+
+        @Override
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder("if (");
             builder.append(condition);
             builder.append(") {");
@@ -1876,27 +1958,27 @@ public abstract class RegexCompiler implements Compiler {
                 builder.append(simpleimpl);
             } else if (impl == null) {
                 builder.append("<unparsed>");
+            } else if(simple) {
+                builder.append("...");
             } else {
-                join(Arrays.asList(impl), ';', builder);
+                joinToSource(Arrays.asList(impl.impl), ';', builder);
             }
             builder.append("}");
             if (el != null) {
                 builder.append(' ');
-                builder.append(el);
+                builder.append(el.toSource(simple));
             }
             return builder.toString();
         }
 
         @Override
         public Parsed complete(Parsed part) {
-            if (!(part instanceof NewLine)) {
-                if (el != null) {
-                    el = (Else) el.transform(part);
-                } else if (part instanceof Else) {
-                    el = (Else) part;
-                } else {
-                    return super.complete(part);
-                }
+            if (el != null) {
+                el = (Else) el.transform(part);
+            } else if (part instanceof Else) {
+                el = (Else) part;
+            } else {
+                return super.complete(part);
             }
 
             return this;
@@ -1912,7 +1994,14 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public Parsed transform(Transformer transformer) {
+            if(el != null)
+                el = (Else)el.transform(transformer);
+            return super.transform(transformer);
+        }
+
+        @Override
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder("else if (");
             builder.append(condition);
             builder.append(") {");
@@ -1920,8 +2009,10 @@ public abstract class RegexCompiler implements Compiler {
                 builder.append(simpleimpl);
             } else if (impl == null) {
                 builder.append("<unparsed>");
+            } else if(simple) {
+                builder.append("...");
             } else {
-                join(Arrays.asList(impl), ';', builder);
+                joinToSource(Arrays.asList(impl.impl), ';', builder);
             }
             builder.append("}");
             if (el != null) {
@@ -1933,14 +2024,12 @@ public abstract class RegexCompiler implements Compiler {
 
         @Override
         public Parsed complete(Parsed part) {
-            if (!(part instanceof NewLine)) {
-                if (part instanceof Else) {
-                    el = (Else) part;
-                } else if (el != null) {
-                    el = (Else) el.transform(part);
-                } else {
-                    return super.complete(part);
-                }
+            if (el != null) {
+                el = (Else) el.transform(part);
+            } else if (part instanceof Else) {
+                el = (Else) part;
+            } else {
+                return super.complete(part);
             }
 
             return this;
@@ -1958,14 +2047,16 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder("else {");
             if (simpleimpl != null) {
                 builder.append(simpleimpl);
             } else if (impl == null) {
                 builder.append("<unparsed>");
+            } else if(simple) {
+                builder.append("...");
             } else {
-                join(Arrays.asList(impl), ';', builder);
+                joinToSource(Arrays.asList(impl.impl), ';', builder);
             }
             builder.append("}");
             return builder.toString();
@@ -1983,9 +2074,7 @@ public abstract class RegexCompiler implements Compiler {
         public Parsed transform(Parsed part) {
             if(part instanceof SemiColon)
                 throw new CompleteException();
-            if(part instanceof NewLine)
-                return this;
-            throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + toString());
+            throw new Unexpected(this, part);
         }
 
         @Override
@@ -2000,7 +2089,7 @@ public abstract class RegexCompiler implements Compiler {
 
         @Override
         public Parsed finish() {
-            throw new Error.JavaException("SyntaxError", "Unexpected " + toSource());
+            return null;
         }
     }
 
@@ -2010,7 +2099,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return ")";
         }
     }
@@ -2033,7 +2122,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder("{");
 
             Iterator<Map.Entry<java.lang.String, Parsed>> it = entries.entrySet().iterator();
@@ -2062,9 +2151,6 @@ public abstract class RegexCompiler implements Compiler {
             if (state == State.Complete) {
                 return super.transform(part);
             }
-            if (part instanceof NewLine) {
-                return this;
-            }
 
             switch (state) {
                 case NeedKey:
@@ -2079,7 +2165,7 @@ public abstract class RegexCompiler implements Compiler {
                     } else if (part instanceof Number) {
                         currentEntryKey = net.nexustools.njs.Number.toString(((Number) part).value);
                     } else {
-                        throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource());
+                        throw new Unexpected(this, part);
                     }
 
                     state = State.HaveKey;
@@ -2126,7 +2212,7 @@ public abstract class RegexCompiler implements Compiler {
 
             }
 
-            throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource());
+            throw new Unexpected(this, part);
         }
 
         @Override
@@ -2164,7 +2250,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return "}";
         }
     }
@@ -2173,13 +2259,17 @@ public abstract class RegexCompiler implements Compiler {
 
         boolean closed;
         Parsed currentEntry;
-        List<Parsed> entries = new ArrayList();
+        public List<Parsed> entries = new ArrayList();
 
+        public OpenArray(List<Parsed> entries) {
+            this.entries.addAll(entries);
+            closed = true;
+        }
         public OpenArray() {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder("[");
             join(entries, ',', builder);
             if (closed) {
@@ -2207,7 +2297,7 @@ public abstract class RegexCompiler implements Compiler {
                         currentEntry = currentEntry.finish();
                         if (currentEntry != null) {
                             if (currentEntry.isIncomplete()) {
-                                throw new Error.JavaException("SyntaxError", "Expected more after " + currentEntry);
+                                throw new Error.JavaException("SyntaxError", "Expected more after " + describe(currentEntry) + " at " + currentEntry.rows + ":" + currentEntry.columns);
                             }
                             entries.add(currentEntry);
                             currentEntry = null;
@@ -2255,7 +2345,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return "]";
         }
     }
@@ -2266,7 +2356,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return ",";
         }
     }
@@ -2277,7 +2367,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return "null";
         }
 
@@ -2293,7 +2383,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return "undefined";
         }
 
@@ -2306,10 +2396,13 @@ public abstract class RegexCompiler implements Compiler {
     public static class ClassMethod extends Function {
         public enum Type {
             Normal,
+            Static,
+            Symbol,
             Constructor,
             Getter,
             Setter
         }
+        Parsed symbolRef;
         final Class clazz;
         Type type = Type.Normal;
         public ClassMethod(Class clazz) {
@@ -2332,6 +2425,7 @@ public abstract class RegexCompiler implements Compiler {
             AfterExtends,
             AfterExtender,
             InBody,
+            InSymbol,
             GetterStart,
             SetterStart,
             BeforeMethodArgs,
@@ -2351,7 +2445,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder("class ");
             builder.append(name);
             if(_extends != null) {
@@ -2424,7 +2518,26 @@ public abstract class RegexCompiler implements Compiler {
                         state = State.Complete;
                         return this;
                     }
+                    if(part instanceof OpenArray) {
+                        state = State.InSymbol;
+                        currentClassMethod.type = ClassMethod.Type.Symbol;
+                        return this;
+                    }
                     break;
+                case InSymbol:
+                    if(currentClassMethod.symbolRef == null) {
+                        currentClassMethod.symbolRef = part;
+                        return this;
+                    } else if(!(currentClassMethod.symbolRef.isIncomplete())) {
+                        if(part instanceof CloseArray) {
+                            currentClassMethod.symbolRef = currentClassMethod.symbolRef.finish();
+                            state = State.BeforeMethodArgs;
+                            return this;
+                        }
+                    }
+                    
+                    currentClassMethod.symbolRef = currentClassMethod.symbolRef.transform(part);
+                    return this;
                 case BeforeMethodArgs:
                     if(part instanceof OpenBracket) {
                         state = State.InMethod;
@@ -2435,16 +2548,13 @@ public abstract class RegexCompiler implements Compiler {
                     currentClassMethod.transform(part);
                     return this;
                 case Complete:
-                    if(part instanceof NewLine || part instanceof SemiColon)
+                    if(part instanceof SemiColon)
                         throw new CompleteException();
             }
             
-            if(part instanceof NewLine)
-                return this;
-            
             if(state == State.Complete)
                 return super.transform(part);
-            throw new Error.JavaException("SyntaxError", "Unexpected " + part + " (" + state + ")");
+            throw new Unexpected(this, part);
         }
         
         
@@ -2492,7 +2602,7 @@ public abstract class RegexCompiler implements Compiler {
     public static class Extends extends Referency {
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return "extends";
         }
 
@@ -2535,11 +2645,11 @@ public abstract class RegexCompiler implements Compiler {
         Parsed call;
         Parsed storage;
         java.lang.String name;
-        java.lang.String vararg;
-        List<java.lang.String> arguments = new ArrayList();
+        public java.lang.String vararg;
+        public List<java.lang.String> arguments = new ArrayList();
         State state = State.BeforeName;
         java.lang.String source;
-        ScriptData impl;
+        public ScriptData impl;
 
         public Function() {
         }
@@ -2549,7 +2659,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder;
             if(type == Type.Lambda) {
                 builder = new StringBuilder("(");
@@ -2561,7 +2671,7 @@ public abstract class RegexCompiler implements Compiler {
                     else
                         builder.append(storage);
                 } else {
-                    join(Arrays.asList(impl), ';', builder);
+                    joinToSource(Arrays.asList(impl.impl), ';', builder);
                 }
             } else {
                 builder = new StringBuilder("function");
@@ -2578,7 +2688,7 @@ public abstract class RegexCompiler implements Compiler {
                 if (impl == null) {
                     builder.append("<unparsed>");
                 } else {
-                    join(Arrays.asList(impl), ';', builder);
+                    joinToSource(Arrays.asList(impl.impl), ';', builder);
                 }
                 builder.append("}");
             }
@@ -2621,10 +2731,6 @@ public abstract class RegexCompiler implements Compiler {
 
         @Override
         public Parsed transform(Parsed part) {
-            if (part instanceof NewLine) {
-                return this;
-            }
-
             switch (state) {
                 case BeforeName:
                     if (part instanceof Multiply) {
@@ -2702,7 +2808,7 @@ public abstract class RegexCompiler implements Compiler {
                     return this;
             }
 
-            throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSimpleSource() + " (" + state + ')');
+            throw new Unexpected(this, part);
         }
 
         @Override
@@ -2745,7 +2851,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return ";";
         }
     }
@@ -2756,7 +2862,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return "\\n";
         }
 
@@ -2786,7 +2892,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return "<>";
         }
 
@@ -2806,7 +2912,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         public Parsed finish() {
-            throw new Error.JavaException("SyntaxError", "Unexpected " + toSource());
+            throw new Unexpected(this, this);
         }
     }
 
@@ -2821,13 +2927,20 @@ public abstract class RegexCompiler implements Compiler {
         public Rh() {
         }
 
+        @Override
+        public Parsed transform(Transformer transformer) {
+            if(rhs != null)
+                rhs = rhs.transform(transformer);
+            return super.transform(transformer);
+        }
+
         public abstract java.lang.String op();
 
         @Override
         public Parsed transform(Parsed part) {
             if (rhs == null) {
                 if (!part.isStandalone()) {
-                    throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + describe(this));
+                    throw new Unexpected(this, part);
                 }
                 rhs = part;
                 return this;
@@ -2856,14 +2969,14 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return op() + toLPadString(rhs);
         }
     }
 
     public static abstract class RhLh extends Rh {
 
-        public final Parsed lhs;
+        public Parsed lhs;
 
         public RhLh() {
             lhs = null;
@@ -2884,6 +2997,13 @@ public abstract class RegexCompiler implements Compiler {
             columns = lhs.columns;
             this.lhs = lhs.finish();
         }
+
+        @Override
+        public Parsed transform(Transformer transformer) {
+            if(lhs != null)
+                lhs = lhs.transform(transformer);
+            return super.transform(transformer);
+        }
         
         public boolean requireLHS() {
             return true;
@@ -2892,21 +3012,18 @@ public abstract class RegexCompiler implements Compiler {
         @Override
         public Parsed finish() {
             if (lhs == null && requireLHS()) {
-                throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Missing Left-Hand-Side (" + getClass().getSimpleName() + ')');
+                throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Missing Left-Hand-Side (" + getClass().getSimpleName() + ") at " + rows + ":" + columns);
             }
             return super.finish();
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return toRPadString(lhs) + op() + toLPadString(rhs);
         }
     }
 
     public static abstract class RhLhReferency extends RhLh implements BaseReferency {
-
-        private boolean newline;
-
         public RhLhReferency() {
         }
 
@@ -2931,7 +3048,7 @@ public abstract class RegexCompiler implements Compiler {
                     ((OpenArray) rhs).closed = true;
                 } else {
                     if (!part.isStandalone()) {
-                        throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + describe(this));
+                        throw new Unexpected(this, part);
                     }
                     rhs = part;
                 }
@@ -2954,11 +3071,6 @@ public abstract class RegexCompiler implements Compiler {
                 return this;
             } else if (part instanceof IntegerReference) {
                 rhs = rhs.transform(part);
-                return this;
-            }
-
-            if (part instanceof NewLine) {
-                newline = true;
                 return this;
             }
 
@@ -3215,10 +3327,6 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         public Parsed transformFallback(Parsed part) {
-            if (newline) {
-                throw new CompleteException(part);
-            }
-
             rhs = rhs.transform(part);
             return this;
         }
@@ -3226,8 +3334,6 @@ public abstract class RegexCompiler implements Compiler {
     }
 
     public static abstract class RhReferency extends Rh implements BaseReferency {
-
-        private boolean newline;
 
         public RhReferency() {
         }
@@ -3245,7 +3351,7 @@ public abstract class RegexCompiler implements Compiler {
                     ((OpenArray) rhs).closed = true;
                 } else {
                     if (!part.isStandalone()) {
-                        throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + describe(this));
+                        throw new Unexpected(this, part);
                     }
                     rhs = part;
                 }
@@ -3273,10 +3379,6 @@ public abstract class RegexCompiler implements Compiler {
 
             if (part instanceof SemiColon) {
                 throw new CompleteException();
-            }
-            if (part instanceof NewLine) {
-                newline = true;
-                return this;
             }
 
             boolean useRhs = rhs instanceof Rh && rhs instanceof BaseReferency;
@@ -3482,11 +3584,8 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         public Parsed transformFallback(Parsed part) {
-            if (newline) {
-                throw new CompleteException(part);
-            }
 
-            throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + describe(this));
+            throw new Unexpected(this, part);
         }
 
     }
@@ -4000,6 +4099,13 @@ public abstract class RegexCompiler implements Compiler {
         public java.lang.String primaryType() {
             return "number";
         }
+
+        @Override
+        public java.lang.String toSource(boolean simple) {
+            if(lhs.toString().equals("0.0"))
+                return "-" + (rhs == null ? "" : rhs.toSimpleSource());
+            return super.toSource(simple);
+        }
     }
 
     public static class InstanceOf extends RhLhReferency {
@@ -4098,6 +4204,12 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
+        public Parsed transform(Transformer transformer) {
+            ref = ref.transform(transformer);
+            return super.transform(transformer);
+        }
+
+        @Override
         public Parsed transform(Parsed part) {
             if (right) {
                 return super.transform(part);
@@ -4141,14 +4253,14 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder();
             if (right) {
-                builder.append(unparsed(ref));
+                builder.append(unparsedToSource(ref));
             }
             builder.append("++");
             if (!right) {
-                builder.append(unparsed(ref));
+                builder.append(unparsedToSource(ref));
             }
             return builder.toString();
         }
@@ -4186,6 +4298,12 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
+        public Parsed transform(Transformer transformer) {
+            ref = ref.transform(transformer);
+            return super.transform(transformer);
+        }
+
+        @Override
         public Parsed transform(Parsed part) {
             if (right) {
                 return super.transform(part);
@@ -4229,14 +4347,14 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder();
             if (right) {
-                builder.append(unparsed(ref));
+                builder.append(unparsedToSource(ref));
             }
             builder.append("--");
             if (!right) {
-                builder.append(unparsed(ref));
+                builder.append(unparsedToSource(ref));
             }
             return builder.toString();
         }
@@ -4410,7 +4528,7 @@ public abstract class RegexCompiler implements Compiler {
     public static class Of extends Helper implements BaseReferency {
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return "of";
         }
 
@@ -4439,9 +4557,6 @@ public abstract class RegexCompiler implements Compiler {
         public Parsed transform(Parsed part) {
             if (closed) {
                 return super.transform(part);
-            }
-            if (part instanceof NewLine) {
-                return this;
             }
 
             if (reference == null) {
@@ -4480,7 +4595,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder buffer = new StringBuilder("new ");
             buffer.append(reference);
             if (arguments != null) {
@@ -4543,7 +4658,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return condition + " ? " + success + " : " + failure;
         }
 
@@ -4612,7 +4727,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return '/' + pattern + '/' + flags;
         }
 
@@ -4653,13 +4768,14 @@ public abstract class RegexCompiler implements Compiler {
             } else if(part instanceof CloseGroup && !array) {
                 names.put(currentKey, currentValue == null ? currentKey : currentValue);
                 closed = true;
-            } else
-                throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " after " + describe(this));
+            } else {
+                throw new Unexpected(this, part);
+            }
             return this;
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder(array ? "[ " : "{ ");
             for(Map.Entry<java.lang.String, java.lang.String> name : names.entrySet()) {
                 if(builder.length() > 2)
@@ -4719,9 +4835,19 @@ public abstract class RegexCompiler implements Compiler {
             }
         }
         Set currentSet;
-        List<Set> sets = new ArrayList();
+        public List<Set> sets = new ArrayList();
 
         public Var() {
+        }
+
+        @Override
+        public Parsed transform(Transformer transformer) {
+            for(Set set : sets) {
+                set.lhs = set.lhs.transform(transformer);
+                if(set.rhs != null)
+                    set.rhs = set.rhs.transform(transformer);
+            }
+            return super.transform(transformer);
         }
 
         @Override
@@ -4766,11 +4892,11 @@ public abstract class RegexCompiler implements Compiler {
                 throw new CompleteException();
             }
 
-            throw new Error.JavaException("SyntaxError", "Unexpected " + part.toSource() + " near " + describe(this));
+            throw new Unexpected(this, part);
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder();
             builder.append(getClass().getSimpleName().toLowerCase());
             builder.append(' ');
@@ -4826,7 +4952,7 @@ public abstract class RegexCompiler implements Compiler {
     public static class VarArgs extends Helper {
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return "...";
         }
         
@@ -4835,7 +4961,7 @@ public abstract class RegexCompiler implements Compiler {
     public static class Lambda extends Helper {
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return "=>";
         }
         
@@ -4865,7 +4991,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return '"' + convertStringSource(string) + '"';
         }
 
@@ -4931,7 +5057,7 @@ public abstract class RegexCompiler implements Compiler {
         }
         
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             StringBuilder builder = new StringBuilder("`");
             for(java.lang.Object part : parts)
                 if(part instanceof Parsed) {
@@ -4970,7 +5096,7 @@ public abstract class RegexCompiler implements Compiler {
         }
         
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return java.lang.String.valueOf(value);
         }
 
@@ -4994,18 +5120,18 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         @Override
-        public java.lang.String toSource() {
+        public java.lang.String toSource(boolean simple) {
             return java.lang.String.valueOf(value);
         }
 
         @Override
         public Referency extend(DirectReference reference) {
-            throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + reference);
+            throw new Unexpected(this, reference);
         }
 
         @Override
         public Referency extend(IntegerReference reference) {
-            throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + reference);
+            throw new Unexpected(this, reference);
         }
 
         @Override
@@ -5064,7 +5190,7 @@ public abstract class RegexCompiler implements Compiler {
     public static final Pattern SEMICOLON = Pattern.compile("^;");
     public static final Pattern NOTEQUALS = Pattern.compile("^!=");
     public static final Pattern EQUALS = Pattern.compile("^==");
-    public static final Pattern NEWLINE = Pattern.compile("^\n");
+    public static final Pattern NEWLINE = Pattern.compile("^(\r\n|\r|\n)");
     public static final Pattern ACCESS = Pattern.compile("^\\[");
     public static final Pattern PERCENT = Pattern.compile("^%");
     public static final Pattern OR = Pattern.compile("^\\|");
@@ -5205,7 +5331,11 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         public final ScriptData parse(ParserReader reader) throws IOException {
-            return parse(reader, new StringBuilder());
+            try {
+                return parse(reader, new StringBuilder());
+            } catch(Unexpected ex) {
+                throw new Error.JavaException("SyntaxError", "Unexpected " + describe(ex.next) + " after " + describe(ex.current) + " at " + ex.next.rows + ":" + ex.next.columns, ex);
+            }
         }
         
         public boolean inFunction() {
@@ -5228,189 +5358,224 @@ public abstract class RegexCompiler implements Compiler {
             final int sRows = reader.rows;
             final int sColumns = reader.columns;
 
+            boolean newline = false;
             Parsed currentPart = null;
+            List<Parsed> queue = new ArrayList();
             List<Parsed> parts = new ArrayList();
+            next:
             while (true) {
-                java.lang.String buffer = reader.current();
-                if (buffer == null) {
-                    eof();
-                    break;
-                }
-                next:
-                while (true) {
+                try {
+                    if(!queue.isEmpty())
+                        throw new PartExchange(queue.remove(0), 0);
+                    if (reader.current() == null) {
+                        eof();
+                        break;
+                    }
                     for (Pattern pat : patterns) {
-                        matcher = pat.matcher(buffer);
+                        matcher = pat.matcher(reader.currentBuffer);
                         if (matcher.find()) {
-                            int rows = reader.rows;
-                            int columns = reader.columns;
-                            try {
-                                match(pat, matcher, reader);
-                                builder.append(reader.ltrim(matcher.group().length()));
-                            } catch (PartExchange part) {
-                                part.part.rows = rows;
-                                part.part.columns = columns;
+                            match(pat, matcher, reader);
+                            builder.append(reader.ltrim(matcher.group().length()));
+                            continue next;
+                        }
+                    }
+                    if (reader.more() == null) {
+                        throw new Error.JavaException("SyntaxError", "No matching patterns for " + this + ": " + reader.currentBuffer.substring(0, Math.min(20, reader.currentBuffer.length())));
+                    }
+                    continue;
+                } catch (PartExchange part) {
+                    if(part.part.rows <= 0) {
+                        part.part.rows = reader.rows;
+                        part.part.columns = reader.columns;
+                    }
+                    if(part.part instanceof NewLine) {
+                        builder.append(reader.ltrim(1));
+                        newline = true;
+                        continue;
+                    }
+                    if (currentPart != null) {
+                        if (!currentPart.isIncomplete()) {
+                            if(part.part instanceof CloseGroup) {
+                                currentPart = currentPart.finish();
                                 if (currentPart != null) {
-                                    if (!currentPart.isIncomplete()) {
-                                        if(part.part instanceof CloseGroup) {
-                                            currentPart = currentPart.finish();
-                                            if (currentPart != null) {
-                                                if (!currentPart.isStandalone()) {
-                                                    throw new Error.JavaException("SyntaxError", "Unexpected " + currentPart);
-                                                }
-                                                if (currentPart.isIncomplete()) {
-                                                    throw new Error.JavaException("SyntaxError", "Expected more after " + currentPart);
-                                                }
-                                                parts.add(currentPart);
-                                            }
-                                            if (DEBUG) {
-                                                System.out.println("[" + this + "] End...");
-                                            }
-                                            end(sRows, sColumns, parts, builder.toString());
-                                        }
+                                    if (!currentPart.isStandalone()) {
+                                        throw new Error.JavaException("SyntaxError", "Unexpected " + describe(currentPart) + " at " + currentPart.rows + ":" + currentPart.columns);
                                     }
+                                    if (currentPart.isIncomplete()) {
+                                        throw new Error.JavaException("SyntaxError", "Expected more after " + describe(currentPart) + " at " + currentPart.rows + ":" + currentPart.columns);
+                                    }
+                                    parts.add(currentPart);
+                                }
+                                if (DEBUG) {
+                                    System.out.println("[" + this + "] End...");
+                                }
+                                end(sRows, sColumns, parts, builder.toString());
+                            }
+                        }
 
-                                    try {
-                                        if (DEBUG) {
-                                            System.out.println("[" + this + "] " + describe(currentPart) + " -> " + describe(part.part));
-                                        }
-                                        try {
-                                            currentPart = currentPart.transform(part.part);
-                                        } catch (Reparse reparse) {
-                                            reader.ltrim(part.trim);
-                                            reader.currentBuffer = reparse.buffer + reader.currentBuffer;
-                                            currentPart = currentPart.transform(reparse.transform);
-                                            break next;
-                                        }
-                                    } catch (CompleteException ex) {
-                                        if (DEBUG) {
-                                            System.out.println("[" + this + "] Complete: " + ex);
-                                            ex.printStackTrace(System.out);
-                                        }
+                        try {
+                            if (DEBUG) {
+                                System.out.println("[" + this + "] " + describe(currentPart) + " -> " + describe(part.part));
+                            }
+                            try {
+                                currentPart = currentPart.transform(part.part);
+                            } catch (Reparse reparse) {
+                                reader.ltrim(part.trim);
+                                reader.currentBuffer = reparse.buffer + reader.currentBuffer;
+                                currentPart = currentPart.transform(reparse.transform);
+                                newline = false;
+                                continue;
+                            } catch(Unexpected ex) {
+                                if(newline) {
+                                    if(currentPart instanceof Block && ((Block)currentPart).simpleimpl != null && ((Block)currentPart).state == Block.State.InSimpleImpl) {
+                                        ((Block)currentPart).simpleimpl = ((Block)currentPart).simpleimpl.finish();
+                                        ((Block)currentPart).state = Block.State.Complete;
+                                    } else {
                                         currentPart = currentPart.finish();
                                         if (currentPart != null) {
                                             if (!currentPart.isStandalone()) {
-                                                throw new Error.JavaException("SyntaxError", "Unexpected " + currentPart, ex);
+                                                throw new Error.JavaException("SyntaxError", "Unexpected " + describe(currentPart) + " at " + currentPart.rows + ":" + currentPart.columns, ex);
                                             }
                                             if (currentPart.isIncomplete()) {
-                                                throw new Error.JavaException("SyntaxError", "Expected more after " + currentPart, ex);
+                                                throw new Error.JavaException("SyntaxError", "Expected more after " + describe(currentPart) + " at " + currentPart.rows + ":" + currentPart.columns, ex);
                                             }
                                             parts.add(currentPart);
+                                            currentPart = null;
                                         }
-                                        if (ex.part != null) {
-                                            if (ex.part instanceof CloseGroup) {
-                                                if (DEBUG) {
-                                                    System.out.println("[" + this + "] End...");
-                                                }
-                                                end(sRows, sColumns, parts, builder.toString());
-                                            }
-                                            if (!ex.part.isStandalone()) {
-                                                if (ex.part instanceof SemiColon) {
-                                                    builder.append(reader.ltrim(part.trim));
-                                                    currentPart = null;
-                                                    break next;
-                                                }
-                                                throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + ex.part, ex);
-                                            }
-                                        }
-                                        try {
-                                            currentPart = transform(ex.part);
-                                        } catch (Reparse reparse) {
-                                            reader.ltrim(part.trim);
-                                            reader.currentBuffer = reparse.buffer + reader.currentBuffer;
-                                            currentPart = reparse.transform;
-                                            break next;
-                                        }
-                                    } catch (ParseFunction ex) {
-                                        builder.append(reader.ltrim(part.trim));
-                                        try {
-                                            functionParser.parse(reader);
-                                        } catch (ParseComplete ce) {
-                                            ex.function.impl = ce.impl;
-                                            ex.function.impl.callee = ex.function;
-                                            ex.function.source = ce.source;
-                                            ex.function.complete();
-                                            builder.append(ce.source);
-                                            builder.append(reader.ltrim(1));
-                                        }
-                                        break next;
-                                    } catch (ParseBlock ex) {
-                                        builder.append(reader.ltrim(part.trim));
-                                        try {
-                                            blockParser.parse(reader);
-                                        } catch (ParseComplete ce) {
-                                            ex.block.impl = ce.impl;
-                                            ex.block.complete();
-                                            builder.append(ce.source);
-                                            builder.append(reader.ltrim(1));
-                                        }
-                                        break next;
-                                    } catch (ParseSwitch ex) {
-                                        builder.append(reader.ltrim(part.trim));
-                                        try {
-                                            switchParser.parse(reader);
-                                        } catch (ParseComplete ce) {
-                                            ex.block.impl = ce.impl;
-                                            ex.block.state = Block.State.Complete;
-                                            builder.append(ce.source);
-                                            builder.append(reader.ltrim(1));
-                                        }
-                                        break next;
                                     }
+                                    queue.add(ex.next);
+                                    newline = false;
                                 } else {
-                                    if (part.part instanceof CloseGroup) {
-                                        if (DEBUG) {
-                                            System.out.println("[" + this + "] End...");
-                                        }
-                                        end(sRows, sColumns, parts, builder.toString());
-                                    } else
-                                        try {
-                                            currentPart = transform(part.part);
-                                        } catch (Reparse reparse) {
-                                            reader.ltrim(part.trim);
-                                            reader.currentBuffer = reparse.buffer + reader.currentBuffer;
-                                            currentPart = reparse.transform;
-                                            break next;
-                                        }
+                                    throw ex;
                                 }
-                                builder.append(reader.ltrim(part.trim));
-                            } catch (PartComplete part) {
-                                currentPart = currentPart.finish();
-                                if (currentPart != null) {
-                                    if (currentPart instanceof CloseGroup) {
-                                        if (DEBUG) {
-                                            System.out.println("[" + this + "] End...");
-                                        }
-                                        end(sRows, sColumns, parts, builder.toString());
-                                    }
-                                    if (!currentPart.isStandalone()) {
-                                        throw new Error.JavaException("SyntaxError", "Unexpected " + currentPart);
-                                    }
-                                    if (currentPart.isIncomplete()) {
-                                        throw new Error.JavaException("SyntaxError", "Expected more after " + currentPart);
-                                    }
-                                    parts.add(currentPart);
-                                    currentPart = null;
-                                }
-                                builder.append(reader.ltrim(part.trim));
                             }
-                            break next;
+                        } catch (CompleteException ex) {
+                            if (DEBUG) {
+                                System.out.println("[" + this + "] Complete: " + ex);
+                                ex.printStackTrace(System.out);
+                            }
+                            currentPart = currentPart.finish();
+                            if (currentPart != null) {
+                                if (!currentPart.isStandalone()) {
+                                    throw new Error.JavaException("SyntaxError", "Unexpected " + describe(currentPart) + " at " + currentPart.rows + ":" + currentPart.columns, ex);
+                                }
+                                if (currentPart.isIncomplete()) {
+                                    throw new Error.JavaException("SyntaxError", "Expected more after " + describe(currentPart) + " at " + currentPart.rows + ":" + currentPart.columns, ex);
+                                }
+                                parts.add(currentPart);
+                            }
+                            if (ex.part != null) {
+                                if (ex.part instanceof CloseGroup) {
+                                    if (DEBUG) {
+                                        System.out.println("[" + this + "] End...");
+                                    }
+                                    end(sRows, sColumns, parts, builder.toString());
+                                }
+                                if (!ex.part.isStandalone()) {
+                                    if (ex.part instanceof SemiColon) {
+                                        builder.append(reader.ltrim(part.trim));
+                                        currentPart = null;
+                                        continue;
+                                    }
+                                    throw new net.nexustools.njs.Error.JavaException("SyntaxError", "Unexpected " + describe(ex.part) + " at " + ex.part.rows + ":" + ex.part.columns, ex);
+                                }
+                            }
+                            try {
+                                currentPart = transform(ex.part);
+                            } catch (Reparse reparse) {
+                                reader.ltrim(part.trim);
+                                reader.currentBuffer = reparse.buffer + reader.currentBuffer;
+                                currentPart = reparse.transform;
+                                newline = false;
+                                continue;
+                            }
+                        } catch (ParseFunction ex) {
+                            builder.append(reader.ltrim(part.trim));
+                            try {
+                                functionParser.parse(reader);
+                            } catch (ParseComplete ce) {
+                                ex.function.impl = ce.impl;
+                                ex.function.impl.callee = ex.function;
+                                ex.function.source = ce.source;
+                                ex.function.complete();
+                                builder.append(ce.source);
+                                builder.append(reader.ltrim(1));
+                            }
+                            newline = false;
+                            continue;
+                        } catch (ParseBlock ex) {
+                            builder.append(reader.ltrim(part.trim));
+                            try {
+                                blockParser.parse(reader);
+                            } catch (ParseComplete ce) {
+                                ex.block.impl = ce.impl;
+                                ex.block.complete();
+                                builder.append(ce.source);
+                                builder.append(reader.ltrim(1));
+                            }
+                            newline = false;
+                            continue;
+                        } catch (ParseSwitch ex) {
+                            builder.append(reader.ltrim(part.trim));
+                            try {
+                                switchParser.parse(reader);
+                            } catch (ParseComplete ce) {
+                                ex.block.impl = ce.impl;
+                                ex.block.state = Block.State.Complete;
+                                builder.append(ce.source);
+                                builder.append(reader.ltrim(1));
+                            }
+                            newline = false;
+                            continue;
                         }
+                    } else {
+                        if (part.part instanceof CloseGroup) {
+                            if (DEBUG) {
+                                System.out.println("[" + this + "] End...");
+                            }
+                            end(sRows, sColumns, parts, builder.toString());
+                        } else
+                            try {
+                                currentPart = transform(part.part);
+                            } catch (Reparse reparse) {
+                                reader.ltrim(part.trim);
+                                reader.currentBuffer = reparse.buffer + reader.currentBuffer;
+                                currentPart = reparse.transform;
+                                newline = false;
+                                continue;
+                            }
                     }
-                    java.lang.String next;
-                    if ((next = reader.more()) == null) {
-                        throw new Error.JavaException("SyntaxError", "No matching patterns for " + this + ": " + buffer.substring(0, Math.min(20, buffer.length())));
+                    builder.append(reader.ltrim(part.trim));
+                    newline = false;
+                } catch (PartComplete part) {
+                    currentPart = currentPart.finish();
+                    if (currentPart != null) {
+                        if (currentPart instanceof CloseGroup) {
+                            if (DEBUG) {
+                                System.out.println("[" + this + "] End...");
+                            }
+                            end(sRows, sColumns, parts, builder.toString());
+                        }
+                        if (!currentPart.isStandalone()) {
+                            throw new Error.JavaException("SyntaxError", "Unexpected " + describe(currentPart) + " at " + currentPart.rows + ":" + currentPart.columns);
+                        }
+                        if (currentPart.isIncomplete()) {
+                            throw new Error.JavaException("SyntaxError", "Expected more after " + describe(currentPart) + " at " + currentPart.rows + ":" + currentPart.columns);
+                        }
+                        parts.add(currentPart);
+                        currentPart = null;
                     }
-                    buffer = next;
+                    builder.append(reader.ltrim(part.trim));
                 }
             }
             if (currentPart != null) {
                 currentPart = currentPart.finish();
                 if (currentPart != null) {
                     if (!currentPart.isStandalone()) {
-                        throw new Error.JavaException("SyntaxError", "Unexpected " + currentPart);
+                        throw new Error.JavaException("SyntaxError", "Unexpected " + describe(currentPart) + " at " + currentPart.rows + ":" + currentPart.columns);
                     }
                     if (currentPart.isIncomplete()) {
-                        throw new Error.JavaException("SyntaxError", "Expected more after " + currentPart);
+                        throw new Error.JavaException("SyntaxError", "Expected more after " + describe(currentPart) + " at " + currentPart.rows + ":" + currentPart.columns);
                     }
                     parts.add(currentPart);
                     currentPart = null;
@@ -5420,7 +5585,7 @@ public abstract class RegexCompiler implements Compiler {
         }
 
         public void end(int rows, int columns, List<Parsed> parts, java.lang.String source) {
-            throw new Error.JavaException("SyntaxError", "Unexpected }");
+            throw new Error.JavaException("SyntaxError", "Unexpected } at " + rows + ":" + columns);
         }
 
         public abstract void match(Pattern pattern, Matcher matcher, ParserReader reader);

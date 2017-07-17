@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -63,10 +63,10 @@ public class Blocks {
         test("while");
     }
 
-    @Test
-    public void _switch() {
-        test("switch");
-    }
+//    @Test
+//    public void _switch() {
+//        test("switch");
+//    }
 
     @Test
     public void _try() {

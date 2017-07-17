@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -251,6 +251,24 @@ public class Array extends AbstractFunction {
                 _this.delete(index);
                 _this.set("length", global.wrap(index));
                 return popped;
+            }
+        });
+        prototype.setHidden("join", new AbstractFunction(global) {
+            @Override
+            public BaseObject call(BaseObject _this, BaseObject... params) {
+                int length = _this.get("length").toInt();
+                if (length < 1) {
+                    return global.wrap(" ");
+                }
+
+                java.lang.String glue = params.length > 0 ? params[0].toString() : "";
+                StringBuilder b = new StringBuilder();
+                for (int i = 0; i < length; i++) {
+                    if(i > 0)
+                        b.append(glue);
+                    b.append(_this.get(i));
+                }
+                return global.wrap(b.toString());
             }
         });
         prototype.setHidden("filter", new AbstractFunction(global) {

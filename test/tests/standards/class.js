@@ -17,9 +17,14 @@
 var Assert = importClass("org.junit.Assert");
 var System = importClass("java.lang.System");
 
+var testSymbol = Symbol("test");
+
 class Empty {
     get nothing() {
         return 0;
+    }
+    [testSymbol]() {
+        return "orange";
     }
 }
 
@@ -38,11 +43,16 @@ class Test2 extends Test {
     farmer(a, b, ...c) {
         return super.farmer(c[0], c[1]);
     }
+    [testSymbol]() {
+        return "yellow";
+    }
 }
 
-System.out.println(Empty);
 Assert.assertTrue((new Empty) instanceof Empty);
+Assert.assertTrue((new Empty)[testSymbol] === "orange");
+Assert.assertTrue((new Test1)[testSymbol] === "orange");
 Assert.assertTrue((new Test2) instanceof Empty);
 Assert.assertTrue((new Test2) instanceof Test);
-System.out.println((new Test2).farmer(null, null, 1, 2));
+Assert.assertTrue((new Test2).farmer(null, null, 1, 2) == 54);
 Assert.assertTrue((new Test2).nothing === 0);
+Assert.assertTrue((new Test2)[testSymbol] === "yellow");

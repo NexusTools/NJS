@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -22,6 +22,6 @@ import java.io.Reader;
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public interface Compiler {
-	public Script compile(String source, String fileName, boolean inFunction);
-	public Script compile(Reader source, String fileName, boolean inFunction);
+    public Script compile(String source, String fileName, boolean inFunction);
+    public Script compile(Reader source, String fileName, boolean inFunction);
 }

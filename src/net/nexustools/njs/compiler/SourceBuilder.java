@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -49,17 +49,20 @@ public class SourceBuilder {
     }
 
     public void indent() {
-        indent += '\t';
+        indent += "    ";
         if (Character.isWhitespace(builder.charAt(builder.length() - 1))) {
-            builder.append('\t');
+            builder.append("    ");
         }
     }
 
     public void unindent() {
-        int pos = builder.length() - 1;
-        indent = indent.substring(0, indent.length() - 1);
-        if (Character.isWhitespace(builder.charAt(pos))) {
-            builder.deleteCharAt(pos);
+        indent = indent.substring(0, indent.length() - 4);
+        for(int i=4; i>=1; i--) {
+            int pos = builder.length() - i;
+            if (Character.isWhitespace(builder.charAt(pos)))
+                builder.deleteCharAt(pos);
+            else
+                return;
         }
     }
 

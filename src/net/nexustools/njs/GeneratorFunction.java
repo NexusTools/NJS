@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -20,14 +20,14 @@ package net.nexustools.njs;
  * @author Katelyn Slater <kate@nexustools.com>
  */
 public class GeneratorFunction extends AbstractFunction {
-	
-	public GeneratorFunction(Global global) {
-		super(global);
-	}
 
-	@Override
-	public BaseObject call(BaseObject _this, BaseObject... params) {
-		throw new UnsupportedOperationException("Not supported yet.");
-	}
-	
+    public GeneratorFunction(Global global) {
+        super(global);
+    }
+
+    @Override
+    public BaseObject call(BaseObject _this, BaseObject... params) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
 }

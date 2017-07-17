@@ -16,23 +16,37 @@
 
 var Assert = importClass("org.junit.Assert");
 
-if (true) {
-
-} else
-    Assert.fail();
-
-function test(state) {
-    if(state == 0)
-        return "a";
-    else if(state == 1)
-        return "b";
-    else if(state == 2)
-        return "c";
-    else
-        return "d";
+function* anotherGenerator(i) {
+  yield i + 1;
+  yield i + 2;
+  yield i + 3;
 }
 
-Assert.assertTrue(test(0) === "a");
-Assert.assertTrue(test(1) === "b");
-Assert.assertTrue(test(2) === "c");
-Assert.assertTrue(test(3) === "d");
+function* generator(i) {
+  yield i;
+  yield* anotherGenerator(i);
+  yield i + 10;
+}
+
+var gen = generator(10);
+
+Assert.assertTrue(gen.next().value == 10);
+Assert.assertTrue(gen.next().value == 11);
+Assert.assertTrue(gen.next().value == 12);
+Assert.assertTrue(gen.next().value == 13);
+Assert.assertTrue(gen.next().value == 20);
+
+function* logGenerator() {
+  var a = yield;
+  var b = yield;
+  var c = yield;
+  yield a+b+c;
+}
+
+var gen = logGenerator();
+
+gen.next();
+gen.next('pretzel');
+gen.next('california');
+gen.next('mayonnaise');
+Assert.assertTrue(gen.next().value === "pretzelcaliforniamayonnaise");

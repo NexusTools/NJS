@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
  *
  * @author Katelyn Slater <kate@nexustools.com>
  */
-public abstract class String extends AbstractFunction {
+public class String extends AbstractFunction {
 
     public static class Instance extends GenericObject {
 
@@ -222,6 +222,17 @@ public abstract class String extends AbstractFunction {
                 return "String_prototype_charCodeAt";
             }
         });
+        prototype.setHidden("replace", new AbstractFunction(global) {
+            @Override
+            public BaseObject call(BaseObject _this, BaseObject... params) {
+                return String.this.wrap(_this.toString().replaceAll(params[0].toString(), params[1].toString()));
+            }
+
+            @Override
+            public java.lang.String name() {
+                return "String_prototype_replace";
+            }
+        });
         prototype.setArrayOverride(new ArrayOverride() {
             @Override
             public BaseObject get(int i, BaseObject _this, Or<BaseObject> or) {
@@ -276,8 +287,10 @@ public abstract class String extends AbstractFunction {
         }
         return _this;
     }
-
-    public abstract Instance wrap(java.lang.String string);
+    
+    public Instance wrap(java.lang.String string) {
+        return new Instance(global, string, true);
+    }
 
     public String.Instance from(BaseObject param) {
         if (param instanceof Instance) {

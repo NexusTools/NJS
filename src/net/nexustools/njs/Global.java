@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -15,15 +15,14 @@
  */
 package net.nexustools.njs;
 
+import net.nexustools.njs.compiler.Compiler;
+import net.nexustools.njs.compiler.JavaTranspiler;
+import net.nexustools.njs.compiler.RuntimeCompiler;
+import net.nexustools.njs.compiler.NullCompiler;
 import java.lang.ref.WeakReference;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import net.nexustools.njs.compiler.Compiler;
-import net.nexustools.njs.compiler.JavaTranspiler;
-import net.nexustools.njs.compiler.NullCompiler;
-import net.nexustools.njs.compiler.RuntimeCompiler;
 
 /**
  *
@@ -88,18 +87,8 @@ public class Global extends GenericObject {
     public Global(Compiler compiler) {
         this.compiler = compiler;
 
-        try {
-            super.Number = new ConstructNumber();
-        } catch (Throwable ex) {
-            super.Number = new CachedNumber();
-        }
-        Number = super.Number;
-        try {
-            super.String = new ConstructString();
-        } catch (Throwable ex) {
-            super.String = new CachedString();
-        }
-        String = super.String;
+        Number = super.Number = new Number();
+        String = super.String = new String();
 
         Symbol = new Symbol(this);
         Symbol.initConstants();
@@ -127,8 +116,8 @@ public class Global extends GenericObject {
         java_object = Symbol.create("java_object");
         Number.initConstants();
 
-        ObjectPrototype.String = NumberPrototype.String = Object.String = String;
-        ObjectPrototype.Number = NumberPrototype.Number = String.Number = Object.Number = Number;
+        ObjectPrototype.String = NumberPrototype.String = Object.String = Number.String = String;
+        ObjectPrototype.Number = NumberPrototype.Number = String.Number = Object.Number = Number.Number = Number;
         NaN = Number.NaN;
 
         PositiveOne = Number.PositiveOne;
@@ -166,12 +155,7 @@ public class Global extends GenericObject {
 
         setHidden("NaN", Number.NaN);
         setHidden("Infinity", Number.PositiveInfinity);
-        setHidden("isNaN", new AbstractFunction(this) {
-            @Override
-            public BaseObject call(BaseObject _this, BaseObject... params) {
-                return Double.isNaN(params[0].toDouble()) ? Boolean.TRUE : Boolean.FALSE;
-            }
-        });
+        setHidden("isNaN", Number.isNaN);
         setHidden("Function", Function);
         setHidden("Object", Object);
         setHidden("String", String);
@@ -228,12 +212,28 @@ public class Global extends GenericObject {
         return wrap(javaObject, null);
     }
 
+    private final List<WeakReference<JavaObjectWrapper>> OBJECTS = new ArrayList();
     public BaseObject wrap(java.lang.Object javaObject, Class<?> desiredClass) {
         assert (javaObject != null);
         if (desiredClass == null) {
             desiredClass = javaObject.getClass();
         }
-        return new JavaObjectWrapper(javaObject, wrap(desiredClass), this);
+        synchronized(OBJECTS) {
+            JavaClassWrapper javaClass = wrap(desiredClass);
+            Iterator<WeakReference<JavaObjectWrapper>> it = OBJECTS.iterator();
+            while (it.hasNext()) {
+                WeakReference<JavaObjectWrapper> ref = it.next();
+                JavaObjectWrapper wrapper = ref.get();
+                if (wrapper == null) {
+                    it.remove();
+                } else if (wrapper.javaObject == javaObject && wrapper.get("constructor") == javaClass) {
+                    return wrapper;
+                }
+            }
+            JavaObjectWrapper wrapper = new JavaObjectWrapper(javaObject, javaClass, this);
+            OBJECTS.add(new WeakReference(wrapper));
+            return wrapper;
+        }
     }
 
 }

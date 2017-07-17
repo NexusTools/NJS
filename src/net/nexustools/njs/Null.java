@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -315,7 +315,7 @@ public final class Null implements BaseObject {
 
     @Override
     public String.Instance _toString() {
-        throw new UnsupportedOperationException("Not supported");
+        return ((Global)Scope.current().scopeables[0]).String.wrap("null");
     }
 
     @Override

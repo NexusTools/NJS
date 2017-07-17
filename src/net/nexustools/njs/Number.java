@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -19,17 +19,15 @@ package net.nexustools.njs;
  *
  * @author Katelyn Slater <kate@nexustools.com>
  */
-public abstract class Number extends AbstractFunction {
+public class Number extends AbstractFunction {
 
     public static class Instance extends GenericObject {
 
         public final double value;
-        public final Number Number;
         public final boolean _const;
 
         Instance(Number Number, Symbol.Instance iterator, String String, double number, boolean _const) {
             super(Number, iterator, String, (Number) null);
-            this.Number = Number;
             this.value = number;
             this._const = _const;
         }
@@ -132,23 +130,22 @@ public abstract class Number extends AbstractFunction {
                 return true;
             }
 
-            return _const && !Double.isNaN(value) && obj instanceof Instance
-                    && ((Instance) obj)._const && value == ((Instance) obj).value;
+            return _const && (!Double.isNaN(value) && obj instanceof Instance
+                    && ((Instance) obj)._const && value == ((Instance) obj).value);
         }
     }
 
     public Number.Instance NaN;
+    public AbstractFunction isNaN;
     public Number.Instance PositiveInfinity;
     public Number.Instance NegativeInfinity;
     public Number.Instance NegativeOne;
     public Number.Instance PositiveOne;
     public Number.Instance Zero;
 
-    public Number() {
-    }
-
     public void initConstants() {
         NaN = wrap(Double.NaN);
+        setHidden("NaN", NaN);
         Zero = wrap(0);
         PositiveOne = wrap(1);
         NegativeOne = wrap(-1);
@@ -163,6 +160,13 @@ public abstract class Number extends AbstractFunction {
     }
 
     protected void initPrototypeFunctions(final Global global) {
+        isNaN = new AbstractFunction(global) {
+            @Override
+            public BaseObject call(BaseObject _this, BaseObject... params) {
+                return Double.isNaN(params[0].toDouble()) ? global.Boolean.TRUE : global.Boolean.FALSE;
+            }
+        };
+        setHidden("isNaN", isNaN);
         GenericObject prototype = (GenericObject) prototype();
         prototype.setHidden("toString", new AbstractFunction(global) {
             @Override
@@ -192,8 +196,10 @@ public abstract class Number extends AbstractFunction {
         }
         return _this;
     }
-
-    public abstract Instance wrap(double number);
+    
+    public Instance wrap(double number) {
+        return new Instance(this, iterator, String, number, true);
+    }
 
     public static java.lang.String toString(double number) {
         long val = (long)number;

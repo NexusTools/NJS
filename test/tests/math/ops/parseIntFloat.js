@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -13,17 +13,11 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package net.nexustools.njs;
 
-/**
- *
- * @author Katelyn Slater <kate@nexustools.com>
- */
-public class ConstructNumber extends Number {
+var Assert = importClass("org.junit.Assert");
+var System = importClass("java.lang.System");
 
-	@Override
-	public Instance wrap(double number) {
-		return new Instance(this, iterator, String, number, true);
-	}
-	
-}
+Assert.assertTrue(isNaN(parseInt("tuna")));
+Assert.assertTrue(Number.isNaN(parseInt("soldier")));
+Assert.assertTrue(parseFloat("5.192") == 5.192);
+Assert.assertTrue(parseInt("23") == 23);

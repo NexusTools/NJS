@@ -37,3 +37,6 @@ var nullException = new java.lang.NullPointerException();
 Assert.assertTrue(nullException instanceof java.lang.Object);
 Assert.assertTrue(nullException instanceof java.lang.Throwable);
 Assert.assertTrue(nullException instanceof java.lang.RuntimeException);
+
+Assert.assertTrue(java.lang.Boolean.TRUE);
+Assert.assertTrue(!java.lang.Boolean.FALSE);

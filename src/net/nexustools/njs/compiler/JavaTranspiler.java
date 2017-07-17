@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -206,7 +206,6 @@ public class JavaTranspiler extends RegexCompiler {
 
         @Override
         public java.lang.String refName(java.lang.String name, boolean create) {
-            System.out.println("refName: " + name + ", " + create);
             java.lang.String output = parent.refName(name, false);
             if (output == null) {
                 AtomicInteger atomicInteger = used_names.get(name);
@@ -941,7 +940,7 @@ public class JavaTranspiler extends RegexCompiler {
         if (System.getProperties().containsKey("NJSNOCOMPILING")) {
             throw new RuntimeException("NJSNOCOMPILING");
         }
-        //assert ((new JavaTranspiler().compile("(function munchkin(){\n\tfunction yellow(){\n\t\treturn 55;\n\t}\n\treturn yellow()\n\t})()", "JavaCompilerStaticTest", false)).exec(new Global(), null).toString().equals("55"));
+        //assert ((new JavaTranspiler().compile("(function munchkin(){\n    function yellow(){\n        return 55;\n    }\n    return yellow()\n    })()", "JavaCompilerStaticTest", false)).exec(new Global(), null).toString().equals("55"));
     }
 
     private boolean generateCommonComparison(SourceBuilder sourceBuilder, java.lang.String ltype, boolean not, Parsed lhs, Parsed rhs, java.lang.String methodPrefix, java.lang.String baseScope, java.lang.String fileName, LocalStack localStack, StackOptimizations expectedStack, Map<java.lang.String, Function> functionMap, Map<java.lang.String, Class> classMap, ClassNameScopeChain scopeChain, Map<java.lang.Integer, FilePosition> sourceMap, List<java.lang.Object> extras, boolean[] hasBreak, TranspileContext context) {
@@ -1752,7 +1751,7 @@ public class JavaTranspiler extends RegexCompiler {
                         if (addDebugging) {
                             sourceBuilder.unindent();
                             sourceBuilder.appendln("} catch(ClassCastException ex) {");
-                            sourceBuilder.append("\tthrow new net.nexustools.njs.Error.JavaException(\"ReferenceError\", \"");
+                            sourceBuilder.append("    throw new net.nexustools.njs.Error.JavaException(\"ReferenceError\", \"");
                             sourceBuilder.append(convertStringSource(source));
                             sourceBuilder.appendln(" is not a function\");");
                             sourceBuilder.appendln("}");
@@ -1809,7 +1808,7 @@ public class JavaTranspiler extends RegexCompiler {
                         if (addDebugging) {
                             sourceBuilder.unindent();
                             sourceBuilder.appendln("} catch(ClassCastException ex) {");
-                            sourceBuilder.append("\tthrow new net.nexustools.njs.Error.JavaException(\"ReferenceError\", \"");
+                            sourceBuilder.append("    throw new net.nexustools.njs.Error.JavaException(\"ReferenceError\", \"");
                             sourceBuilder.append(convertStringSource(source));
                             sourceBuilder.appendln(" is not a function\");");
                             sourceBuilder.appendln("}");
@@ -1863,7 +1862,7 @@ public class JavaTranspiler extends RegexCompiler {
                         if (addDebugging) {
                             sourceBuilder.unindent();
                             sourceBuilder.appendln("} catch(ClassCastException ex) {");
-                            sourceBuilder.append("\tthrow new net.nexustools.njs.Error.JavaException(\"ReferenceError\", \"");
+                            sourceBuilder.append("    throw new net.nexustools.njs.Error.JavaException(\"ReferenceError\", \"");
                             sourceBuilder.append(convertStringSource(source));
                             sourceBuilder.appendln(" is not a function\");");
                             sourceBuilder.appendln("}");
@@ -1933,7 +1932,7 @@ public class JavaTranspiler extends RegexCompiler {
                         if (addDebugging) {
                             sourceBuilder.unindent();
                             sourceBuilder.appendln("} catch(ClassCastException ex) {");
-                            sourceBuilder.append("\tthrow new net.nexustools.njs.Error.JavaException(\"ReferenceError\", \"");
+                            sourceBuilder.append("    throw new net.nexustools.njs.Error.JavaException(\"ReferenceError\", \"");
                             sourceBuilder.append(convertStringSource(source));
                             sourceBuilder.appendln(" is not a function\");");
                             sourceBuilder.appendln("}");
@@ -1995,7 +1994,7 @@ public class JavaTranspiler extends RegexCompiler {
                     sourceBuilder.appendln(";");
                     sourceBuilder.unindent();
                     sourceBuilder.appendln("} catch(ClassCastException ex) {");
-                    sourceBuilder.append("\tthrow new net.nexustools.njs.Error.JavaException(\"ReferenceError\", \"");
+                    sourceBuilder.append("    throw new net.nexustools.njs.Error.JavaException(\"ReferenceError\", \"");
                     sourceBuilder.append(source);
                     sourceBuilder.appendln(" is not a function\");");
                     sourceBuilder.appendln("}");
@@ -2388,9 +2387,11 @@ public class JavaTranspiler extends RegexCompiler {
             return false;
         } else if (part instanceof ReferenceChain) {
             java.lang.String base = ((ReferenceChain) part).chain.remove(0);
-            if(context == TranspileContext.ClassMethod && base.equals("super"))
+            if(context == TranspileContext.ClassMethod && base.equals("super")) {
                 sourceBuilder.append("_super");
-            else
+                if(!((ReferenceChain)part).chain.isEmpty())
+                    sourceBuilder.append(".prototype()");
+            } else
                 generateBaseScopeAccess(sourceBuilder, base, baseScope, expectedStack, localStack);
             for (java.lang.String ref : ((ReferenceChain) part).chain) {
                 sourceBuilder.append(".get(");
@@ -2578,7 +2579,7 @@ public class JavaTranspiler extends RegexCompiler {
                 hasReturn = generateBlockSource(sourceBuilder, ((Try) part).impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.unindent();
                 sourceBuilder.appendln("} catch(net.nexustools.njs.Error.InvisibleException ex) {");
-                sourceBuilder.appendln("\tthrow ex;");
+                sourceBuilder.appendln("    throw ex;");
                 sourceBuilder.appendln("} catch(Throwable t) {");
                 sourceBuilder.indent();
                 java.lang.String newScope = extendScope(baseScope, "catchScope");
@@ -2598,7 +2599,7 @@ public class JavaTranspiler extends RegexCompiler {
                 hasReturn = generateBlockSource(sourceBuilder, c.impl, methodPrefix, newScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context) && hasReturn;
                 sourceBuilder.unindent();
                 sourceBuilder.appendln("} finally {");
-                sourceBuilder.append("\t");
+                sourceBuilder.append("    ");
                 sourceBuilder.append(newScope);
                 sourceBuilder.appendln(".exit();");
                 sourceBuilder.appendln("}");
@@ -2615,7 +2616,7 @@ public class JavaTranspiler extends RegexCompiler {
                 hasReturn = generateBlockSource(sourceBuilder, ((Try) part).impl, methodPrefix, baseScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context);
                 sourceBuilder.unindent();
                 sourceBuilder.appendln("} catch(net.nexustools.njs.Error.InvisibleException ex) {");
-                sourceBuilder.appendln("\tthrow ex;");
+                sourceBuilder.appendln("    throw ex;");
                 sourceBuilder.appendln("} catch(Throwable t) {");
                 sourceBuilder.indent();
                 java.lang.String newScope;
@@ -2646,7 +2647,7 @@ public class JavaTranspiler extends RegexCompiler {
                 hasReturn = generateBlockSource(sourceBuilder, c.impl, methodPrefix, newScope, fileName, localStack, expectedStack, functionMap, classMap, scopeChain, sourceMap, extras, hasBreak, context) && hasReturn;
                 sourceBuilder.unindent();
                 sourceBuilder.appendln("} finally {");
-                sourceBuilder.append("\t");
+                sourceBuilder.append("    ");
                 sourceBuilder.append(newScope);
                 sourceBuilder.appendln(".exit();");
                 sourceBuilder.appendln("}");
@@ -3591,7 +3592,7 @@ public class JavaTranspiler extends RegexCompiler {
         if (addDebugging || !scope.isFunction()) {
             sourceBuilder.appendln("@Override");
             sourceBuilder.appendln("public String source() {");
-            sourceBuilder.append("\treturn \"");
+            sourceBuilder.append("    return \"");
             if (addDebugging) {
                 sourceBuilder.append(convertStringSource(script.source));
             } else {
@@ -3613,7 +3614,7 @@ public class JavaTranspiler extends RegexCompiler {
         if (!scope.isGlobal()) {
             sourceBuilder.appendln("@Override");
             sourceBuilder.appendln("public String name() {");
-            sourceBuilder.append("\treturn \"");
+            sourceBuilder.append("    return \"");
             boolean isLambda = script.callee != null && script.callee.isLambda();
             if (script.callee != null && script.callee.name != null) {
                 sourceBuilder.append(isLambda ? "<lambda>" : "<anonymous>");
@@ -3631,7 +3632,7 @@ public class JavaTranspiler extends RegexCompiler {
                 sourceBuilder.append("_this");
             sourceBuilder.appendln(", BaseObject... params) {");
             if (opt == null && !scope.isMethod()) {
-                sourceBuilder.append("\tfinal Scope baseScope = extendScope(");
+                sourceBuilder.append("    final Scope baseScope = extendScope(");
                 if(!isLambda)
                     sourceBuilder.append("_this");
                 sourceBuilder.appendln(");");
@@ -3641,7 +3642,7 @@ public class JavaTranspiler extends RegexCompiler {
                 List<java.lang.String> arguments = script.callee.arguments;
                 java.lang.String vararg = script.callee.vararg;
                 if (opt == null) {
-                    sourceBuilder.appendln("\tbaseScope.var(\"arguments\", new Arguments(global, this, params));");
+                    sourceBuilder.appendln("    baseScope.var(\"arguments\", new Arguments(global, this, params));");
                 } else {
                     localStack.put("this", "this");
                     if (usesStackClass) {
@@ -3651,36 +3652,36 @@ public class JavaTranspiler extends RegexCompiler {
                         if(vararg != null)
                             localStack.put(vararg, "argument");
                         if (localStack.isEmpty()) {
-                            sourceBuilder.appendln("\tfinal Scope baseScope = extendScope(_this);");
+                            sourceBuilder.appendln("    final Scope baseScope = extendScope(_this);");
                         } else {
-                            sourceBuilder.append("\tfinal ");
+                            sourceBuilder.append("    final ");
                             sourceBuilder.append(stackName);
                             sourceBuilder.append(" localStack = new ");
                             sourceBuilder.append(stackName);
                             sourceBuilder.appendln("();");
                             if (opt.stackType() == ScopeOptimizer.StackType.TypedClass) {
-                                sourceBuilder.appendln("\tfinal Scope baseScope = extendScope(_this);");
+                                sourceBuilder.appendln("    final Scope baseScope = extendScope(_this);");
                             } else {
-                                sourceBuilder.appendln("\tfinal Scope baseScope = extendScope(_this, localStack);");
+                                sourceBuilder.appendln("    final Scope baseScope = extendScope(_this, localStack);");
                             }
                         }
                         if (!arguments.contains("arguments") && opt.usesArguments()) {
-                            sourceBuilder.appendln("\tlocalStack.arguments = new Arguments(global, this, params);");
+                            sourceBuilder.appendln("    localStack.arguments = new Arguments(global, this, params);");
                             localStack.put("arguments", "arguments");
                         }
                     } else {
                         if (!arguments.contains("arguments") && opt.usesArguments()) {
-                            sourceBuilder.appendln("\tBaseObject arguments = new Arguments(global, this, params);");
+                            sourceBuilder.appendln("    BaseObject arguments = new Arguments(global, this, params);");
                             localStack.put("arguments", "arguments");
                         }
                         for (int i = 0; i < arguments.size(); i++) {
-                            sourceBuilder.append("\tBaseObject ");
+                            sourceBuilder.append("    BaseObject ");
                             sourceBuilder.append(arguments.get(i));
                             sourceBuilder.appendln(";");
                             localStack.put(arguments.get(i), "argument");
                         }
                         if(vararg != null) {
-                            sourceBuilder.append("\tBaseObject ");
+                            sourceBuilder.append("    BaseObject ");
                             sourceBuilder.append(vararg);
                             sourceBuilder.appendln(";");
                             localStack.put(vararg, "argument");
@@ -3693,7 +3694,7 @@ public class JavaTranspiler extends RegexCompiler {
                             if (type.equals("argument")) {
                                 continue;
                             }
-                            sourceBuilder.append("\t");
+                            sourceBuilder.append("    ");
                             if (type.equals("string")) {
                                 sourceBuilder.append("String");
                             } else if (type.equals("boolean")) {
@@ -3714,11 +3715,11 @@ public class JavaTranspiler extends RegexCompiler {
                     }
                 }
                 if (!arguments.isEmpty()) {
-                    sourceBuilder.appendln("\tswitch(params.length) {");
+                    sourceBuilder.appendln("    switch(params.length) {");
                     int argsize = arguments.size();
                     for (int i = 0; i <= argsize; i++) {
                         int a = 0;
-                        sourceBuilder.append("\t\t");
+                        sourceBuilder.append("        ");
                         boolean _default = i == argsize;
                         if (_default) {
                             sourceBuilder.append("default");
@@ -3729,13 +3730,13 @@ public class JavaTranspiler extends RegexCompiler {
                         sourceBuilder.appendln(":");
                         for (; a < i; a++) {
                             if (script.optimizations == null) {
-                                sourceBuilder.append("\t\t\tbaseScope.var(\"");
+                                sourceBuilder.append("            baseScope.var(\"");
                                 sourceBuilder.append(convertStringSource(arguments.get(a)));
                                 sourceBuilder.append("\", params[");
                                 sourceBuilder.append(java.lang.String.valueOf(a));
                                 sourceBuilder.appendln("]);");
                             } else {
-                                sourceBuilder.append("\t\t\t");
+                                sourceBuilder.append("            ");
                                 if (usesStackClass) {
                                     sourceBuilder.append("localStack.");
                                 }
@@ -3747,11 +3748,11 @@ public class JavaTranspiler extends RegexCompiler {
                         }
                         for (; a < argsize; a++) {
                             if (script.optimizations == null) {
-                                sourceBuilder.append("\t\t\tbaseScope.var(\"");
+                                sourceBuilder.append("            baseScope.var(\"");
                                 sourceBuilder.append(convertStringSource(arguments.get(a)));
                                 sourceBuilder.appendln("\", Undefined.INSTANCE);");
                             } else {
-                                sourceBuilder.append("\t\t\t");
+                                sourceBuilder.append("            ");
                                 if (usesStackClass) {
                                     sourceBuilder.append("localStack.");
                                 }
@@ -3762,13 +3763,13 @@ public class JavaTranspiler extends RegexCompiler {
                         if(vararg != null) {
                             if(_default) {
                                 if (script.optimizations == null) {
-                                    sourceBuilder.append("\t\t\tbaseScope.var(\"");
+                                    sourceBuilder.append("            baseScope.var(\"");
                                     sourceBuilder.append(convertStringSource(vararg));
                                     sourceBuilder.append("\", new GenericArray(global, params, ");
                                     sourceBuilder.append(java.lang.String.valueOf(argsize));
                                     sourceBuilder.appendln("));");
                                 } else {
-                                    sourceBuilder.append("\t\t\t");
+                                    sourceBuilder.append("            ");
                                     if (usesStackClass) {
                                         sourceBuilder.append("localStack.");
                                     }
@@ -3779,11 +3780,11 @@ public class JavaTranspiler extends RegexCompiler {
                                 }
                             } else {
                                 if (script.optimizations == null) {
-                                    sourceBuilder.append("\t\t\tbaseScope.var(\"");
+                                    sourceBuilder.append("            baseScope.var(\"");
                                     sourceBuilder.append(convertStringSource(vararg));
                                     sourceBuilder.appendln("\", new GenericArray(global));");
                                 } else {
-                                    sourceBuilder.append("\t\t\t");
+                                    sourceBuilder.append("            ");
                                     if (usesStackClass) {
                                         sourceBuilder.append("localStack.");
                                     }
@@ -3792,16 +3793,16 @@ public class JavaTranspiler extends RegexCompiler {
                                 }
                             }
                         }
-                        sourceBuilder.appendln("\t\t\tbreak;");
+                        sourceBuilder.appendln("            break;");
                     }
-                    sourceBuilder.appendln("\t}");
+                    sourceBuilder.appendln("    }");
                 } else if(vararg != null) {
                     if (script.optimizations == null) {
-                        sourceBuilder.append("\tbaseScope.var(\"");
+                        sourceBuilder.append("    baseScope.var(\"");
                         sourceBuilder.append(convertStringSource(vararg));
                         sourceBuilder.append("\", new GenericArray(global, params));");
                     } else {
-                        sourceBuilder.append("\t");
+                        sourceBuilder.append("    ");
                         if (usesStackClass) {
                             sourceBuilder.append("localStack.");
                         }
@@ -3816,12 +3817,12 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.appendln("@Override");
             if (scope.isFunction()) {
                 sourceBuilder.appendln("public BaseObject exec(Global global, final Scope scope) {");
-                sourceBuilder.appendln("\tfinal Scope baseScope = scope == null ? Scope.current().beginBlock() : scope;");
-                sourceBuilder.appendln("\tfinal BaseObject _this = baseScope._this;");
+                sourceBuilder.appendln("    final Scope baseScope = scope == null ? Scope.current().beginBlock() : scope;");
+                sourceBuilder.appendln("    final BaseObject _this = baseScope._this;");
             } else {
                 sourceBuilder.appendln("public BaseObject exec(Global global, Scope scope) {");
-                sourceBuilder.appendln("\tfinal Scope baseScope = scope == null ? new Scope(global) : scope;");
-                sourceBuilder.appendln("\tfinal BaseObject _this = global;");
+                sourceBuilder.appendln("    final Scope baseScope = scope == null ? new Scope(global) : scope;");
+                sourceBuilder.appendln("    final BaseObject _this = global;");
             }
         }
         sourceBuilder.indent();
@@ -3924,7 +3925,7 @@ public class JavaTranspiler extends RegexCompiler {
         if (opt == null || usesStackClass) {
             sourceBuilder.unindent();
             sourceBuilder.appendln("} finally {");
-            sourceBuilder.appendln("\tbaseScope.exit();");
+            sourceBuilder.appendln("    baseScope.exit();");
             sourceBuilder.appendln("}");
         }
         sourceBuilder.unindent();
@@ -3986,7 +3987,7 @@ public class JavaTranspiler extends RegexCompiler {
                     sourceBuilder.append("if(key.equals(\"");
                     sourceBuilder.append(convertStringSource(key));
                     sourceBuilder.appendln("\"))");
-                    sourceBuilder.append("\treturn this.");
+                    sourceBuilder.append("    return this.");
                     sourceBuilder.append(key);
                     sourceBuilder.appendln(";");
                 }
@@ -4010,10 +4011,10 @@ public class JavaTranspiler extends RegexCompiler {
                     sourceBuilder.append("if(key.equals(\"");
                     sourceBuilder.append(convertStringSource(key));
                     sourceBuilder.appendln("\")) {");
-                    sourceBuilder.append("\tthis.");
+                    sourceBuilder.append("    this.");
                     sourceBuilder.append(key);
                     sourceBuilder.appendln(" = val;");
-                    sourceBuilder.appendln("\treturn;");
+                    sourceBuilder.appendln("    return;");
                     sourceBuilder.append("}");
                 }
                 sourceBuilder.appendln();
@@ -4037,7 +4038,7 @@ public class JavaTranspiler extends RegexCompiler {
                     sourceBuilder.append("if(key.equals(\"");
                     sourceBuilder.append(convertStringSource(key));
                     sourceBuilder.appendln("\"))");
-                    sourceBuilder.appendln("\treturn false;");
+                    sourceBuilder.appendln("    return false;");
                 }
                 sourceBuilder.appendln("return or.or(key);");
                 sourceBuilder.unindent();
@@ -4078,11 +4079,15 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.appendln("baseScope = scope;");
             GetterSetter getset;
             ClassMethod constructor = null;
+            Map<Parsed, ClassMethod> symbols = new HashMap();
             Map<java.lang.String, GetterSetter> properties = new HashMap();
             for(ClassMethod classMethod : clazz.methods) {
                 switch(classMethod.type) {
                     case Constructor:
                         constructor = classMethod;
+                        break;
+                    case Symbol:
+                        symbols.put(classMethod.symbolRef, classMethod);
                         break;
                     case Getter:
                         getset = properties.get(classMethod.name);
@@ -4119,7 +4124,13 @@ public class JavaTranspiler extends RegexCompiler {
                         if(_extends)
                             sourceBuilder.append("_super, ");
                         sourceBuilder.appendln("global, scope));");
+                        break;
+                    default:
+                        throw new RuntimeException("Cannot compile `" + classMethod + "`");
                 }
+            }
+            for(Map.Entry<Parsed, ClassMethod> _entry : symbols.entrySet()) {
+                
             }
             for(Map.Entry<java.lang.String, GetterSetter> _entry : properties.entrySet()) {
                 sourceBuilder.append("((GenericObject)prototype).defineProperty(\"");
@@ -4198,7 +4209,7 @@ public class JavaTranspiler extends RegexCompiler {
             generateExtras(sourceBuilder, extras);
             generateFunctions(sourceBuilder, functionMap, methodPrefix, fileName, _scopeChain, SourceScope.SubFunction, _extends, TranspileContext.ClassMethod);
             sourceBuilder.appendln("Scope extendScope(BaseObject _this) {");
-            sourceBuilder.appendln("\treturn baseScope.extend(_this);");
+            sourceBuilder.appendln("    return baseScope.extend(_this);");
             sourceBuilder.appendln("}");
             sourceBuilder.unindent();
             sourceBuilder.appendln("}");
@@ -4213,13 +4224,13 @@ public class JavaTranspiler extends RegexCompiler {
             sourceBuilder.append(" final Map<Integer, Utilities.FilePosition> SOURCE_MAP = Collections.unmodifiableMap(new LinkedHashMap<Integer, Utilities.FilePosition>()");
             if (!sourceMap.isEmpty()) {
                 sourceBuilder.appendln(" {");
-                sourceBuilder.appendln("\t{");
+                sourceBuilder.appendln("    {");
                 for (Map.Entry<java.lang.Integer, FilePosition> entry : sourceMap.entrySet()) {
                     FilePosition fpos = entry.getValue();
                     if(fpos.row == 0 || fpos.column == 0)
                         continue;
                     
-                    sourceBuilder.append("\t\tput(");
+                    sourceBuilder.append("        put(");
                     sourceBuilder.append("" + entry.getKey());
                     sourceBuilder.append(", new Utilities.FilePosition(");
                     sourceBuilder.append("" + entry.getValue().row);
@@ -4227,7 +4238,7 @@ public class JavaTranspiler extends RegexCompiler {
                     sourceBuilder.append("" + entry.getValue().column);
                     sourceBuilder.appendln("));");
                 }
-                sourceBuilder.appendln("\t}");
+                sourceBuilder.appendln("    }");
                 sourceBuilder.append("}");
             }
             sourceBuilder.appendln(");");
@@ -4261,13 +4272,13 @@ public class JavaTranspiler extends RegexCompiler {
             if(function.isLambda())
                 sourceBuilder.append("BaseObject _this, ");
             sourceBuilder.appendln("Global global, Scope scope) {");
-            sourceBuilder.append("\tsuper(");
+            sourceBuilder.append("    super(");
             if(function.isLambda())
                 sourceBuilder.append("_this, ");
             sourceBuilder.appendln("global);");
-            sourceBuilder.appendln("\tbaseScope = scope;");
+            sourceBuilder.appendln("    baseScope = scope;");
             if(scopeHasSuper)
-                sourceBuilder.appendln("\tthis._super = _super;");
+                sourceBuilder.appendln("    this._super = _super;");
             sourceBuilder.appendln("}");
 
             if(function.impl == null) {
@@ -4284,14 +4295,14 @@ public class JavaTranspiler extends RegexCompiler {
                 if(!function.isLambda())
                     sourceBuilder.append("BaseObject _this");
                 sourceBuilder.appendln(") {");
-                sourceBuilder.appendln("\treturn baseScope.extend(_this);");
+                sourceBuilder.appendln("    return baseScope.extend(_this);");
                 sourceBuilder.appendln("}");
             } else if (funcopt.stackType() != ScopeOptimizer.StackType.TypedLocal) {
                 sourceBuilder.appendln("Scope extendScope(");
                 if(!function.isLambda())
                     sourceBuilder.append("BaseObject _this, ");
                 sourceBuilder.appendln("Scopable stack) {");
-                sourceBuilder.appendln("\treturn baseScope.extend(_this, stack);");
+                sourceBuilder.appendln("    return baseScope.extend(_this, stack);");
                 sourceBuilder.appendln("}");
             }
             
@@ -4351,7 +4362,7 @@ public class JavaTranspiler extends RegexCompiler {
                     } else
                         throw new RuntimeException("Cannot compile " + part);
                     sourceBuilder.appendln(")");
-                    sourceBuilder.appendln("\treturn SwitchEnum" + i + "." + entry.getKey() + ";");
+                    sourceBuilder.appendln("    return SwitchEnum" + i + "." + entry.getKey() + ";");
                 }
                 sourceBuilder.appendln("return null;");
                 sourceBuilder.unindent();
@@ -4404,7 +4415,7 @@ public class JavaTranspiler extends RegexCompiler {
         sourceBuilder.append("public ");
         sourceBuilder.append(className);
         sourceBuilder.appendln("(Global global) {");
-        sourceBuilder.appendln("\tsuper(global);");
+        sourceBuilder.appendln("    super(global);");
         sourceBuilder.appendln("}");
         
         sourceBuilder.append("public ");
@@ -4434,10 +4445,10 @@ public class JavaTranspiler extends RegexCompiler {
 
         if (generateMain) {
             sourceBuilder.appendln("public static void main(String[] args) {");
-            sourceBuilder.appendln("\tGlobal global = Utilities.createExtendedGlobal();");
-            sourceBuilder.appendln("\tScope scope = new Scope(global);");
-            sourceBuilder.appendln("\tscope.var(\"arguments\", Utilities.convertArguments(global, args));");
-            sourceBuilder.append("\tnew ");
+            sourceBuilder.appendln("    Global global = Utilities.createExtendedGlobal();");
+            sourceBuilder.appendln("    Scope scope = new Scope(global);");
+            sourceBuilder.appendln("    scope.var(\"arguments\", Utilities.convertArguments(global, args));");
+            sourceBuilder.append("    new ");
             sourceBuilder.append(className);
             sourceBuilder.appendln("().exec(global, scope);");
             sourceBuilder.appendln("}");

@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2016 NexusTools.
+ * Copyright (C) 2017 NexusTools.
  *
  * This library is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU Lesser General Public License as   
@@ -66,7 +66,7 @@ public class JavaClassWrapper extends AbstractFunction {
                 continue;
             }
 
-            //method.setAccessible(true);
+            method.setAccessible(true);
             List<Method> meths = methods.get(method.getName());
             if (meths == null) {
                 methods.put(method.getName(), meths = new ArrayList());
@@ -99,7 +99,7 @@ public class JavaClassWrapper extends AbstractFunction {
         }
 
         for (Constructor constructor : javaClass.getDeclaredConstructors()) {
-            //constructor.setAccessible(true);
+            constructor.setAccessible(true);
             List<Constructor> cons = constructors.get(constructor.getParameterCount());
             if (cons == null) {
                 constructors.put(constructor.getParameterCount(), cons = new ArrayList());
@@ -118,7 +118,7 @@ public class JavaClassWrapper extends AbstractFunction {
                 continue;
             }
 
-            //method.setAccessible(true);
+            method.setAccessible(true);
             List<Method> meths = methods.get(method.getName());
             if (meths == null) {
                 methods.put(method.getName(), meths = new ArrayList());
@@ -155,7 +155,7 @@ public class JavaClassWrapper extends AbstractFunction {
                 continue;
             }
 
-            //field.setAccessible(true);
+            field.setAccessible(true);
             prototype.defineProperty(field.getName(), new AbstractFunction(global) {
                 @Override
                 public BaseObject call(BaseObject _this, BaseObject... params) {
@@ -187,7 +187,7 @@ public class JavaClassWrapper extends AbstractFunction {
                 continue;
             }
 
-            //field.setAccessible(true);
+            field.setAccessible(true);
             defineProperty(field.getName(), new AbstractFunction(global) {
                 @Override
                 public BaseObject call(BaseObject _this, BaseObject... params) {
@@ -231,35 +231,31 @@ public class JavaClassWrapper extends AbstractFunction {
             Utilities.ConversionAccuracy convertAccuracy = new Utilities.ConversionAccuracy();
             java.lang.Object[] converted = new java.lang.Object[params.length];
             for (Constructor constructor : constructors.get(params.length)) {
-                again:
+                Class[] types = constructor.getParameterTypes();
+                if (DEBUG) {
+                    System.out.println(constructor);
+                }
                 while (true) {
                     float conversionAccuracy = 0;
-                    if (DEBUG) {
-                        System.out.println(constructor);
-                    }
-                    Class[] types = constructor.getParameterTypes();
                     for (int i = 0; i < params.length; i++) {
                         try {
+                            convertAccuracy.accuracy = 0;
                             converted[i] = Utilities.jsToJava(global, params[i], types[i], convertAccuracy);
-                            if (DEBUG) {
+                            if (DEBUG)
                                 System.out.println(types[i] + ": " + convertAccuracy.accuracy);
-                            }
+                            if(convertAccuracy.accuracy <= 0)
+                                throw new UnsupportedOperationException();
                             conversionAccuracy += convertAccuracy.accuracy;
                         } catch (UnsupportedOperationException ex) {
-                            if (DEBUG) {
-                                System.out.println(ex);
-                            }
-                            break again;
+                            conversionAccuracy = 0;
+                            break;
                         } catch (NumberFormatException ex) {
-                            break again;
+                            conversionAccuracy = 0;
+                            break;
                         }
                     }
 
                     if (conversionAccuracy > bestAccuracy) {
-                        if (DEBUG) {
-                            System.out.println(conversionAccuracy);
-                        }
-
                         bestConstructor = constructor;
                         bestConversion = converted;
                         bestAccuracy = conversionAccuracy;
@@ -307,32 +303,33 @@ public class JavaClassWrapper extends AbstractFunction {
             Utilities.ConversionAccuracy convertAccuracy = new Utilities.ConversionAccuracy();
             java.lang.Object[] converted = new java.lang.Object[params.length];
             for (Method method : byLength.get(params.length)) {
-                again:
+                Class[] types = method.getParameterTypes();
+                if(types.length != params.length)
+                    continue;
+                if (DEBUG) {
+                    System.out.println(method);
+                }
                 while (true) {
                     float conversionAccuracy = 0;
-                    if (DEBUG) {
-                        System.out.println(method);
-                    }
-                    Class[] types = method.getParameterTypes();
                     for (int i = 0; i < params.length; i++) {
                         try {
+                            convertAccuracy.accuracy = 0;
                             converted[i] = Utilities.jsToJava(global, params[i], types[i], convertAccuracy);
+                            if(DEBUG)
+                                System.out.println(converted[i] + ": " + convertAccuracy.accuracy);
+                            if(convertAccuracy.accuracy <= 0)
+                                throw new UnsupportedOperationException();
                             conversionAccuracy += convertAccuracy.accuracy;
                         } catch (UnsupportedOperationException ex) {
-                            if (DEBUG) {
-                                System.out.println(ex);
-                            }
-                            break again;
+                            conversionAccuracy = 0;
+                            break;
                         } catch (NumberFormatException ex) {
-                            break again;
+                            conversionAccuracy = 0;
+                            break;
                         }
                     }
 
                     if (conversionAccuracy > bestAccuracy) {
-                        if (DEBUG) {
-                            System.out.println(conversionAccuracy);
-                        }
-
                         bestMethod = method;
                         bestConversion = converted;
                         bestAccuracy = conversionAccuracy;
@@ -347,26 +344,25 @@ public class JavaClassWrapper extends AbstractFunction {
             bestMethod = noParams.isEmpty() ? null : noParams.get(0);
         }
 
-        if (bestMethod != null) {
-            try {
-                return Utilities.javaToJS(global, bestMethod.invoke(__this, bestConversion));
-            } catch (IllegalAccessException ex) {
-                throw new Error.JavaException("JavaError", "Illegal access", ex);
-            } catch (IllegalArgumentException ex) {
-                throw new Error.JavaException("JavaError", "Illegal arguments", ex);
-            } catch (InvocationTargetException ex) {
-                Throwable target = ex.getTargetException();
-                if (target instanceof RuntimeException) {
-                    throw (RuntimeException) target;
-                }
-                if (target instanceof java.lang.Error) {
-                    throw (java.lang.Error) target;
-                }
-                throw new RuntimeException(ex);
+        if (bestMethod == null)
+            throw new Error.JavaException("JavaError", "Incompatible arguments");
+        
+        try {
+            return Utilities.javaToJS(global, bestMethod.invoke(__this, bestConversion));
+        } catch (IllegalAccessException ex) {
+            throw new Error.JavaException("JavaError", "Illegal access", ex);
+        } catch (IllegalArgumentException ex) {
+            throw new Error.JavaException("JavaError", "Illegal arguments", ex);
+        } catch (InvocationTargetException ex) {
+            Throwable target = ex.getTargetException();
+            if (target instanceof RuntimeException) {
+                throw (RuntimeException) target;
             }
+            if (target instanceof java.lang.Error) {
+                throw (java.lang.Error) target;
+            }
+            throw new RuntimeException(ex);
         }
-
-        throw new Error.JavaException("JavaError", "Incompatible arguments");
     }
 
     @Override
